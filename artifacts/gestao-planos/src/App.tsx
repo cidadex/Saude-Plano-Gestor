@@ -23,6 +23,7 @@ import VendedorPropostas from "@/pages/vendedor/propostas";
 import VendedorComissoes from "@/pages/vendedor/comissoes";
 import VendedorBoletos from "@/pages/vendedor/boletos";
 import VendedorCobranca from "@/pages/vendedor/cobranca";
+import VendedorPlanos from "@/pages/vendedor/planos";
 
 const queryClient = new QueryClient();
 
@@ -52,6 +53,7 @@ function VendedorRoutes() {
         <Route path="/vendedor/comissoes" component={VendedorComissoes} />
         <Route path="/vendedor/boletos" component={VendedorBoletos} />
         <Route path="/vendedor/cobranca" component={VendedorCobranca} />
+        <Route path="/vendedor/planos" component={VendedorPlanos} />
         <Route component={NotFound} />
       </Switch>
     </VendedorLayout>

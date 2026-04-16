@@ -7,7 +7,8 @@ import {
   LogOut,
   BellRing,
   ChevronRight,
-  Home
+  Home,
+  Shield
 } from "lucide-react";
 import { vendedorAtual } from "@/data/vendedores";
 
@@ -17,6 +18,7 @@ const rotulos: Record<string, string> = {
   '/vendedor/comissoes': 'Comissões',
   '/vendedor/boletos': 'Boletos',
   '/vendedor/cobranca': 'Cobrança',
+  '/vendedor/planos': 'Planos',
 };
 
 function Breadcrumb({ location }: { location: string }) {
@@ -39,6 +41,7 @@ export function VendedorLayout({ children }: { children: React.ReactNode }) {
   const navItems = [
     { href: "/vendedor", label: "Dashboard", icon: LayoutDashboard },
     { href: "/vendedor/propostas", label: "Propostas", icon: FileText },
+    { href: "/vendedor/planos", label: "Planos", icon: Shield },
     { href: "/vendedor/comissoes", label: "Comissões", icon: DollarSign },
     { href: "/vendedor/boletos", label: "Boletos", icon: Receipt },
     { href: "/vendedor/cobranca", label: "Cobrança", icon: BellRing },
