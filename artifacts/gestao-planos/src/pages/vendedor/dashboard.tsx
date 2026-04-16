@@ -1,10 +1,9 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { vendedorAtual } from "@/data/vendedores";
 import { getPropostasByVendedor } from "@/data/propostas";
-import { getTotalComissoesVendedor } from "@/data/comissoes";
+import { getTotalComissoesVendedor, getComissoesByVendedor } from "@/data/comissoes";
 import { getBoletosByVendedor } from "@/data/boletos";
 import { getClientesByVendedor } from "@/data/clientes";
 import { formatMoney, getStatusBadgeVariant } from "@/lib/format";
@@ -12,6 +11,7 @@ import { Link } from "wouter";
 import {
   FileText, DollarSign, Receipt, ArrowRight, Users,
   CheckCircle2, AlertCircle, Clock, UserCheck, TrendingUp,
+  CalendarDays, BadgeDollarSign, Wallet, MessageCircle,
 } from "lucide-react";
 
 function parseDataBR(data: string): Date | null {
@@ -30,6 +30,7 @@ export default function VendedorDashboard() {
   const meusBoletos = getBoletosByVendedor(vendedorAtual.nome);
   const meusClientes = getClientesByVendedor(vendedorAtual.nome);
   const comissoes = getTotalComissoesVendedor(vendedorAtual.nome);
+  const minhasComissoes = getComissoesByVendedor(vendedorAtual.nome);
 
   const totalTitulares = meusClientes.filter(c => c.tipo === 'TITULAR').length;
   const totalDependentes = meusClientes.filter(c => c.tipo === 'DEPENDENTE').length;
@@ -58,222 +59,221 @@ export default function VendedorDashboard() {
   }).length;
 
   const receitaCarteira = meusClientes.reduce((acc, c) => acc + c.valor, 0);
-  const propostasRecentes = propostas.slice(0, 5);
+  const saldoCarteira = meusClientes.reduce((acc, c) => acc + c.saldo, 0);
+  const comissaoPendente = minhasComissoes.filter(c => c.status === 'PENDENTE').reduce((a, c) => a + c.valor, 0);
 
-  const pctAdimplente = boletosMes.length > 0
-    ? Math.round((pgEmDia.length / boletosMes.length) * 100)
-    : 0;
+  const propostasRecentes = propostas.slice(0, 5);
+  const pctAdimplente = boletosMes.length > 0 ? Math.round((pgEmDia.length / boletosMes.length) * 100) : 0;
+
+  const clientesCobranca = meusClientes
+    .filter(c => boletosMes.some(b => b.clienteCpf === c.cpf && b.status === 'VENCIDO'))
+    .slice(0, 4);
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-2 pb-4 border-b">
-        <h2 className="text-3xl font-bold tracking-tight text-foreground">Olá, {vendedorAtual.nome}</h2>
-        <p className="text-muted-foreground">Painel de acompanhamento da sua carteira e resultados.</p>
+    <div className="space-y-7">
+      {/* Header */}
+      <div className="flex items-start justify-between pb-4 border-b">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Olá, {vendedorAtual.nome.split(' ')[0]} 👋</h2>
+          <p className="text-muted-foreground text-sm mt-0.5">Seu painel de resultados — Abril 2026</p>
+        </div>
+        <span className="text-xs bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full px-3 py-1 font-semibold">
+          {pctAdimplente}% adimplente
+        </span>
       </div>
 
-      {/* ── MINHA CARTEIRA ─────────────────────────────── */}
-      <section className="space-y-3">
-        <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Minha Carteira</h3>
+      {/* ── KPIs Minha Carteira ────────────────── */}
+      <section className="space-y-2.5">
+        <p className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-[0.12em]">Minha Carteira</p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card data-testid="metric-ativos-vendedor" className="border-l-4 border-l-emerald-500">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Ativo</CardTitle>
-              <Users className="h-4 w-4 text-emerald-500" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-3xl font-bold">{meusClientes.length}</div>
-              <p className="text-xs text-muted-foreground mt-1">Beneficiários ativos</p>
-            </CardContent>
-          </Card>
 
-          <Card className="border-l-4 border-l-blue-400">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Titulares</CardTitle>
-              <UserCheck className="h-4 w-4 text-blue-400" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-3xl font-bold">{totalTitulares}</div>
-              <p className="text-xs text-muted-foreground mt-1">{totalDependentes} dependente{totalDependentes !== 1 ? 's' : ''}</p>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="metric-receita-vendedor" className="border-l-4 border-l-primary">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Receita da Carteira</CardTitle>
-              <DollarSign className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-3xl font-bold text-primary">{formatMoney(receitaCarteira)}</div>
-              <p className="text-xs text-muted-foreground mt-1">Faturamento mensal</p>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="metric-comissoes-vendedor" className="border-l-4 border-l-amber-400">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Minhas Comissões</CardTitle>
-              <Receipt className="h-4 w-4 text-amber-500" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-3xl font-bold text-amber-600">{formatMoney(vendedorAtual.comissaoTotal)}</div>
-              <p className="text-xs text-muted-foreground mt-1">Histórico total</p>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* ── PAGAMENTOS ABRIL 2026 ──────────────────────── */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Pagamentos — Abril 2026</h3>
-          <Badge variant="outline" className="text-xs">{pctAdimplente}% adimplente</Badge>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Card className="border-l-4 border-l-emerald-500">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Pagamentos em Dia</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-2xl font-bold text-emerald-600">{formatMoney(totalPgEmDia)}</div>
-              <p className="text-xs text-muted-foreground mt-1">{pgEmDia.length} boleto{pgEmDia.length !== 1 ? 's' : ''} pagos</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-red-500">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Em Atraso</CardTitle>
-              <AlertCircle className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-2xl font-bold text-red-600">{formatMoney(totalPgEmAtraso)}</div>
-              <p className="text-xs text-muted-foreground mt-1">{pgEmAtraso.length} vencido{pgEmAtraso.length !== 1 ? 's' : ''}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-amber-400">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">A Vencer</CardTitle>
-              <Clock className="h-4 w-4 text-amber-500" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-2xl font-bold text-amber-600">{formatMoney(totalAVencer)}</div>
-              <p className="text-xs text-muted-foreground mt-1">{pgAVencer.length} pendente{pgAVencer.length !== 1 ? 's' : ''}</p>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* ── NOVAS VENDAS ──────────────────────────────── */}
-      <section className="space-y-3">
-        <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Minhas Ativações</h3>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Card className="border-l-4 border-l-violet-400">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Hoje</CardTitle>
-              <TrendingUp className="h-4 w-4 text-violet-500" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-3xl font-bold">{vendasHoje}</div>
-              <p className="text-xs text-muted-foreground mt-1">16/04/2026</p>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-violet-400">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Esta Semana</CardTitle>
-              <TrendingUp className="h-4 w-4 text-violet-500" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-3xl font-bold">{vendasSemana}</div>
-              <p className="text-xs text-muted-foreground mt-1">10/04 a 16/04</p>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-violet-400">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Este Mês</CardTitle>
-              <TrendingUp className="h-4 w-4 text-violet-500" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-3xl font-bold">{vendasMes}</div>
-              <p className="text-xs text-muted-foreground mt-1">Ativações em Abril</p>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* ── PROPOSTAS + FINANCEIRO ─────────────────────── */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="flex flex-col">
-          <CardHeader className="pb-3 border-b">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Propostas Recentes</CardTitle>
-                <CardDescription>Status das suas últimas vendas</CardDescription>
-              </div>
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/vendedor/propostas" className="flex items-center gap-1 text-xs">
-                  Ver todas <ArrowRight className="h-3 w-3" />
-                </Link>
-              </Button>
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 p-5 text-white shadow-lg shadow-emerald-900/20">
+            <div className="absolute right-3 top-3 opacity-20"><Users className="h-16 w-16" /></div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-200">Minha Carteira</p>
+            <p className="mt-2 text-5xl font-extrabold" data-testid="metric-ativos-vendedor">{meusClientes.length}</p>
+            <p className="mt-1.5 text-sm text-emerald-200">beneficiários ativos</p>
+            <div className="mt-3 flex gap-3 text-xs text-emerald-300 border-t border-emerald-500/50 pt-3">
+              <span className="flex items-center gap-1"><UserCheck className="h-3 w-3" />{totalTitulares} titular{totalTitulares !== 1 ? 'es' : ''}</span>
+              <span>·</span>
+              <span>{totalDependentes} depend.</span>
             </div>
-          </CardHeader>
-          <CardContent className="flex-1 p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Plano</TableHead>
-                  <TableHead className="text-right">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {propostasRecentes.map(prop => (
-                  <TableRow key={prop.id}>
-                    <TableCell className="font-medium">
-                      <div className="truncate max-w-[150px] text-sm" title={prop.clienteNome}>
-                        {prop.clienteNome}
-                      </div>
-                      <div className="text-xs text-muted-foreground">{prop.dataEnvio}</div>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{prop.codigoPlano || prop.plano}</TableCell>
-                    <TableCell className="text-right">
-                      <Badge variant="outline" className={getStatusBadgeVariant(prop.status)}>
-                        {prop.status.replace('_', ' ')}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card className="flex flex-col border-primary/20">
-          <CardHeader className="bg-primary/5 pb-3 border-b">
-            <CardTitle className="text-primary flex items-center gap-2 text-base">
-              <DollarSign className="h-5 w-5" /> Resumo de Comissões
-            </CardTitle>
-            <CardDescription>Acompanhamento de repasses</CardDescription>
-          </CardHeader>
-          <CardContent className="p-5 space-y-4">
-            <div className="space-y-3">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Agenciamento (Venda)</span>
-                <span className="font-semibold">{formatMoney(comissoes.venda)}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Serviço (Vitalícia)</span>
-                <span className="font-semibold">{formatMoney(comissoes.servico)}</span>
-              </div>
-              <div className="pt-3 border-t flex justify-between items-center font-bold">
-                <span>Total Acumulado</span>
-                <span className="text-primary text-lg">{formatMoney(vendedorAtual.comissaoTotal)}</span>
-              </div>
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 p-5 text-white shadow-lg shadow-blue-900/20">
+            <div className="absolute right-3 top-3 opacity-20"><DollarSign className="h-16 w-16" /></div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-blue-200">Receita da Carteira</p>
+            <p className="mt-2 text-3xl font-extrabold leading-tight" data-testid="metric-receita-vendedor">{formatMoney(receitaCarteira)}</p>
+            <p className="mt-1.5 text-sm text-blue-200">faturamento mensal</p>
+            <div className="mt-3 text-xs text-blue-300 border-t border-blue-500/50 pt-3">
+              Saldo corretora: <span className="font-bold text-white">{formatMoney(saldoCarteira)}</span>
             </div>
-            <Button className="w-full" asChild>
-              <Link href="/vendedor/comissoes">Ver Extrato Completo</Link>
+          </div>
+
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 p-5 text-white shadow-lg shadow-amber-900/20">
+            <div className="absolute right-3 top-3 opacity-20"><Receipt className="h-16 w-16" /></div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-amber-200">Comissão a Receber</p>
+            <p className="mt-2 text-3xl font-extrabold leading-tight" data-testid="metric-comissoes-vendedor">{formatMoney(comissaoPendente)}</p>
+            <p className="mt-1.5 text-sm text-amber-200">pendente de repasse</p>
+            <div className="mt-3 text-xs text-amber-300 border-t border-amber-500/50 pt-3">
+              Total histórico: <span className="font-bold text-white">{formatMoney(vendedorAtual.comissaoTotal)}</span>
+            </div>
+          </div>
+
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-violet-600 to-purple-700 p-5 text-white shadow-lg shadow-violet-900/20">
+            <div className="absolute right-3 top-3 opacity-20"><TrendingUp className="h-16 w-16" /></div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-violet-200">Ativações Abril</p>
+            <p className="mt-2 text-5xl font-extrabold">{vendasMes}</p>
+            <p className="mt-1.5 text-sm text-violet-200">novos clientes este mês</p>
+            <div className="mt-3 flex gap-3 text-xs text-violet-300 border-t border-violet-500/50 pt-3">
+              <span>Semana: {vendasSemana}</span>
+              <span>·</span>
+              <span>Hoje: {vendasHoje}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Pagamentos ─────────────────────────────── */}
+      <section className="space-y-2.5">
+        <p className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-[0.12em]">Pagamentos — Abril 2026</p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="rounded-xl border bg-card p-5 flex gap-4 items-center shadow-sm">
+            <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Pagos em Dia</p>
+              <p className="text-2xl font-bold text-emerald-600 mt-0.5">{formatMoney(totalPgEmDia)}</p>
+              <p className="text-xs text-muted-foreground">{pgEmDia.length} boleto{pgEmDia.length !== 1 ? 's' : ''} confirmados</p>
+            </div>
+          </div>
+          <div className="rounded-xl border bg-card p-5 flex gap-4 items-center shadow-sm">
+            <div className="w-12 h-12 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
+              <AlertCircle className="h-6 w-6 text-red-600" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Em Atraso</p>
+              <p className="text-2xl font-bold text-red-600 mt-0.5">{formatMoney(totalPgEmAtraso)}</p>
+              <p className="text-xs text-muted-foreground">{pgEmAtraso.length} boleto{pgEmAtraso.length !== 1 ? 's' : ''} vencido{pgEmAtraso.length !== 1 ? 's' : ''}</p>
+            </div>
+          </div>
+          <div className="rounded-xl border bg-card p-5 flex gap-4 items-center shadow-sm">
+            <div className="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+              <Clock className="h-6 w-6 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">A Vencer</p>
+              <p className="text-2xl font-bold text-amber-600 mt-0.5">{formatMoney(totalAVencer)}</p>
+              <p className="text-xs text-muted-foreground">{pgAVencer.length} boleto{pgAVencer.length !== 1 ? 's' : ''} pendente{pgAVencer.length !== 1 ? 's' : ''}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Propostas + Cobrança ───────────────────── */}
+      <div className="grid gap-5 lg:grid-cols-2">
+
+        {/* Propostas recentes */}
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-primary" />
+              <span className="font-semibold text-sm">Propostas Recentes</span>
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/vendedor/propostas" className="flex items-center gap-1 text-xs">
+                Ver todas <ArrowRight className="h-3 w-3" />
+              </Link>
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30 hover:bg-muted/30">
+                <TableHead className="text-xs">Cliente</TableHead>
+                <TableHead className="text-xs">Plano</TableHead>
+                <TableHead className="text-right text-xs">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {propostasRecentes.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center text-muted-foreground py-6 text-sm">
+                    Nenhuma proposta encontrada.
+                  </TableCell>
+                </TableRow>
+              ) : propostasRecentes.map(prop => (
+                <TableRow key={prop.id}>
+                  <TableCell>
+                    <div className="font-medium text-sm truncate max-w-[140px]">{prop.clienteNome}</div>
+                    <div className="text-xs text-muted-foreground">{prop.dataEnvio}</div>
+                  </TableCell>
+                  <TableCell className="text-xs font-mono text-muted-foreground">{prop.plano}</TableCell>
+                  <TableCell className="text-right">
+                    <Badge variant="outline" className={`text-xs ${getStatusBadgeVariant(prop.status)}`}>
+                      {prop.status.replace('_', ' ')}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Comissões + atalhos */}
+        <div className="space-y-4">
+          {/* Resumo comissões */}
+          <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BadgeDollarSign className="h-4 w-4 text-amber-600" />
+                <span className="font-semibold text-sm">Comissões</span>
+              </div>
+              <Link href="/vendedor/comissoes" className="text-xs text-primary hover:underline flex items-center gap-1">
+                Ver extrato <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Agenciamento (Venda)</span>
+                <span className="font-semibold text-blue-600">{formatMoney(comissoes.venda)}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Serviço (Vitalícia/mês)</span>
+                <span className="font-semibold text-violet-600">{formatMoney(comissoes.servico)}</span>
+              </div>
+              <div className="pt-3 border-t flex items-center justify-between font-bold">
+                <span className="text-sm">Total Acumulado</span>
+                <span className="text-lg text-amber-600">{formatMoney(vendedorAtual.comissaoTotal)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Atalhos */}
+          <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+            <div className="px-5 py-3.5 border-b">
+              <span className="font-semibold text-sm">Acesso Rápido</span>
+            </div>
+            <div className="p-2 space-y-1">
+              {[
+                { href: '/vendedor/carteira', label: 'Minha Carteira', sub: `${meusClientes.length} clientes ativos`, icon: Users, color: 'text-emerald-600 bg-emerald-50' },
+                { href: '/vendedor/boletos', label: 'Boletos', sub: `${pgAVencer.length} pendentes neste mês`, icon: Receipt, color: 'text-blue-600 bg-blue-50' },
+                { href: '/vendedor/cobranca', label: 'Cobrança', sub: `${pgEmAtraso.length} inadimplente${pgEmAtraso.length !== 1 ? 's' : ''}`, icon: MessageCircle, color: 'text-red-600 bg-red-50' },
+                { href: '/vendedor/propostas', label: 'Propostas', sub: `${propostas.length} proposta${propostas.length !== 1 ? 's' : ''}`, icon: FileText, color: 'text-violet-600 bg-violet-50' },
+              ].map(item => (
+                <Link key={item.href} href={item.href} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-muted/60 transition-colors group">
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${item.color}`}>
+                    <item.icon className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium leading-none">{item.label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{item.sub}</p>
+                  </div>
+                  <ArrowRight className="h-3 w-3 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

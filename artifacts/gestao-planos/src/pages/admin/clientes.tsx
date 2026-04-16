@@ -285,47 +285,63 @@ export default function AdminClientes() {
                         <TableRow className="bg-muted/20 hover:bg-muted/20">
                           <TableCell colSpan={8} className="p-0">
                             <div className="px-6 py-4 border-b">
-                              <div className="grid md:grid-cols-4 gap-x-6 gap-y-2 text-sm mb-4">
+                              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 text-sm mb-4">
                                 {/* Coluna 1 — Identificação */}
                                 <div className="space-y-1.5">
-                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Identificação</p>
-                                  <p><span className="text-muted-foreground">Código:</span> <span className="font-mono">{cliente.codigo}</span></p>
-                                  <p><span className="text-muted-foreground">Nasc.:</span> {cliente.dataNascimento} ({cliente.idade} anos)</p>
-                                  <p><span className="text-muted-foreground">Tipo:</span>{' '}
-                                    <span className={cliente.tipo === 'TITULAR' ? 'font-semibold text-blue-600' : 'font-semibold text-purple-600'}>
-                                      {cliente.tipo}
-                                    </span>
-                                  </p>
+                                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 pb-1 border-b">Identificação</p>
+                                  <p><span className="text-muted-foreground">Código:</span> <span className="font-mono text-xs bg-muted px-1 rounded">{cliente.codigo}</span></p>
+                                  <p><span className="text-muted-foreground">Nasc.:</span> {cliente.dataNascimento} <span className="text-muted-foreground">({cliente.idade} anos)</span></p>
+                                  {cliente.sexo && <p><span className="text-muted-foreground">Sexo:</span> <span className="font-medium">{cliente.sexo === 'M' ? 'Masculino' : 'Feminino'}</span></p>}
                                   <p><span className="text-muted-foreground">Ativação:</span> {cliente.dataAtivacao}</p>
+                                  {cliente.tipo === 'DEPENDENTE' && (
+                                    <>
+                                      <p><span className="text-muted-foreground">Vínculo:</span> <span className="font-semibold text-purple-600">{cliente.grauParentesco || 'Dependente'}</span></p>
+                                      {cliente.titularNome && <p><span className="text-muted-foreground">Titular:</span> <span className="font-medium">{cliente.titularNome}</span></p>}
+                                      {cliente.titularCpf && <p><span className="text-muted-foreground">CPF Titular:</span> <span className="font-mono text-xs">{cliente.titularCpf}</span></p>}
+                                    </>
+                                  )}
                                 </div>
 
                                 {/* Coluna 2 — Contato */}
                                 <div className="space-y-1.5">
-                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Contato & Localização</p>
-                                  <p><span className="text-muted-foreground">Telefone:</span> {display.telefone || <span className="italic text-muted-foreground/70">Não informado</span>}</p>
-                                  <p><span className="text-muted-foreground">Cidade/UF:</span> {display.cidade}/{display.estado}</p>
+                                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 pb-1 border-b">Contato & Endereço</p>
+                                  <p><span className="text-muted-foreground">Telefone:</span> {display.telefone || <span className="italic text-muted-foreground/70">—</span>}</p>
+                                  {cliente.email && <p><span className="text-muted-foreground">E-mail:</span> <span className="text-xs">{cliente.email}</span></p>}
+                                  {cliente.cep && <p><span className="text-muted-foreground">CEP:</span> <span className="font-mono text-xs">{cliente.cep}</span></p>}
+                                  {cliente.logradouro && (
+                                    <p><span className="text-muted-foreground">Logradouro:</span> {cliente.logradouro}{cliente.numero ? `, ${cliente.numero}` : ''}</p>
+                                  )}
+                                  {cliente.complemento && <p><span className="text-muted-foreground">Compl.:</span> {cliente.complemento}</p>}
                                   <p><span className="text-muted-foreground">Bairro:</span> {display.bairro || '—'}</p>
+                                  <p><span className="text-muted-foreground">Cidade/UF:</span> {display.cidade}/{display.estado}</p>
                                 </div>
 
                                 {/* Coluna 3 — Plano */}
                                 <div className="space-y-1.5">
-                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Plano & Valores</p>
+                                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 pb-1 border-b">Plano & Contrato</p>
+                                  <p><span className="text-muted-foreground">Plano:</span> <span className="font-semibold">{cliente.plano}</span></p>
                                   <p><span className="text-muted-foreground">Código Plano:</span> <span className="font-mono text-xs">{cliente.codigoPlano}</span></p>
-                                  <p><span className="text-muted-foreground">Vr. Plano 2025:</span> {formatMoney(cliente.vrPl)}</p>
-                                  <p><span className="text-muted-foreground">Vr. 2026:</span> <span className="font-semibold">{formatMoney(cliente.valor2026)}</span></p>
-                                  <p><span className="text-muted-foreground">Saldo:</span> {formatMoney(cliente.saldo)}</p>
+                                  {cliente.matricula && <p><span className="text-muted-foreground">Carteirinha:</span> <span className="font-mono text-xs">{cliente.matricula}</span></p>}
+                                  <p><span className="text-muted-foreground">Pagamento:</span> {cliente.formaPagamento}</p>
+                                  <p><span className="text-muted-foreground">Vencimento:</span> <span className="font-medium">Dia {cliente.vencimento}</span></p>
+                                  <p><span className="text-muted-foreground">Representante:</span> {cliente.representante || cliente.responsavel}</p>
                                 </div>
 
-                                {/* Coluna 4 — Observações */}
+                                {/* Coluna 4 — Financeiro */}
                                 <div className="space-y-1.5">
-                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Observações</p>
-                                  {display.observacao
-                                    ? <p className="text-amber-600 font-medium leading-relaxed">{display.observacao}</p>
-                                    : <p className="text-muted-foreground/60 italic">Sem observações</p>
-                                  }
+                                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 pb-1 border-b">Financeiro</p>
+                                  <p><span className="text-muted-foreground">Valor 2025:</span> {formatMoney(cliente.vrPl)}</p>
+                                  <p><span className="text-muted-foreground">Valor 2026:</span> <span className="font-semibold">{formatMoney(cliente.valor2026)}</span></p>
+                                  <p><span className="text-muted-foreground">Saldo Corretora:</span> <span className="font-semibold text-emerald-600">{formatMoney(cliente.saldo)}</span></p>
                                   {cliente.comissao > 0 && (
-                                    <p className="mt-2"><span className="text-muted-foreground">Comissão:</span> <span className="font-semibold text-emerald-600">R$ {cliente.comissao.toFixed(2)}</span></p>
+                                    <p><span className="text-muted-foreground">Comissão:</span> <span className="font-semibold text-amber-600">{formatMoney(cliente.comissao)}</span></p>
                                   )}
+                                  {display.observacao ? (
+                                    <div className="mt-2 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                                      <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide mb-1">Observação</p>
+                                      <p className="text-xs text-amber-700 font-medium">{display.observacao}</p>
+                                    </div>
+                                  ) : null}
                                 </div>
                               </div>
 

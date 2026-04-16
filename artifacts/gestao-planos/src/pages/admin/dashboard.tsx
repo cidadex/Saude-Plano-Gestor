@@ -1,5 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Link } from "wouter";
 import { clientesAtivos } from "@/data/clientes";
 import { clientesCancelados } from "@/data/cancelados";
 import { comissoes } from "@/data/comissoes";
@@ -7,12 +6,13 @@ import { boletos } from "@/data/boletos";
 import { vendedores } from "@/data/vendedores";
 import { formatMoney } from "@/lib/format";
 import {
-  Users, UserMinus, DollarSign, Wallet, TrendingUp,
-  CheckCircle2, AlertCircle, Clock, CalendarDays, UserCheck, UserX,
+  Users, UserX, DollarSign, Wallet, TrendingUp, CheckCircle2,
+  AlertCircle, Clock, CalendarDays, UserCheck, ArrowRight,
+  BadgeDollarSign, BarChart3, Banknote,
 } from "lucide-react";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
-  Tooltip as RechartsTooltip, Legend,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  ResponsiveContainer, Tooltip as RechartsTooltip, Legend,
 } from "recharts";
 
 function parseDataBR(data: string): Date | null {
@@ -29,9 +29,9 @@ const MES_ATUAL_NUM = 3;
 const ANO_ATUAL = 2026;
 
 const mesesLabels: Record<string, string> = {
-  '09/2025': 'Set 25', '10/2025': 'Out 25', '11/2025': 'Nov 25',
-  '12/2025': 'Dez 25', '01/2026': 'Jan 26', '02/2026': 'Fev 26',
-  '03/2026': 'Mar 26', '04/2026': 'Abr 26',
+  '09/2025': 'Set', '10/2025': 'Out', '11/2025': 'Nov',
+  '12/2025': 'Dez', '01/2026': 'Jan', '02/2026': 'Fev',
+  '03/2026': 'Mar', '04/2026': 'Abr',
 };
 
 export default function AdminDashboard() {
@@ -41,6 +41,7 @@ export default function AdminDashboard() {
   const totalCancelados = clientesCancelados.length;
 
   const receitaMensal = clientesAtivos.reduce((acc, c) => acc + c.valor, 0);
+  const saldoTotal = clientesAtivos.reduce((acc, c) => acc + c.saldo, 0);
 
   const boletosMes = boletos.filter(b => b.mesReferencia === '04/2026');
   const pgEmDia = boletosMes.filter(b => b.status === 'PAGO');
@@ -69,215 +70,298 @@ export default function AdminDashboard() {
     .filter(c => c.status === 'PENDENTE')
     .reduce((acc, c) => acc + c.valor, 0);
 
+  const pctAdimplente = boletosMes.length > 0
+    ? Math.round((pgEmDia.length / boletosMes.length) * 100)
+    : 0;
+
   const ativacoesData = Object.entries(mesesLabels).map(([mes, label]) => {
     const [m, y] = mes.split('/');
     const count = clientesAtivos.filter(c => {
       const d = parseDataBR(c.dataAtivacao);
       return d && d.getMonth() === Number(m) - 1 && d.getFullYear() === Number(y);
     }).length;
-    return { name: label, Ativações: count };
+    const canceladosMes = clientesCancelados.filter(c => {
+      if (!c.dataCancelamento) return false;
+      const [cm, cy] = c.dataCancelamento.split('/');
+      return cm === m && cy === y;
+    }).length;
+    return { name: label, Ativações: count, Cancelamentos: canceladosMes };
   });
 
-  const vendedoresData = vendedores
-    .map(v => ({ name: v.nome, Ativos: v.totalAtivos, Cancelados: v.totalCancelados }))
-    .sort((a, b) => b.Ativos - a.Ativos)
-    .slice(0, 8);
+  const pagamentosData = [
+    { name: 'Pagos', valor: totalPgEmDia, qtd: pgEmDia.length, cor: '#10b981' },
+    { name: 'A Vencer', valor: totalAVencer, qtd: pgAVencer.length, cor: '#f59e0b' },
+    { name: 'Vencidos', valor: totalPgEmAtraso, qtd: pgEmAtraso.length, cor: '#ef4444' },
+  ];
 
-  const pctAdimplente = boletosMes.length > 0
-    ? Math.round((pgEmDia.length / boletosMes.length) * 100)
-    : 0;
+  const topVendedores = vendedores
+    .map(v => {
+      const receita = clientesAtivos
+        .filter(c => c.representante.toUpperCase() === v.nome.toUpperCase() || c.responsavel.toUpperCase() === v.nome.toUpperCase())
+        .reduce((a, c) => a + c.valor, 0);
+      return { nome: v.nome, ativos: v.totalAtivos, receita };
+    })
+    .sort((a, b) => b.receita - a.receita)
+    .slice(0, 5);
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-2 pb-4 border-b">
-        <h2 className="text-3xl font-bold tracking-tight text-foreground">Dashboard Geral</h2>
-        <p className="text-muted-foreground">Visão panorâmica da corretora — carteira, faturamento e vendas.</p>
+    <div className="space-y-7">
+      {/* Header */}
+      <div className="flex items-start justify-between pb-4 border-b">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+          <p className="text-muted-foreground text-sm mt-0.5">Visão geral da corretora — Abril 2026</p>
+        </div>
+        <span className="text-xs bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full px-3 py-1 font-semibold">
+          {pctAdimplente}% adimplente
+        </span>
       </div>
 
-      {/* ── CARTEIRA ──────────────────────────────────── */}
-      <section className="space-y-3">
-        <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Carteira de Beneficiários</h3>
+      {/* ── LINHA 1: KPIs Carteira ───────────────────── */}
+      <section className="space-y-2.5">
+        <p className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-[0.12em]">Carteira de Beneficiários</p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card data-testid="metric-ativos" className="border-l-4 border-l-emerald-500">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Ativos</CardTitle>
-              <Users className="h-4 w-4 text-emerald-500" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-3xl font-bold text-foreground">{totalAtivos}</div>
-              <p className="text-xs text-muted-foreground mt-1">Beneficiários na carteira</p>
-            </CardContent>
-          </Card>
 
-          <Card className="border-l-4 border-l-blue-500">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Titulares</CardTitle>
-              <UserCheck className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-3xl font-bold text-foreground">{totalTitulares}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {totalDependentes} dependente{totalDependentes !== 1 ? 's' : ''}
-              </p>
-            </CardContent>
-          </Card>
+          {/* Total Ativos */}
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-600 to-blue-700 p-5 text-white shadow-lg shadow-blue-900/20">
+            <div className="absolute right-3 top-3 opacity-20">
+              <Users className="h-16 w-16" />
+            </div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-blue-200">Total Ativos</p>
+            <p className="mt-2 text-5xl font-extrabold" data-testid="metric-ativos">{totalAtivos}</p>
+            <p className="mt-1.5 text-sm text-blue-200">beneficiários na carteira</p>
+            <div className="mt-3 flex gap-3 text-xs text-blue-300 border-t border-blue-500/50 pt-3">
+              <span className="flex items-center gap-1"><UserCheck className="h-3 w-3" />{totalTitulares} titulares</span>
+              <span>·</span>
+              <span>{totalDependentes} depend.</span>
+            </div>
+          </div>
 
-          <Card data-testid="metric-cancelados" className="border-l-4 border-l-red-400">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Cancelamentos</CardTitle>
-              <UserX className="h-4 w-4 text-red-400" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-3xl font-bold text-red-600">{totalCancelados}</div>
-              <p className="text-xs text-muted-foreground mt-1">Histórico total</p>
-            </CardContent>
-          </Card>
+          {/* Receita Mensal */}
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 p-5 text-white shadow-lg shadow-emerald-900/20">
+            <div className="absolute right-3 top-3 opacity-20">
+              <DollarSign className="h-16 w-16" />
+            </div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-200">Receita Mensal</p>
+            <p className="mt-2 text-3xl font-extrabold leading-tight" data-testid="metric-receita">{formatMoney(receitaMensal)}</p>
+            <p className="mt-1.5 text-sm text-emerald-200">soma dos contratos ativos</p>
+            <div className="mt-3 flex gap-3 text-xs text-emerald-300 border-t border-emerald-500/50 pt-3">
+              <span>Saldo corretora: <span className="font-bold text-white">{formatMoney(saldoTotal)}</span></span>
+            </div>
+          </div>
 
-          <Card data-testid="metric-comissoes" className="border-l-4 border-l-amber-400">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Comissões a Pagar</CardTitle>
-              <Wallet className="h-4 w-4 text-amber-500" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-3xl font-bold text-amber-600">{formatMoney(comissoesAbertas)}</div>
-              <p className="text-xs text-muted-foreground mt-1">Pendentes de repasse</p>
-            </CardContent>
-          </Card>
+          {/* Cancelados */}
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-red-500 to-rose-600 p-5 text-white shadow-lg shadow-red-900/20">
+            <div className="absolute right-3 top-3 opacity-20">
+              <UserX className="h-16 w-16" />
+            </div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-red-200">Cancelados</p>
+            <p className="mt-2 text-5xl font-extrabold" data-testid="metric-cancelados">{totalCancelados}</p>
+            <p className="mt-1.5 text-sm text-red-200">histórico de cancelamentos</p>
+            <div className="mt-3 flex gap-3 text-xs text-red-300 border-t border-red-500/50 pt-3">
+              <span>{clientesCancelados.filter(c => c.debitoTotal && c.debitoTotal > 0).length} com débito pendente</span>
+            </div>
+          </div>
+
+          {/* Comissões */}
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 p-5 text-white shadow-lg shadow-amber-900/20">
+            <div className="absolute right-3 top-3 opacity-20">
+              <Wallet className="h-16 w-16" />
+            </div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-amber-200">Comissões a Pagar</p>
+            <p className="mt-2 text-3xl font-extrabold leading-tight" data-testid="metric-comissoes">{formatMoney(comissoesAbertas)}</p>
+            <p className="mt-1.5 text-sm text-amber-200">pendentes de repasse</p>
+            <div className="mt-3 text-xs text-amber-300 border-t border-amber-500/50 pt-3">
+              <Link href="/admin/comissoes" className="flex items-center gap-1 hover:text-white transition-colors">
+                Ver extrato <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* ── FATURAMENTO MÊS ATUAL ─────────────────────── */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Faturamento — Abril 2026</h3>
-          <Badge variant="outline" className="text-xs">
-            {pctAdimplente}% adimplente
-          </Badge>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card data-testid="metric-receita" className="border-l-4 border-l-primary">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Receita Mensal</CardTitle>
-              <DollarSign className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-3xl font-bold text-primary">{formatMoney(receitaMensal)}</div>
-              <p className="text-xs text-muted-foreground mt-1">Soma carteira ativa</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-emerald-500">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Pagamentos em Dia</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-3xl font-bold text-emerald-600">{formatMoney(totalPgEmDia)}</div>
-              <p className="text-xs text-muted-foreground mt-1">{pgEmDia.length} boleto{pgEmDia.length !== 1 ? 's' : ''} pagos</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-red-500">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Pagamentos em Atraso</CardTitle>
-              <AlertCircle className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-3xl font-bold text-red-600">{formatMoney(totalPgEmAtraso)}</div>
-              <p className="text-xs text-muted-foreground mt-1">{pgEmAtraso.length} boleto{pgEmAtraso.length !== 1 ? 's' : ''} vencido{pgEmAtraso.length !== 1 ? 's' : ''}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-amber-400">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">A Vencer</CardTitle>
-              <Clock className="h-4 w-4 text-amber-500" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-3xl font-bold text-amber-600">{formatMoney(totalAVencer)}</div>
-              <p className="text-xs text-muted-foreground mt-1">{pgAVencer.length} boleto{pgAVencer.length !== 1 ? 's' : ''} pendente{pgAVencer.length !== 1 ? 's' : ''}</p>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* ── NOVAS VENDAS ─────────────────────────────── */}
-      <section className="space-y-3">
-        <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Novas Ativações</h3>
+      {/* ── LINHA 2: Pagamentos Abril ─────────────────── */}
+      <section className="space-y-2.5">
+        <p className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-[0.12em]">Pagamentos — Abril 2026</p>
         <div className="grid gap-4 sm:grid-cols-3">
-          <Card className="border-l-4 border-l-violet-400">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Hoje</CardTitle>
-              <CalendarDays className="h-4 w-4 text-violet-500" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-3xl font-bold text-foreground">{vendasHoje}</div>
-              <p className="text-xs text-muted-foreground mt-1">Ativações em 16/04/2026</p>
-            </CardContent>
-          </Card>
 
-          <Card className="border-l-4 border-l-violet-400">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Esta Semana</CardTitle>
-              <TrendingUp className="h-4 w-4 text-violet-500" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-3xl font-bold text-foreground">{vendasSemana}</div>
-              <p className="text-xs text-muted-foreground mt-1">10/04 a 16/04/2026</p>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border bg-card p-5 flex gap-4 items-center shadow-sm">
+            <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Pagos em Dia</p>
+              <p className="text-2xl font-bold text-emerald-600 mt-0.5">{formatMoney(totalPgEmDia)}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{pgEmDia.length} boleto{pgEmDia.length !== 1 ? 's' : ''} confirmados</p>
+            </div>
+          </div>
 
-          <Card className="border-l-4 border-l-violet-400">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Este Mês</CardTitle>
-              <UserMinus className="h-4 w-4 text-violet-500" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-3xl font-bold text-foreground">{vendasMes}</div>
-              <p className="text-xs text-muted-foreground mt-1">Ativações em Abril 2026</p>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border bg-card p-5 flex gap-4 items-center shadow-sm">
+            <div className="w-12 h-12 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
+              <AlertCircle className="h-6 w-6 text-red-600" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Em Atraso</p>
+              <p className="text-2xl font-bold text-red-600 mt-0.5">{formatMoney(totalPgEmAtraso)}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{pgEmAtraso.length} boleto{pgEmAtraso.length !== 1 ? 's' : ''} vencido{pgEmAtraso.length !== 1 ? 's' : ''}</p>
+            </div>
+          </div>
+
+          <div className="rounded-xl border bg-card p-5 flex gap-4 items-center shadow-sm">
+            <div className="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+              <Clock className="h-6 w-6 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">A Vencer</p>
+              <p className="text-2xl font-bold text-amber-600 mt-0.5">{formatMoney(totalAVencer)}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{pgAVencer.length} boleto{pgAVencer.length !== 1 ? 's' : ''} pendente{pgAVencer.length !== 1 ? 's' : ''}</p>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* ── GRÁFICOS ─────────────────────────────────── */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card data-testid="chart-ativacoes">
-          <CardHeader className="pb-2 border-b">
-            <CardTitle className="text-base">Ativações por Mês</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4 h-[280px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={ativacoesData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" fontSize={12} />
-                <YAxis fontSize={12} allowDecimals={false} />
-                <RechartsTooltip />
-                <Bar dataKey="Ativações" fill="#6366f1" radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      {/* ── LINHA 3: Novas Ativações ─────────────────── */}
+      <section className="space-y-2.5">
+        <p className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-[0.12em]">Novas Ativações</p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {[
+            { label: 'Hoje', value: vendasHoje, sub: '16/04/2026', icon: CalendarDays, color: 'violet' },
+            { label: 'Esta Semana', value: vendasSemana, sub: '10/04 — 16/04', icon: TrendingUp, color: 'violet' },
+            { label: 'Abril 2026', value: vendasMes, sub: 'ativações no mês', icon: BadgeDollarSign, color: 'violet' },
+          ].map(item => (
+            <div key={item.label} className="rounded-xl border bg-card p-5 flex gap-4 items-center shadow-sm">
+              <div className="w-12 h-12 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
+                <item.icon className="h-6 w-6 text-violet-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">{item.label}</p>
+                <p className="text-4xl font-extrabold text-foreground mt-0.5">{item.value}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{item.sub}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
-        <Card data-testid="chart-vendedores">
-          <CardHeader className="pb-2 border-b">
-            <CardTitle className="text-base">Ativos vs Cancelados por Vendedor</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4 h-[280px]">
+      {/* ── LINHA 4: Gráficos ─────────────────────────── */}
+      <section className="grid gap-5 lg:grid-cols-3">
+        {/* Gráfico ativações */}
+        <div className="lg:col-span-2 rounded-xl border bg-card shadow-sm overflow-hidden" data-testid="chart-ativacoes">
+          <div className="px-5 py-4 border-b flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-primary" />
+            <span className="font-semibold text-sm">Ativações × Cancelamentos por Mês</span>
+          </div>
+          <div className="p-4 h-[240px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={vendedoresData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" fontSize={11} />
-                <YAxis fontSize={11} allowDecimals={false} />
-                <RechartsTooltip />
+              <BarChart data={ativacoesData} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="name" fontSize={11} tick={{ fill: 'var(--muted-foreground)' }} />
+                <YAxis fontSize={11} tick={{ fill: 'var(--muted-foreground)' }} allowDecimals={false} />
+                <RechartsTooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8 }} />
                 <Legend />
-                <Bar dataKey="Ativos" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="Cancelados" stackId="a" fill="#ef4444" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="Ativações" fill="#6366f1" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="Cancelamentos" fill="#f87171" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
+
+        {/* Top Vendedores */}
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden" data-testid="chart-vendedores">
+          <div className="px-5 py-4 border-b flex items-center gap-2">
+            <Users className="h-4 w-4 text-primary" />
+            <span className="font-semibold text-sm">Top Vendedores</span>
+          </div>
+          <div className="p-4 space-y-3">
+            {topVendedores.map((v, i) => {
+              const max = topVendedores[0]?.receita || 1;
+              const pct = Math.round((v.receita / max) * 100);
+              return (
+                <div key={v.nome} className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${
+                        i === 0 ? 'bg-amber-500' : i === 1 ? 'bg-slate-400' : 'bg-amber-700'
+                      }`}>{i + 1}</span>
+                      <span className="font-medium text-xs truncate max-w-[100px]">{v.nome}</span>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-bold">{formatMoney(v.receita)}</p>
+                      <p className="text-[10px] text-muted-foreground">{v.ativos} ativos</p>
+                    </div>
+                  </div>
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${i === 0 ? 'bg-primary' : 'bg-primary/40'}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ── LINHA 5: Distribuição de Pagamentos ─────── */}
+      <section className="grid gap-5 lg:grid-cols-3">
+        <div className="lg:col-span-2 rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b flex items-center gap-2">
+            <Banknote className="h-4 w-4 text-primary" />
+            <span className="font-semibold text-sm">Distribuição de Cobrança — Abril 2026</span>
+          </div>
+          <div className="p-4 flex gap-4 items-center">
+            <div className="flex-1 space-y-3">
+              {pagamentosData.map(p => (
+                <div key={p.name} className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground text-xs font-medium">{p.name}</span>
+                    <span className="font-bold text-sm">{formatMoney(p.valor)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${(p.valor / receitaMensal) * 100}%`,
+                          background: p.cor,
+                        }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground w-12 text-right">{p.qtd} bol.</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Atalhos rápidos */}
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b">
+            <span className="font-semibold text-sm">Acesso Rápido</span>
+          </div>
+          <div className="p-3 space-y-1.5">
+            {[
+              { href: '/admin/clientes', label: 'Clientes Ativos', sub: `${totalAtivos} beneficiários`, icon: Users, color: 'text-blue-600 bg-blue-50' },
+              { href: '/admin/financeiro', label: 'Financeiro', sub: 'Boletos e cobranças', icon: Banknote, color: 'text-emerald-600 bg-emerald-50' },
+              { href: '/admin/comissoes', label: 'Comissões', sub: formatMoney(comissoesAbertas) + ' a pagar', icon: BadgeDollarSign, color: 'text-amber-600 bg-amber-50' },
+              { href: '/admin/relatorios', label: 'Relatórios', sub: 'Análises por vendedor', icon: BarChart3, color: 'text-violet-600 bg-violet-50' },
+            ].map(item => (
+              <Link key={item.href} href={item.href} className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted/60 transition-colors group">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${item.color}`}>
+                  <item.icon className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold leading-none">{item.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{item.sub}</p>
+                </div>
+                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

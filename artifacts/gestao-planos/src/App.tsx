@@ -7,7 +7,6 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 
 import { AdminLayout } from "@/components/layout/admin-layout";
-// Admin Pages
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminClientes from "@/pages/admin/clientes";
 import AdminCancelados from "@/pages/admin/cancelados";
@@ -15,15 +14,18 @@ import AdminPlanos from "@/pages/admin/planos";
 import AdminVendedores from "@/pages/admin/vendedores";
 import AdminPropostas from "@/pages/admin/propostas";
 import AdminCobranca from "@/pages/admin/cobranca";
+import AdminRelatorios from "@/pages/admin/relatorios";
+import AdminFinanceiro from "@/pages/admin/financeiro";
+import AdminComissoes from "@/pages/admin/comissoes";
 
 import { VendedorLayout } from "@/components/layout/vendedor-layout";
-// Vendedor Pages
 import VendedorDashboard from "@/pages/vendedor/dashboard";
 import VendedorPropostas from "@/pages/vendedor/propostas";
 import VendedorComissoes from "@/pages/vendedor/comissoes";
 import VendedorBoletos from "@/pages/vendedor/boletos";
 import VendedorCobranca from "@/pages/vendedor/cobranca";
 import VendedorPlanos from "@/pages/vendedor/planos";
+import VendedorCarteira from "@/pages/vendedor/carteira";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +40,9 @@ function AdminRoutes() {
         <Route path="/admin/vendedores" component={AdminVendedores} />
         <Route path="/admin/propostas" component={AdminPropostas} />
         <Route path="/admin/cobranca" component={AdminCobranca} />
+        <Route path="/admin/relatorios" component={AdminRelatorios} />
+        <Route path="/admin/financeiro" component={AdminFinanceiro} />
+        <Route path="/admin/comissoes" component={AdminComissoes} />
         <Route component={NotFound} />
       </Switch>
     </AdminLayout>
@@ -49,6 +54,7 @@ function VendedorRoutes() {
     <VendedorLayout>
       <Switch>
         <Route path="/vendedor" component={VendedorDashboard} />
+        <Route path="/vendedor/carteira" component={VendedorCarteira} />
         <Route path="/vendedor/propostas" component={VendedorPropostas} />
         <Route path="/vendedor/comissoes" component={VendedorComissoes} />
         <Route path="/vendedor/boletos" component={VendedorBoletos} />
