@@ -2,10 +2,11 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, FileText, DollarSign, Receipt, LogOut,
   BellRing, ChevronRight, Home, Shield, HeartPulse, Menu,
-  Users, Wallet,
+  Users, Wallet, Sun, Moon,
 } from "lucide-react";
 import { vendedorAtual } from "@/data/vendedores";
 import { useState } from "react";
+import { useTheme } from "@/hooks/useTheme";
 
 const rotulos: Record<string, string> = {
   '/vendedor': 'Dashboard',
@@ -44,6 +45,7 @@ function Breadcrumb({ location }: { location: string }) {
 export function VendedorLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { theme, toggle } = useTheme();
 
   const initials = vendedorAtual.nome.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
 
@@ -97,7 +99,14 @@ export function VendedorLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Footer */}
-      <div className="px-3 pb-4 border-t border-white/10 pt-3">
+      <div className="px-3 pb-4 border-t border-white/10 pt-3 space-y-0.5">
+        <button
+          onClick={toggle}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-500 hover:bg-white/5 hover:text-slate-300 border border-transparent transition-all"
+        >
+          {theme === 'dark' ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-slate-400" />}
+          {theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
+        </button>
         <Link
           href="/"
           data-testid="nav-sair"

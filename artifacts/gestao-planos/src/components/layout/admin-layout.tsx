@@ -2,9 +2,10 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, Users, UserMinus, ClipboardList, FileText,
   Briefcase, LogOut, BellRing, ChevronRight, Home, HeartPulse,
-  Menu, BarChart3, Banknote, ChevronDown,
+  Menu, BarChart3, Banknote, ChevronDown, Sun, Moon,
 } from "lucide-react";
 import { useState } from "react";
+import { useTheme } from "@/hooks/useTheme";
 
 const rotulos: Record<string, string> = {
   '/admin': 'Dashboard',
@@ -56,6 +57,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState<string | null>('/admin/clientes');
+  const { theme, toggle } = useTheme();
 
   const isGroupActive = (item: NavItem) =>
     item.sub ? item.sub.some(s => s.href === location) : location === item.href;
@@ -141,7 +143,14 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Footer */}
-      <div className="px-3 pb-4 border-t border-white/10 pt-3">
+      <div className="px-3 pb-4 border-t border-white/10 pt-3 space-y-0.5">
+        <button
+          onClick={toggle}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-500 hover:bg-white/5 hover:text-slate-300 border border-transparent transition-all"
+        >
+          {theme === 'dark' ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-slate-400" />}
+          {theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
+        </button>
         <Link
           href="/"
           data-testid="nav-sair"
