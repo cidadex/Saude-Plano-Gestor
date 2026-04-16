@@ -3,9 +3,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { planos, tabelasPlanos } from "@/data/planos";
 import { formatMoney } from "@/lib/format";
+import type { TabelaPlano, TabelaPlanoFaixaEtaria } from "@/data/types";
 
 export default function AdminPlanos() {
-  const renderTabelaIdade = (tabela: any, index: number) => (
+  const renderTabelaIdade = (tabela: TabelaPlano, index: number) => (
     <Card key={index} className="mb-6 overflow-hidden">
       <CardHeader className="bg-primary/5 pb-4">
         <CardTitle className="text-lg">
@@ -23,7 +24,7 @@ export default function AdminPlanos() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {tabela.titular.map((item: any, i: number) => (
+            {tabela.titular.map((item: TabelaPlanoFaixaEtaria, i: number) => (
               <TableRow key={i}>
                 <TableCell className="font-medium">{item.faixa}</TableCell>
                 <TableCell className="text-right">{formatMoney(item.enfermaria)}</TableCell>
