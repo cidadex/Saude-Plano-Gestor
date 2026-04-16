@@ -7,8 +7,34 @@ import {
   FileText, 
   Briefcase,
   LogOut,
-  BellRing
+  BellRing,
+  ChevronRight,
+  Home
 } from "lucide-react";
+
+const rotulos: Record<string, string> = {
+  '/admin': 'Dashboard',
+  '/admin/clientes': 'Clientes',
+  '/admin/cancelados': 'Cancelados',
+  '/admin/planos': 'Planos',
+  '/admin/vendedores': 'Vendedores',
+  '/admin/propostas': 'Propostas',
+  '/admin/cobranca': 'Cobrança',
+};
+
+function Breadcrumb({ location }: { location: string }) {
+  if (location === '/admin') return null;
+  const label = rotulos[location];
+  if (!label) return null;
+  return (
+    <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-4">
+      <Home className="h-3.5 w-3.5" />
+      <Link href="/admin" className="hover:text-foreground transition-colors">Início</Link>
+      <ChevronRight className="h-3.5 w-3.5" />
+      <span className="text-foreground font-medium">{label}</span>
+    </div>
+  );
+}
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -50,6 +76,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       </aside>
       <main className="flex-1 overflow-auto">
         <div className="p-4 md:p-8 max-w-7xl mx-auto">
+          <Breadcrumb location={location} />
           {children}
         </div>
       </main>

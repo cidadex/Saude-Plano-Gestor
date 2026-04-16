@@ -8,7 +8,7 @@ export default function Home() {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="max-w-3xl w-full space-y-8">
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-extrabold tracking-tight text-slate-900">Hapvida Sales Management</h1>
+          <h1 className="text-4xl font-extrabold tracking-tight text-slate-900">Hapvida Gestão de Vendas</h1>
           <p className="text-lg text-slate-600">Selecione o perfil de acesso para continuar</p>
         </div>
 

@@ -5,9 +5,33 @@ import {
   DollarSign, 
   Receipt,
   LogOut,
-  BellRing
+  BellRing,
+  ChevronRight,
+  Home
 } from "lucide-react";
 import { vendedorAtual } from "@/data/vendedores";
+
+const rotulos: Record<string, string> = {
+  '/vendedor': 'Dashboard',
+  '/vendedor/propostas': 'Propostas',
+  '/vendedor/comissoes': 'Comissões',
+  '/vendedor/boletos': 'Boletos',
+  '/vendedor/cobranca': 'Cobrança',
+};
+
+function Breadcrumb({ location }: { location: string }) {
+  if (location === '/vendedor') return null;
+  const label = rotulos[location];
+  if (!label) return null;
+  return (
+    <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-4">
+      <Home className="h-3.5 w-3.5" />
+      <Link href="/vendedor" className="hover:text-foreground transition-colors">Início</Link>
+      <ChevronRight className="h-3.5 w-3.5" />
+      <span className="text-foreground font-medium">{label}</span>
+    </div>
+  );
+}
 
 export function VendedorLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -58,6 +82,7 @@ export function VendedorLayout({ children }: { children: React.ReactNode }) {
       </aside>
       <main className="flex-1 overflow-auto">
         <div className="p-4 md:p-8 max-w-7xl mx-auto">
+          <Breadcrumb location={location} />
           {children}
         </div>
       </main>
