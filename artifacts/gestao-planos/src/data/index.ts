@@ -6,3 +6,4 @@ export * from './vendedores';
 export * from './propostas';
 export * from './boletos';
 export * from './comissoes';
+export * from './relatorio-ativo';

@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { getBoletosByVendedor } from "@/data/boletos";
 import { vendedorAtual } from "@/data/vendedores";
+import { clientesAtivos } from "@/data/clientes";
 import { formatMoney, getStatusBadgeVariant } from "@/lib/format";
 import { Search, Receipt, Calendar, FileWarning, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -192,7 +193,7 @@ export default function VendedorBoletos() {
           open={whatsappAberto}
           onClose={() => { setWhatsappAberto(false); setBoletoSelecionado(null); }}
           clienteNome={boletoSelecionado.clienteNome}
-          telefone="(85) 99999-0000"
+          telefone={clientesAtivos.find(c => c.cpf === boletoSelecionado.clienteCpf)?.telefone ?? '(85) 99999-0000'}
           valor={boletoSelecionado.valor}
           mesReferencia={boletoSelecionado.mesReferencia}
           vencimento={boletoSelecionado.vencimento}
