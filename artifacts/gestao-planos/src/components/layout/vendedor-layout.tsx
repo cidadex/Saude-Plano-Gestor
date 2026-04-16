@@ -4,7 +4,8 @@ import {
   FileText, 
   DollarSign, 
   Receipt,
-  LogOut
+  LogOut,
+  BellRing
 } from "lucide-react";
 import { vendedorAtual } from "@/data/vendedores";
 
@@ -16,6 +17,7 @@ export function VendedorLayout({ children }: { children: React.ReactNode }) {
     { href: "/vendedor/propostas", label: "Propostas", icon: FileText },
     { href: "/vendedor/comissoes", label: "Comissões", icon: DollarSign },
     { href: "/vendedor/boletos", label: "Boletos", icon: Receipt },
+    { href: "/vendedor/cobranca", label: "Cobrança", icon: BellRing },
   ];
 
   return (

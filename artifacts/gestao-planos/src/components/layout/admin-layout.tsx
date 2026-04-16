@@ -6,7 +6,8 @@ import {
   ClipboardList, 
   FileText, 
   Briefcase,
-  LogOut
+  LogOut,
+  BellRing
 } from "lucide-react";
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -19,6 +20,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     { href: "/admin/planos", label: "Planos", icon: ClipboardList },
     { href: "/admin/vendedores", label: "Vendedores", icon: Briefcase },
     { href: "/admin/propostas", label: "Propostas", icon: FileText },
+    { href: "/admin/cobranca", label: "Cobrança", icon: BellRing },
   ];
 
   return (

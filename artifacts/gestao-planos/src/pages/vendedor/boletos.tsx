@@ -7,13 +7,17 @@ import { Badge } from "@/components/ui/badge";
 import { getBoletosByVendedor } from "@/data/boletos";
 import { vendedorAtual } from "@/data/vendedores";
 import { formatMoney, getStatusBadgeVariant } from "@/lib/format";
-import { Search, Receipt, Calendar, FileWarning } from "lucide-react";
+import { Search, Receipt, Calendar, FileWarning, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { WhatsappModal } from "@/components/whatsapp-modal";
+import type { Boleto } from "@/data/types";
 
 export default function VendedorBoletos() {
   const [search, setSearch] = useState("");
   const [mesFilter, setMesFilter] = useState("TODOS");
   const [statusFilter, setStatusFilter] = useState("TODOS");
+  const [whatsappAberto, setWhatsappAberto] = useState(false);
+  const [boletoSelecionado, setBoletoSelecionado] = useState<Boleto | null>(null);
 
   const meusBoletos = getBoletosByVendedor(vendedorAtual.nome);
   const meses = useMemo(() => Array.from(new Set(meusBoletos.map(b => b.mesReferencia))), [meusBoletos]);
@@ -35,6 +39,11 @@ export default function VendedorBoletos() {
       vencido: meusBoletos.filter(b => b.status === 'VENCIDO').reduce((acc, b) => acc + b.valor, 0),
     };
   }, [meusBoletos]);
+
+  const handleAbrirWhatsapp = (boleto: Boleto) => {
+    setBoletoSelecionado(boleto);
+    setWhatsappAberto(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -155,9 +164,21 @@ export default function VendedorBoletos() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" className="h-8 text-primary hover:text-primary hover:bg-primary/10">
-                      Ver Código
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="sm" className="h-8 text-primary hover:text-primary hover:bg-primary/10">
+                        Ver Código
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1 border-green-300 text-green-700 hover:bg-green-50 hover:border-green-500 dark:border-green-700 dark:text-green-400"
+                        onClick={() => handleAbrirWhatsapp(boleto)}
+                        data-testid={`btn-whatsapp-boleto-${boleto.id}`}
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">WhatsApp</span>
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -165,6 +186,18 @@ export default function VendedorBoletos() {
           </TableBody>
         </Table>
       </Card>
+
+      {boletoSelecionado && (
+        <WhatsappModal
+          open={whatsappAberto}
+          onClose={() => { setWhatsappAberto(false); setBoletoSelecionado(null); }}
+          clienteNome={boletoSelecionado.clienteNome}
+          telefone="(85) 99999-0000"
+          valor={boletoSelecionado.valor}
+          mesReferencia={boletoSelecionado.mesReferencia}
+          vencimento={boletoSelecionado.vencimento}
+        />
+      )}
     </div>
   );
 }
