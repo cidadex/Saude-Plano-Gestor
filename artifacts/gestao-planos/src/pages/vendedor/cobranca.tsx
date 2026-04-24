@@ -5,51 +5,54 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getCobrancasByVendedor } from "@/data/cobranca";
-import { vendedorAtual } from "@/data/vendedores";
+import { useBoletos, type BoletoAPI } from "@/hooks/useVendedorData";
 import { formatMoney } from "@/lib/format";
-import { Search, MessageCircle, AlertTriangle, Clock } from "lucide-react";
+import { Search, MessageCircle, AlertTriangle, Clock, Loader2 } from "lucide-react";
 import { WhatsappModal } from "@/components/whatsapp-modal";
-import type { RegistroCobranca } from "@/data/cobranca";
 
 function badgeCobranca(status: string) {
-  if (status === 'VENCIDO') return 'border-red-300 bg-red-50 text-red-700 dark:bg-red-950/20';
-  if (status === 'PENDENTE') return 'border-amber-300 bg-amber-50 text-amber-700 dark:bg-amber-950/20';
-  if (status === 'CANCELAR') return 'border-orange-300 bg-orange-50 text-orange-700 dark:bg-orange-950/20';
-  return '';
+  if (status === "VENCIDO") return "border-red-300 bg-red-50 text-red-700";
+  if (status === "PENDENTE") return "border-amber-300 bg-amber-50 text-amber-700";
+  return "";
 }
 
 function labelStatus(status: string) {
-  if (status === 'VENCIDO') return 'Vencido';
-  if (status === 'PENDENTE') return 'Pendente';
-  if (status === 'CANCELAR') return 'A Cancelar';
+  if (status === "VENCIDO") return "Vencido";
+  if (status === "PENDENTE") return "Pendente";
   return status;
 }
 
+function formatDate(iso?: string | null) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("pt-BR");
+}
+
 export default function VendedorCobranca() {
+  const { boletos, loading } = useBoletos();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("TODOS");
   const [modalAberto, setModalAberto] = useState(false);
-  const [registroSelecionado, setRegistroSelecionado] = useState<RegistroCobranca | null>(null);
+  const [boletoSelecionado, setBoletoSelecionado] = useState<BoletoAPI | null>(null);
 
-  const meusRegistros = getCobrancasByVendedor(vendedorAtual.nome);
+  // Cobrança = boletos que precisam de ação (pendentes ou vencidos)
+  const registrosCobranca = useMemo(() =>
+    boletos.filter(b => b.status === "PENDENTE" || b.status === "VENCIDO"),
+    [boletos]);
 
-  const filtrados = useMemo(() => {
-    return meusRegistros.filter(r => {
-      const matchSearch = r.clienteNome.toLowerCase().includes(search.toLowerCase()) ||
-        r.clienteCpf.includes(search);
-      const matchStatus = statusFilter === 'TODOS' || r.status === statusFilter;
-      return matchSearch && matchStatus;
-    });
-  }, [search, statusFilter, meusRegistros]);
+  const filtrados = useMemo(() => registrosCobranca.filter(b => {
+    const matchSearch = b.clienteNome.toLowerCase().includes(search.toLowerCase()) || b.clienteCpf.includes(search);
+    const matchStatus = statusFilter === "TODOS" || b.status === statusFilter;
+    return matchSearch && matchStatus;
+  }), [search, statusFilter, registrosCobranca]);
 
-  const totalPendente = meusRegistros.filter(r => r.status === 'PENDENTE').reduce((a, r) => a + r.valor, 0);
-  const totalVencido = meusRegistros.filter(r => r.status === 'VENCIDO').reduce((a, r) => a + r.valor, 0);
+  const totalPendente = registrosCobranca.filter(b => b.status === "PENDENTE").reduce((a, b) => a + parseFloat(b.valor), 0);
+  const totalVencido = registrosCobranca.filter(b => b.status === "VENCIDO").reduce((a, b) => a + parseFloat(b.valor), 0);
 
-  const handleAbrirWhatsapp = (registro: RegistroCobranca) => {
-    setRegistroSelecionado(registro);
-    setModalAberto(true);
-  };
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -67,7 +70,7 @@ export default function VendedorCobranca() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              {meusRegistros.filter(r => r.status === 'PENDENTE').length}
+              {registrosCobranca.filter(b => b.status === "PENDENTE").length}
             </div>
             <p className="text-sm text-muted-foreground mt-1">{formatMoney(totalPendente)} a receber</p>
           </CardContent>
@@ -81,7 +84,7 @@ export default function VendedorCobranca() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              {meusRegistros.filter(r => r.status === 'VENCIDO').length}
+              {registrosCobranca.filter(b => b.status === "VENCIDO").length}
             </div>
             <p className="text-sm text-muted-foreground mt-1">{formatMoney(totalVencido)} em atraso</p>
           </CardContent>
@@ -133,52 +136,50 @@ export default function VendedorCobranca() {
                   Nenhum registro encontrado.
                 </TableCell>
               </TableRow>
-            ) : (
-              filtrados.map(registro => (
-                <TableRow key={registro.id} data-testid={`row-cob-vendedor-${registro.id}`} className="hover:bg-muted/20">
-                  <TableCell className="font-medium">
-                    <div className="flex flex-col">
-                      <span>{registro.clienteNome}</span>
-                      <span className="text-xs text-muted-foreground font-mono">{registro.clienteCpf}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm font-mono">{registro.plano}</TableCell>
-                  <TableCell className="text-sm">{registro.mesReferencia}</TableCell>
-                  <TableCell className="text-sm">{registro.vencimento}</TableCell>
-                  <TableCell className="text-right font-bold">{formatMoney(registro.valor)}</TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant="outline" className={badgeCobranca(registro.status)}>
-                      {labelStatus(registro.status)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 gap-1.5 border-green-300 text-green-700 hover:bg-green-50 hover:border-green-500 dark:border-green-700 dark:text-green-400"
-                      onClick={() => handleAbrirWhatsapp(registro)}
-                      data-testid={`btn-whatsapp-vendedor-${registro.id}`}
-                    >
-                      <MessageCircle className="h-3.5 w-3.5" />
-                      WhatsApp
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
+            ) : filtrados.map(boleto => (
+              <TableRow key={boleto.id} data-testid={`row-cob-vendedor-${boleto.id}`} className="hover:bg-muted/20">
+                <TableCell className="font-medium">
+                  <div className="flex flex-col">
+                    <span>{boleto.clienteNome}</span>
+                    <span className="text-xs text-muted-foreground font-mono">{boleto.clienteCpf}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-sm font-mono">{boleto.planoCode ?? "—"}</TableCell>
+                <TableCell className="text-sm">{boleto.mesReferencia}</TableCell>
+                <TableCell className="text-sm">{formatDate(boleto.vencimento)}</TableCell>
+                <TableCell className="text-right font-bold">{formatMoney(parseFloat(boleto.valor))}</TableCell>
+                <TableCell className="text-center">
+                  <Badge variant="outline" className={badgeCobranca(boleto.status)}>
+                    {labelStatus(boleto.status)}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-center">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1.5 border-green-300 text-green-700 hover:bg-green-50 hover:border-green-500 dark:border-green-700 dark:text-green-400"
+                    onClick={() => { setBoletoSelecionado(boleto); setModalAberto(true); }}
+                    data-testid={`btn-whatsapp-vendedor-${boleto.id}`}
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    WhatsApp
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </Card>
 
-      {registroSelecionado && (
+      {boletoSelecionado && (
         <WhatsappModal
           open={modalAberto}
-          onClose={() => { setModalAberto(false); setRegistroSelecionado(null); }}
-          clienteNome={registroSelecionado.clienteNome}
-          telefone={registroSelecionado.telefone}
-          valor={registroSelecionado.valor}
-          mesReferencia={registroSelecionado.mesReferencia}
-          vencimento={registroSelecionado.vencimento}
+          onClose={() => { setModalAberto(false); setBoletoSelecionado(null); }}
+          clienteNome={boletoSelecionado.clienteNome}
+          telefone={boletoSelecionado.clienteTelefone ?? "(85) 99999-0000"}
+          valor={parseFloat(boletoSelecionado.valor)}
+          mesReferencia={boletoSelecionado.mesReferencia}
+          vencimento={formatDate(boletoSelecionado.vencimento)}
         />
       )}
     </div>

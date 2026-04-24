@@ -1,4 +1,4 @@
-import { pgTable, text, numeric, timestamp, pgEnum, date } from "drizzle-orm/pg-core";
+import { pgTable, text, numeric, integer, timestamp, pgEnum, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { vendedoresTable } from "./vendedores";
@@ -51,6 +51,19 @@ export const clientesTable = pgTable("clientes", {
   status: statusClienteEnum("status").notNull().default("ATIVO"),
   motivoCancelamento: text("motivo_cancelamento"),
   observacao: text("observacao"),
+  // Business fields
+  codigo: text("codigo"),
+  representante: text("representante"),
+  tipo: text("tipo").notNull().default("TITULAR"),
+  formaPagamento: text("forma_pagamento"),
+  diaVencimento: integer("dia_vencimento"),
+  vrPl: numeric("vr_pl", { precision: 10, scale: 2 }),
+  saldo: numeric("saldo", { precision: 10, scale: 2 }),
+  valor2026: numeric("valor_2026", { precision: 10, scale: 2 }),
+  comissao: numeric("comissao", { precision: 10, scale: 2 }),
+  dataAtivacao: date("data_ativacao"),
+  planoCode: text("plano_code"),
+  codigoPlano: text("codigo_plano"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

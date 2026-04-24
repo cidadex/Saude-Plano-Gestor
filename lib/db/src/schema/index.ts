@@ -6,3 +6,4 @@ export * from "./clientes";
 export * from "./propostas";
 export * from "./boletos";
 export * from "./comunicacoes";
+export * from "./comissoes";

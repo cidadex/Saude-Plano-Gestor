@@ -3,16 +3,29 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { getComissoesByTipo, getTotalComissoesVendedor } from "@/data/comissoes";
-import { vendedorAtual } from "@/data/vendedores";
+import { useComissoes } from "@/hooks/useVendedorData";
 import { formatMoney } from "@/lib/format";
-import { DollarSign, Wallet, ArrowUpRight } from "lucide-react";
+import { DollarSign, Wallet, ArrowUpRight, Loader2 } from "lucide-react";
+
+function formatDate(iso?: string | null) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("pt-BR");
+}
 
 export default function VendedorComissoes() {
-  const nomeVendedor = vendedorAtual.nome;
-  const comissoesVenda = getComissoesByTipo(nomeVendedor, 'VENDA');
-  const comissoesServico = getComissoesByTipo(nomeVendedor, 'SERVICO');
-  const totais = getTotalComissoesVendedor(nomeVendedor);
+  const { comissoes, loading } = useComissoes();
+
+  const comissoesVenda = useMemo(() => comissoes.filter(c => c.tipo === "VENDA"), [comissoes]);
+  const comissoesServico = useMemo(() => comissoes.filter(c => c.tipo === "SERVICO"), [comissoes]);
+
+  const totalVenda = comissoesVenda.reduce((a, c) => a + parseFloat(c.valor), 0);
+  const totalServico = comissoesServico.reduce((a, c) => a + parseFloat(c.valor), 0);
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -29,30 +42,24 @@ export default function VendedorComissoes() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{formatMoney(totais.venda + totais.servico)}</div>
+            <div className="text-3xl font-bold">{formatMoney(totalVenda + totalServico)}</div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
               <ArrowUpRight className="h-4 w-4" /> Venda (Agenciamento)
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{formatMoney(totais.venda)}</div>
-          </CardContent>
+          <CardContent><div className="text-2xl font-bold text-foreground">{formatMoney(totalVenda)}</div></CardContent>
         </Card>
-
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
               <DollarSign className="h-4 w-4" /> Serviço (Vitalícia)
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{formatMoney(totais.servico)}</div>
-          </CardContent>
+          <CardContent><div className="text-2xl font-bold text-foreground">{formatMoney(totalServico)}</div></CardContent>
         </Card>
       </div>
 
@@ -61,7 +68,7 @@ export default function VendedorComissoes() {
           <TabsTrigger value="venda" className="text-sm font-medium data-[state=active]:bg-background">Comissões de Venda</TabsTrigger>
           <TabsTrigger value="servico" className="text-sm font-medium data-[state=active]:bg-background">Taxa de Serviço</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="venda" className="mt-6">
           <Card className="border shadow-sm">
             <CardHeader className="bg-muted/20 pb-4">
@@ -82,26 +89,22 @@ export default function VendedorComissoes() {
               <TableBody>
                 {comissoesVenda.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                      Nenhuma comissão de venda encontrada.
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">Nenhuma comissão de venda encontrada.</TableCell>
+                  </TableRow>
+                ) : comissoesVenda.map(c => (
+                  <TableRow key={c.id}>
+                    <TableCell className="font-semibold text-foreground whitespace-nowrap">{c.mesReferencia}</TableCell>
+                    <TableCell className="font-medium">{c.clienteNome}</TableCell>
+                    <TableCell className="text-muted-foreground font-mono text-sm">{c.planoCode ?? "—"}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{formatDate(c.dataVenda)}</TableCell>
+                    <TableCell className="text-right font-bold text-foreground">{formatMoney(parseFloat(c.valor))}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="outline" className={c.status === "PAGO" ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-amber-100 text-amber-800 border-amber-200"}>
+                        {c.status}
+                      </Badge>
                     </TableCell>
                   </TableRow>
-                ) : (
-                  comissoesVenda.map(c => (
-                    <TableRow key={c.id}>
-                      <TableCell className="font-semibold text-foreground whitespace-nowrap">{c.mesReferencia}</TableCell>
-                      <TableCell className="font-medium">{c.clienteNome}</TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-sm">{c.plano}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{c.dataVenda || '-'}</TableCell>
-                      <TableCell className="text-right font-bold text-foreground">{formatMoney(c.valor)}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline" className={c.status === 'PAGO' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-amber-100 text-amber-800 border-amber-200'}>
-                          {c.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
+                ))}
               </TableBody>
             </Table>
           </Card>
@@ -126,25 +129,21 @@ export default function VendedorComissoes() {
               <TableBody>
                 {comissoesServico.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                      Nenhuma comissão de serviço encontrada.
+                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">Nenhuma comissão de serviço encontrada.</TableCell>
+                  </TableRow>
+                ) : comissoesServico.map(c => (
+                  <TableRow key={c.id}>
+                    <TableCell className="font-semibold text-foreground whitespace-nowrap">{c.mesReferencia}</TableCell>
+                    <TableCell className="font-medium">{c.clienteNome}</TableCell>
+                    <TableCell className="text-muted-foreground font-mono text-sm">{c.planoCode ?? "—"}</TableCell>
+                    <TableCell className="text-right font-bold text-foreground">{formatMoney(parseFloat(c.valor))}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="outline" className={c.status === "PAGO" ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-amber-100 text-amber-800 border-amber-200"}>
+                        {c.status}
+                      </Badge>
                     </TableCell>
                   </TableRow>
-                ) : (
-                  comissoesServico.map(c => (
-                    <TableRow key={c.id}>
-                      <TableCell className="font-semibold text-foreground whitespace-nowrap">{c.mesReferencia}</TableCell>
-                      <TableCell className="font-medium">{c.clienteNome}</TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-sm">{c.plano}</TableCell>
-                      <TableCell className="text-right font-bold text-foreground">{formatMoney(c.valor)}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline" className={c.status === 'PAGO' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-amber-100 text-amber-800 border-amber-200'}>
-                          {c.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
+                ))}
               </TableBody>
             </Table>
           </Card>
