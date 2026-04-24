@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/hooks/useAuth";
 
 const rotulos: Record<string, string> = {
   '/admin': 'Dashboard',
@@ -58,6 +59,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState<string | null>('/admin/clientes');
   const { theme, toggle } = useTheme();
+  const { logout, user } = useAuth();
 
   const isGroupActive = (item: NavItem) =>
     item.sub ? item.sub.some(s => s.href === location) : location === item.href;
@@ -151,14 +153,14 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           {theme === 'dark' ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-slate-400" />}
           {theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
         </button>
-        <Link
-          href="/"
+        <button
+          onClick={() => void logout()}
           data-testid="nav-sair"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-500 hover:bg-white/5 hover:text-slate-300 border border-transparent transition-all"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-500 hover:bg-white/5 hover:text-slate-300 border border-transparent transition-all"
         >
           <LogOut className="h-4 w-4 text-slate-500" />
-          Sair
-        </Link>
+          Sair ({user?.nome ?? ""})
+        </button>
       </div>
     </div>
   );

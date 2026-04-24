@@ -2,11 +2,11 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, FileText, DollarSign, Receipt, LogOut,
   BellRing, ChevronRight, Home, Shield, HeartPulse, Menu,
-  Users, Wallet, Sun, Moon,
+  Users, Sun, Moon,
 } from "lucide-react";
-import { vendedorAtual } from "@/data/vendedores";
 import { useState } from "react";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/hooks/useAuth";
 
 const rotulos: Record<string, string> = {
   '/vendedor': 'Dashboard',
@@ -46,8 +46,10 @@ export function VendedorLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, toggle } = useTheme();
+  const { logout, user } = useAuth();
 
-  const initials = vendedorAtual.nome.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
+  const nomeVendedor = user?.nome ?? "Vendedor";
+  const initials = nomeVendedor.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -67,7 +69,7 @@ export function VendedorLayout({ children }: { children: React.ReactNode }) {
             {initials}
           </div>
           <div className="min-w-0">
-            <p className="text-white text-sm font-semibold truncate">{vendedorAtual.nome}</p>
+            <p className="text-white text-sm font-semibold truncate">{nomeVendedor}</p>
             <p className="text-emerald-400/60 text-[11px]">Consultor de Vendas</p>
           </div>
         </div>
@@ -107,14 +109,14 @@ export function VendedorLayout({ children }: { children: React.ReactNode }) {
           {theme === 'dark' ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-slate-400" />}
           {theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
         </button>
-        <Link
-          href="/"
+        <button
+          onClick={() => void logout()}
           data-testid="nav-sair"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-500 hover:bg-white/5 hover:text-slate-300 border border-transparent transition-all"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-500 hover:bg-white/5 hover:text-slate-300 border border-transparent transition-all"
         >
           <LogOut className="h-4 w-4 text-slate-500" />
           Sair
-        </Link>
+        </button>
       </div>
     </div>
   );
@@ -141,7 +143,7 @@ export function VendedorLayout({ children }: { children: React.ReactNode }) {
           </button>
           <div className="flex items-center gap-2">
             <HeartPulse className="h-4 w-4 text-emerald-400" />
-            <span className="font-bold text-white text-sm">{vendedorAtual.nome}</span>
+            <span className="font-bold text-white text-sm">{nomeVendedor}</span>
           </div>
         </div>
         <main className="flex-1 overflow-auto">

@@ -1,11 +1,13 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/hooks/useTheme";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { Loader2 } from "lucide-react";
 import NotFound from "@/pages/not-found";
 
-import Home from "@/pages/home";
+import Login from "@/pages/login";
 
 import { AdminLayout } from "@/components/layout/admin-layout";
 import AdminDashboard from "@/pages/admin/dashboard";
@@ -30,7 +32,20 @@ import VendedorCarteira from "@/pages/vendedor/carteira";
 
 const queryClient = new QueryClient();
 
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen bg-[#0b1120] flex items-center justify-center">
+      <Loader2 className="h-8 w-8 text-blue-400 animate-spin" />
+    </div>
+  );
+}
+
 function AdminRoutes() {
+  const { user, loading } = useAuth();
+  if (loading) return <LoadingScreen />;
+  if (!user) return <Redirect to="/login" />;
+  if (user.role !== "admin") return <Redirect to="/login" />;
+
   return (
     <AdminLayout>
       <Switch>
@@ -51,6 +66,11 @@ function AdminRoutes() {
 }
 
 function VendedorRoutes() {
+  const { user, loading } = useAuth();
+  if (loading) return <LoadingScreen />;
+  if (!user) return <Redirect to="/login" />;
+  if (user.role !== "vendedor") return <Redirect to="/login" />;
+
   return (
     <VendedorLayout>
       <Switch>
@@ -67,14 +87,26 @@ function VendedorRoutes() {
   );
 }
 
+function HomeRedirect() {
+  const { user, loading } = useAuth();
+  if (loading) return <LoadingScreen />;
+  if (!user) return <Redirect to="/login" />;
+  if (user.role === "admin") return <Redirect to="/admin" />;
+  if (user.role === "vendedor") return <Redirect to="/vendedor" />;
+  if (user.role === "gerente") return <Redirect to="/gerente" />;
+  if (user.role === "cliente") return <Redirect to="/cliente" />;
+  return <Redirect to="/login" />;
+}
+
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/admin/*" component={AdminRoutes} />
+      <Route path="/" component={HomeRedirect} />
+      <Route path="/login" component={Login} />
       <Route path="/admin" component={AdminRoutes} />
-      <Route path="/vendedor/*" component={VendedorRoutes} />
+      <Route path="/admin/:rest*" component={AdminRoutes} />
       <Route path="/vendedor" component={VendedorRoutes} />
+      <Route path="/vendedor/:rest*" component={VendedorRoutes} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -83,14 +115,16 @@ function Router() {
 function App() {
   return (
     <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
-          </WouterRouter>
-          <Toaster />
-        </TooltipProvider>
-      </QueryClientProvider>
+      <AuthProvider>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <Router />
+            </WouterRouter>
+            <Toaster />
+          </TooltipProvider>
+        </QueryClientProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }
