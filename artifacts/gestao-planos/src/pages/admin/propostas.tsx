@@ -10,7 +10,22 @@ import { Label } from "@/components/ui/label";
 import { apiFetch } from "@/lib/api";
 import { formatMoney } from "@/lib/format";
 import { planos } from "@/data/planos";
-import { Search, SlidersHorizontal, Loader2, RefreshCw, AlertCircle, Receipt } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Search, SlidersHorizontal, Loader2, RefreshCw, AlertCircle, Receipt, Plus, Sparkles, ChevronDown, Check, X, UserPlus, Trash2 } from "lucide-react";
+
+type VendedorSelect = { id: string; nome: string; email: string };
+type PlanoSelect = { id: string; codigo: string | null; nome: string; valorTitular: string | null; ativo: boolean };
+type DepAdmin = { _id: string; nome: string; cpf: string; dataNascimento: string; grauParentesco: string };
+
+const GRAUS_PARENTESCO = ["CÔNJUGE", "FILHO(A)", "PAI/MÃE", "OUTRO", "AGREGADO"];
+const FORMAS_PAGAMENTO = ["BOLETO", "CORA", "C6", "BTG", "PIX", "DÉBITO EM FOLHA"];
+
+const NOVA_FORM_INIT = {
+  vendedorId: "", clienteNome: "", clienteCpf: "", dataNascimento: "", sexo: "",
+  telefone: "", email: "", cep: "", logradouro: "", numero: "", bairro: "",
+  cidade: "", estado: "", planoId: "", formaPagamento: "", valorManual: "",
+  observacao: "", dependentes: [] as DepAdmin[],
+};
 
 const STATUS_LABEL: Record<string, string> = {
   AGUARDANDO_ENVIO: "Aguardando envio",
@@ -166,6 +181,132 @@ export default function AdminPropostas() {
     }
   };
 
+  // ─── NOVA PROPOSTA (admin) ────────────────────────────────────
+  const [novaAberta, setNovaAberta] = useState(false);
+  const [novaStep, setNovaStep] = useState<1 | 2 | 3>(1);
+  const [vendedoresList, setVendedoresList] = useState<VendedorSelect[]>([]);
+  const [planosList, setPlanosList] = useState<PlanoSelect[]>([]);
+  const [novaSalvando, setNovaSalvando] = useState(false);
+  const [novaSalvo, setNovaSalvo] = useState(false);
+  const [novaErro, setNovaErro] = useState("");
+  const [novaForm, setNovaForm] = useState({ ...NOVA_FORM_INIT });
+  // IA
+  const [nIaAberta, setNIaAberta] = useState(false);
+  const [nIaTexto, setNIaTexto] = useState("");
+  const [nIaAnalisando, setNIaAnalisando] = useState(false);
+  const [nIaPreenchido, setNIaPreenchido] = useState(false);
+  const [nIaErro, setNIaErro] = useState("");
+
+  useEffect(() => {
+    Promise.all([
+      apiFetch("/admin/vendedores") as Promise<{ vendedores: VendedorSelect[] }>,
+      apiFetch("/planos") as Promise<{ planos: PlanoSelect[] }>,
+    ]).then(([v, p]) => {
+      setVendedoresList(v.vendedores ?? []);
+      setPlanosList((p.planos ?? []).filter(pl => pl.ativo));
+    }).catch(console.error);
+  }, []);
+
+  const handleAnalisarIA = async () => {
+    if (!nIaTexto.trim()) return;
+    setNIaAnalisando(true); setNIaErro(""); setNIaPreenchido(false);
+    try {
+      const res = await apiFetch("/ai/parse-cliente", {
+        method: "POST",
+        body: JSON.stringify({ texto: nIaTexto }),
+      }) as { dados: Record<string, string | null> };
+      const d = res.dados ?? {};
+      setNovaForm(f => ({
+        ...f,
+        clienteNome: d.nome ?? f.clienteNome,
+        clienteCpf: d.cpf ?? f.clienteCpf,
+        dataNascimento: d.dataNascimento ?? f.dataNascimento,
+        sexo: d.sexo ?? f.sexo,
+        telefone: d.telefone ?? f.telefone,
+        email: d.email ?? f.email,
+        cep: d.cep ?? f.cep,
+        logradouro: d.logradouro ?? f.logradouro,
+        numero: d.numero ?? f.numero,
+        bairro: d.bairro ?? f.bairro,
+        cidade: d.cidade ?? f.cidade,
+        estado: d.estado ?? f.estado,
+      }));
+      setNIaPreenchido(true);
+      setTimeout(() => setNIaAberta(false), 1200);
+    } catch (err: unknown) {
+      setNIaErro(err instanceof Error ? err.message : "Não foi possível analisar o texto.");
+    } finally {
+      setNIaAnalisando(false);
+    }
+  };
+
+  const addDep = () => setNovaForm(f => ({
+    ...f,
+    dependentes: [...f.dependentes, { _id: `d${Date.now()}`, nome: "", cpf: "", dataNascimento: "", grauParentesco: "FILHO(A)" }],
+  }));
+  const removeDep = (id: string) => setNovaForm(f => ({ ...f, dependentes: f.dependentes.filter(d => d._id !== id) }));
+  const updateDep = (id: string, field: string, val: string) => setNovaForm(f => ({
+    ...f, dependentes: f.dependentes.map(d => d._id === id ? { ...d, [field]: val } : d),
+  }));
+
+  const handleNovaSalvar = async () => {
+    setNovaSalvando(true); setNovaErro("");
+    try {
+      const plano = planosList.find(p => p.id === novaForm.planoId);
+      await apiFetch("/admin/propostas", {
+        method: "POST",
+        body: JSON.stringify({
+          vendedorId: novaForm.vendedorId,
+          dadosTitular: {
+            nome: novaForm.clienteNome.toUpperCase(),
+            cpf: novaForm.clienteCpf,
+            dataNascimento: novaForm.dataNascimento,
+            sexo: novaForm.sexo,
+            telefone: novaForm.telefone,
+            email: novaForm.email,
+            cep: novaForm.cep,
+            logradouro: novaForm.logradouro,
+            numero: novaForm.numero,
+            bairro: novaForm.bairro,
+            cidade: novaForm.cidade,
+            estado: novaForm.estado,
+            tipo: "TITULAR",
+            plano: plano?.nome ?? "",
+            codigoPlano: plano?.codigo ?? "",
+            formaPagamento: novaForm.formaPagamento,
+            observacao: novaForm.observacao,
+          },
+          dadosDependentes: novaForm.dependentes.map(d => ({
+            nome: d.nome.toUpperCase(), cpf: d.cpf,
+            dataNascimento: d.dataNascimento, grauParentesco: d.grauParentesco, tipo: "DEPENDENTE",
+          })),
+          valorTotal: novaForm.valorManual.replace(",", ".") || null,
+        }),
+      });
+      setNovaSalvo(true);
+      await carregarPropostas();
+      setTimeout(() => {
+        setNovaSalvo(false); setNovaAberta(false); setNovaStep(1);
+        setNovaForm({ ...NOVA_FORM_INIT });
+        setNIaTexto(""); setNIaAberta(false); setNIaPreenchido(false);
+      }, 1500);
+    } catch (err: unknown) {
+      setNovaErro(err instanceof Error ? err.message : String(err));
+    } finally {
+      setNovaSalvando(false);
+    }
+  };
+
+  const handleNovaFechar = () => {
+    setNovaAberta(false); setNovaStep(1); setNovaForm({ ...NOVA_FORM_INIT });
+    setNIaTexto(""); setNIaAberta(false); setNIaPreenchido(false);
+    setNovaErro(""); setNovaSalvo(false);
+  };
+
+  const novaPlanoAtual = planosList.find(p => p.id === novaForm.planoId);
+  const novaPodeAvancar1 = !!novaForm.vendedorId && !!novaForm.clienteNome && !!novaForm.clienteCpf;
+  const novaPodeSalvar = novaPodeAvancar1 && !!novaForm.planoId;
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between pb-4 border-b">
@@ -173,9 +314,14 @@ export default function AdminPropostas() {
           <h2 className="text-3xl font-bold tracking-tight text-foreground">Propostas</h2>
           <p className="text-muted-foreground">Acompanhamento do funil de vendas e envios para operadora.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={carregarPropostas} className="gap-2" data-testid="btn-reload-propostas">
-          <RefreshCw className="h-4 w-4" /> Atualizar
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" className="gap-2" onClick={() => setNovaAberta(true)} data-testid="btn-nova-proposta-admin">
+            <Plus className="h-4 w-4" /> Nova Proposta
+          </Button>
+          <Button variant="outline" size="sm" onClick={carregarPropostas} className="gap-2" data-testid="btn-reload-propostas">
+            <RefreshCw className="h-4 w-4" /> Atualizar
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -310,6 +456,312 @@ export default function AdminPropostas() {
           </Table>
         )}
       </Card>
+
+      {/* ─── MODAL NOVA PROPOSTA (ADMIN) ─── */}
+      <Dialog open={novaAberta} onOpenChange={handleNovaFechar}>
+        <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-primary" /> Nova Proposta
+            </DialogTitle>
+            <DialogDescription>Cadastre um novo cliente e gere uma proposta para envio à operadora.</DialogDescription>
+          </DialogHeader>
+
+          {/* Stepper */}
+          <div className="flex items-center gap-2 py-1">
+            {[1, 2, 3].map(s => (
+              <div key={s} className="flex items-center gap-2">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${novaStep >= s ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/30 text-muted-foreground"}`}>
+                  {novaStep > s ? <Check className="h-3.5 w-3.5" /> : s}
+                </div>
+                <span className={`text-xs font-medium ${novaStep >= s ? "text-foreground" : "text-muted-foreground"}`}>
+                  {s === 1 ? "Titular" : s === 2 ? "Plano + Depend." : "Revisão"}
+                </span>
+                {s < 3 && <div className="h-px w-6 bg-muted-foreground/30" />}
+              </div>
+            ))}
+          </div>
+
+          {/* STEP 1 — Vendedor + Titular */}
+          {novaStep === 1 && (
+            <div className="space-y-4 py-1">
+              {/* Vendedor */}
+              <div className="space-y-1.5">
+                <Label>Vendedor Responsável *</Label>
+                <Select value={novaForm.vendedorId} onValueChange={v => setNovaForm(f => ({ ...f, vendedorId: v }))}>
+                  <SelectTrigger data-testid="select-nova-vendedor"><SelectValue placeholder="Selecione o vendedor..." /></SelectTrigger>
+                  <SelectContent>
+                    {vendedoresList.map(v => <SelectItem key={v.id} value={v.id}>{v.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Cola IA */}
+              <div className="rounded-lg border border-violet-200 bg-violet-50/60">
+                <button type="button"
+                  onClick={() => { setNIaAberta(p => !p); setNIaErro(""); }}
+                  className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-violet-800 hover:bg-violet-100/60 rounded-lg transition-colors"
+                  data-testid="btn-nova-colar-ia">
+                  <span className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-violet-600" />
+                    Colar dados com IA
+                    <span className="text-xs font-normal text-violet-600">— cole texto e a IA preenche o formulário</span>
+                  </span>
+                  <ChevronDown className={`h-4 w-4 text-violet-500 transition-transform ${nIaAberta ? "rotate-180" : ""}`} />
+                </button>
+                {nIaAberta && (
+                  <div className="px-4 pb-4 space-y-3">
+                    <Textarea placeholder="Cole aqui qualquer texto com dados do cliente: mensagem de WhatsApp, e-mail, planilha colada, etc."
+                      value={nIaTexto}
+                      onChange={e => { setNIaTexto(e.target.value); setNIaPreenchido(false); setNIaErro(""); }}
+                      className="resize-none bg-white text-sm min-h-[100px]" rows={4}
+                      data-testid="textarea-nova-ia" />
+                    {nIaErro && <p className="text-xs text-red-600 flex items-center gap-1"><X className="h-3 w-3" />{nIaErro}</p>}
+                    {nIaPreenchido && <p className="text-xs text-emerald-700 flex items-center gap-1"><Check className="h-3 w-3" /> Dados preenchidos! Confira abaixo.</p>}
+                    <Button size="sm" onClick={handleAnalisarIA} disabled={nIaAnalisando || !nIaTexto.trim()}
+                      className="gap-2 bg-violet-600 hover:bg-violet-700" data-testid="btn-nova-analisar-ia">
+                      {nIaAnalisando ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Analisando...</> : <><Sparkles className="h-3.5 w-3.5" />Analisar</>}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Campos titular */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs text-muted-foreground">Nome Completo *</Label>
+                  <Input placeholder="NOME COMPLETO" value={novaForm.clienteNome}
+                    onChange={e => setNovaForm(f => ({ ...f, clienteNome: e.target.value }))} data-testid="input-nova-nome" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">CPF *</Label>
+                  <Input placeholder="000.000.000-00" value={novaForm.clienteCpf}
+                    onChange={e => setNovaForm(f => ({ ...f, clienteCpf: e.target.value }))} data-testid="input-nova-cpf" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Data de Nascimento</Label>
+                  <Input type="date" value={novaForm.dataNascimento}
+                    onChange={e => setNovaForm(f => ({ ...f, dataNascimento: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Sexo</Label>
+                  <Select value={novaForm.sexo} onValueChange={v => setNovaForm(f => ({ ...f, sexo: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="M">Masculino</SelectItem>
+                      <SelectItem value="F">Feminino</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Telefone / WhatsApp</Label>
+                  <Input placeholder="(85) 99999-9999" value={novaForm.telefone}
+                    onChange={e => setNovaForm(f => ({ ...f, telefone: e.target.value }))} data-testid="input-nova-telefone" />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs text-muted-foreground">E-mail</Label>
+                  <Input type="email" placeholder="email@exemplo.com" value={novaForm.email}
+                    onChange={e => setNovaForm(f => ({ ...f, email: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">CEP</Label>
+                  <Input placeholder="00000-000" value={novaForm.cep}
+                    onChange={e => setNovaForm(f => ({ ...f, cep: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Número</Label>
+                  <Input placeholder="123" value={novaForm.numero}
+                    onChange={e => setNovaForm(f => ({ ...f, numero: e.target.value }))} />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs text-muted-foreground">Logradouro</Label>
+                  <Input placeholder="Rua..." value={novaForm.logradouro}
+                    onChange={e => setNovaForm(f => ({ ...f, logradouro: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Bairro</Label>
+                  <Input value={novaForm.bairro} onChange={e => setNovaForm(f => ({ ...f, bairro: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Cidade</Label>
+                  <Input value={novaForm.cidade} onChange={e => setNovaForm(f => ({ ...f, cidade: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Estado (UF)</Label>
+                  <Input placeholder="CE" maxLength={2} value={novaForm.estado}
+                    onChange={e => setNovaForm(f => ({ ...f, estado: e.target.value.toUpperCase() }))} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2 — Plano + Dependentes */}
+          {novaStep === 2 && (
+            <div className="space-y-5 py-1">
+              {/* Plano */}
+              <div className="space-y-1.5">
+                <Label>Plano de Saúde *</Label>
+                <div className="grid grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
+                  {planosList.map(p => (
+                    <button key={p.id} onClick={() => setNovaForm(f => ({ ...f, planoId: p.id }))}
+                      data-testid={`btn-nova-plano-${p.codigo}`}
+                      className={`p-3 rounded-lg border text-left transition-all ${novaForm.planoId === p.id ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/40"}`}>
+                      <div className="font-mono font-bold text-sm">{p.codigo ?? "—"}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5 leading-tight line-clamp-2">{p.nome}</div>
+                      {p.valorTitular && (
+                        <div className="text-xs font-semibold text-primary mt-1">R$ {parseFloat(p.valorTitular).toFixed(2).replace(".", ",")}</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Forma pagamento + valor */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Forma de Pagamento</Label>
+                  <Select value={novaForm.formaPagamento} onValueChange={v => setNovaForm(f => ({ ...f, formaPagamento: v }))}>
+                    <SelectTrigger data-testid="select-nova-pagamento"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      {FORMAS_PAGAMENTO.map(fp => <SelectItem key={fp} value={fp}>{fp}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Valor Total (R$)</Label>
+                  <Input placeholder="0,00" value={novaForm.valorManual}
+                    onChange={e => setNovaForm(f => ({ ...f, valorManual: e.target.value }))}
+                    data-testid="input-nova-valor" />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Observações</Label>
+                  <Textarea placeholder="Informações adicionais..." value={novaForm.observacao}
+                    onChange={e => setNovaForm(f => ({ ...f, observacao: e.target.value }))}
+                    className="resize-none" rows={2} />
+                </div>
+              </div>
+
+              {/* Dependentes */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold">Dependentes</Label>
+                  <Button size="sm" variant="outline" onClick={addDep} className="gap-1.5 text-xs" data-testid="btn-nova-add-dep">
+                    <UserPlus className="h-3.5 w-3.5" /> Adicionar
+                  </Button>
+                </div>
+                {novaForm.dependentes.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic py-2">Nenhum dependente adicionado.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {novaForm.dependentes.map((dep, i) => (
+                      <div key={dep._id} className="rounded-lg border p-3 space-y-2 bg-muted/20">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Dependente {i + 1}</span>
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => removeDep(dep._id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <div className="space-y-1 sm:col-span-2">
+                            <Label className="text-xs text-muted-foreground">Nome</Label>
+                            <Input placeholder="Nome completo" value={dep.nome}
+                              onChange={e => updateDep(dep._id, "nome", e.target.value)} className="h-8 text-sm" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">CPF</Label>
+                            <Input placeholder="000.000.000-00" value={dep.cpf}
+                              onChange={e => updateDep(dep._id, "cpf", e.target.value)} className="h-8 text-sm font-mono" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Nascimento</Label>
+                            <Input type="date" value={dep.dataNascimento}
+                              onChange={e => updateDep(dep._id, "dataNascimento", e.target.value)} className="h-8 text-sm" />
+                          </div>
+                          <div className="space-y-1 sm:col-span-2">
+                            <Label className="text-xs text-muted-foreground">Grau de Parentesco</Label>
+                            <Select value={dep.grauParentesco} onValueChange={v => updateDep(dep._id, "grauParentesco", v)}>
+                              <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {GRAUS_PARENTESCO.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3 — Revisão */}
+          {novaStep === 3 && (
+            <div className="space-y-4 py-1">
+              <div className="rounded-lg border p-4 space-y-3 bg-muted/20">
+                <h3 className="font-semibold text-sm flex items-center gap-2">Dados do Titular</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div><span className="text-muted-foreground">Nome:</span> <span className="font-medium">{novaForm.clienteNome || "—"}</span></div>
+                  <div><span className="text-muted-foreground">CPF:</span> <span className="font-mono">{novaForm.clienteCpf || "—"}</span></div>
+                  <div><span className="text-muted-foreground">Nascimento:</span> <span>{novaForm.dataNascimento ? new Date(novaForm.dataNascimento + "T12:00:00").toLocaleDateString("pt-BR") : "—"}</span></div>
+                  <div><span className="text-muted-foreground">Telefone:</span> <span>{novaForm.telefone || "—"}</span></div>
+                  {novaForm.email && <div className="col-span-2"><span className="text-muted-foreground">E-mail:</span> <span>{novaForm.email}</span></div>}
+                  {novaForm.logradouro && <div className="col-span-2"><span className="text-muted-foreground">Endereço:</span> <span>{novaForm.logradouro}{novaForm.numero ? `, ${novaForm.numero}` : ""} — {novaForm.bairro} — {novaForm.cidade}/{novaForm.estado}</span></div>}
+                </div>
+              </div>
+              <div className="rounded-lg border p-4 space-y-2 bg-muted/20">
+                <h3 className="font-semibold text-sm">Plano</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div><span className="text-muted-foreground">Vendedor:</span> <span className="font-medium">{vendedoresList.find(v => v.id === novaForm.vendedorId)?.nome ?? "—"}</span></div>
+                  <div><span className="text-muted-foreground">Plano:</span> <span className="font-mono font-bold">{novaPlanoAtual?.codigo ?? "—"}</span></div>
+                  <div className="col-span-2"><span className="text-muted-foreground">Nome:</span> <span>{novaPlanoAtual?.nome ?? "—"}</span></div>
+                  <div><span className="text-muted-foreground">Forma Pagto:</span> <span>{novaForm.formaPagamento || "—"}</span></div>
+                  <div><span className="text-muted-foreground">Valor Total:</span> <span className="font-bold text-primary">R$ {novaForm.valorManual || "—"}</span></div>
+                </div>
+              </div>
+              {novaForm.dependentes.length > 0 && (
+                <div className="rounded-lg border p-4 space-y-2 bg-muted/20">
+                  <h3 className="font-semibold text-sm">Dependentes ({novaForm.dependentes.length})</h3>
+                  {novaForm.dependentes.map((d, i) => (
+                    <div key={d._id} className="text-sm flex gap-3 py-1 border-t first:border-0">
+                      <span className="text-muted-foreground">{i + 1}.</span>
+                      <span className="font-medium">{d.nome || "—"}</span>
+                      <span className="text-muted-foreground font-mono text-xs">{d.cpf}</span>
+                      <Badge variant="outline" className="text-xs ml-auto">{d.grauParentesco}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {novaSalvo && (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700">
+                  <Check className="h-5 w-5" /><span className="font-medium">Proposta cadastrada com sucesso!</span>
+                </div>
+              )}
+              {novaErro && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />{novaErro}
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="flex-row gap-2 sm:justify-between">
+            <div>{novaStep > 1 && !novaSalvo && <Button variant="outline" onClick={() => setNovaStep(s => (s - 1) as 1|2|3)}>Voltar</Button>}</div>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={handleNovaFechar}>Cancelar</Button>
+              {novaStep < 3 ? (
+                <Button onClick={() => setNovaStep(s => (s + 1) as 1|2|3)}
+                  disabled={novaStep === 1 && !novaPodeAvancar1}
+                  data-testid="btn-nova-proximo">Próximo</Button>
+              ) : (
+                <Button onClick={handleNovaSalvar} disabled={novaSalvando || novaSalvo || !novaPodeSalvar}
+                  data-testid="btn-nova-salvar">
+                  {novaSalvando ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Salvando...</> : novaSalvo ? "Salvo!" : "Registrar Proposta"}
+                </Button>
+              )}
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de atualização de status */}
       <Dialog open={!!propostaEditando} onOpenChange={() => setPropostaEditando(null)}>

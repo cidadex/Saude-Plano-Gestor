@@ -298,7 +298,7 @@ export default function CadastroCliente({ open, onClose }: CadastroClienteProps)
             <div className="space-y-1.5">
               <Label>Cole o texto com os dados:</Label>
               <Textarea
-                placeholder={`Exemplo:\nNome: ROBERTA NAYARA DE SOUSA FREITAS\nSexo: FEMININO\nCPF: 043.332.293-40\nData nascimento: 18/08/90\nNome mãe: FRANCISCA DA NATIVIDADE DE SOUSA\nEstado civil: DIVORCIADA\nEndereço: AVM DIOGUINHO 4200, APTO 111 BLOCO I\nBairro: PRAIA DO FUTURO\nCep: 60183-712\nCidade: FORTALEZA\nEstado: CEARÁ\nTelefone: (85) 98809-7730\nEmail: email@exemplo.com\nPlano: Hapvida NOSSO PLANO\nObstetrícia: sim`}
+                placeholder={`Exemplo:\nNome: ROBERTA NAYARA DE SOUSA FREITAS\nSexo: FEMININO\nCPF: 043.332.293-40\nData nascimento: 18/08/90\nNome mãe: FRANCISCA DA NATIVIDADE DE SOUSA\nEstado civil: DIVORCIADA\nEndereço: AVM DIOGUINHO 4200, APTO 111 BLOCO I\nBairro: PRAIA DO FUTURO\nCep: 60183-712\nCidade: FORTALEZA\nEstado: CEARÁ\nTelefone: (85) 98809-7730\nEmail: email@exemplo.com\nPlano: NOSSO PLANO\nObstetrícia: sim`}
                 value={textoColar}
                 onChange={e => setTextoColar(e.target.value)}
                 className="min-h-[220px] text-sm font-mono leading-relaxed resize-none"

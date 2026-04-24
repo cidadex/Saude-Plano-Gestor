@@ -16,6 +16,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  clienteLogin: (cpf: string, dataNascimento: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -23,6 +24,7 @@ const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
   login: async () => {},
+  clienteLogin: async () => {},
   logout: async () => {},
 });
 
@@ -67,13 +69,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(data.user);
   };
 
+  const clienteLogin = async (cpf: string, dataNascimento: string) => {
+    const res = await fetch("/api/auth/cliente/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ cpf, dataNascimento }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json() as { error?: string };
+      throw new Error(data.error ?? "Erro ao fazer login");
+    }
+
+    const data = await res.json() as { user: AuthUser };
+    setUser(data.user);
+  };
+
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, clienteLogin, logout }}>
       {children}
     </AuthContext.Provider>
   );

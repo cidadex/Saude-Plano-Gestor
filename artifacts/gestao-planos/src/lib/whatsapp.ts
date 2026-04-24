@@ -38,9 +38,7 @@ export function gerarMensagem(
   if (tipo === 'BOLETO') {
     return `Olá, ${nome}! Tudo bem? 🙂
 
-Aqui é da equipe SEACEC Saúde.
-
-O boleto do seu plano de saúde *Hapvida* referente ao mês de *${mesReferencia}* já está disponível.
+Seu boleto de plano de saúde referente ao mês de *${mesReferencia}* já está disponível.
 
 💰 *Valor:* ${valor}
 📅 *Vencimento:* ${vencimento}
@@ -51,9 +49,7 @@ Em breve enviaremos o código de barras por aqui. Qualquer dúvida, é só chama
   if (tipo === 'ATRASO') {
     return `Olá, ${nome}! Tudo bem?
 
-Aqui é da equipe SEACEC Saúde.
-
-Identificamos que o boleto do seu plano *Hapvida* referente ao mês de *${mesReferencia}* ainda não foi pago.
+Identificamos que o boleto do seu plano de saúde referente ao mês de *${mesReferencia}* ainda não foi pago.
 
 💰 *Valor:* ${valor}
 📅 *Vencimento original:* ${vencimento}
@@ -65,9 +61,7 @@ Para regularizar, entre em contato conosco para receber a 2ª via do boleto atua
 
   return `Olá, ${nome}! Tudo bem?
 
-Aqui é da equipe SEACEC Saúde.
-
-Informamos que seu plano de saúde *Hapvida* está prestes a ser *SUSPENSO* por falta de pagamento.
+Informamos que seu plano de saúde está prestes a ser *SUSPENSO* por falta de pagamento.
 
 📋 *Mês em atraso:* ${mesReferencia}
 💰 *Valor:* ${valor}

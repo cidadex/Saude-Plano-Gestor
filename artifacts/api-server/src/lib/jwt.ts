@@ -10,6 +10,7 @@ export interface JwtPayload {
   nome: string;
   vendedorId?: string;
   gerenteId?: string;
+  clienteId?: string;
   permissoes?: string[];
 }
 

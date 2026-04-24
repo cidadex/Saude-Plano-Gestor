@@ -37,13 +37,13 @@ export default function Home() {
           </div>
           <div>
             <h1 className="text-5xl font-extrabold tracking-tight text-white">
-              Hapvida{" "}
+              Sistema de{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">
                 Gestão
               </span>
             </h1>
             <p className="mt-3 text-lg text-slate-400 font-light">
-              Sistema de Gestão de Vendas de Planos de Saúde
+              Gestão de Vendas de Planos de Saúde
             </p>
           </div>
 
@@ -140,7 +140,7 @@ export default function Home() {
 
         {/* Rodapé */}
         <p className="text-center text-slate-600 text-xs">
-          © 2026 Hapvida · Sistema Interno de Gestão de Planos de Saúde
+          © 2026 Sistema de Gestão de Planos de Saúde
         </p>
       </div>
     </div>

@@ -102,7 +102,7 @@ function GerenteModal({
           </div>
           <div className="space-y-1.5">
             <Label>E-mail *</Label>
-            <Input type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="gerente@seacec.com.br" />
+            <Input type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="gerente@empresa.com.br" />
           </div>
           <div className="space-y-1.5">
             <Label>Telefone</Label>

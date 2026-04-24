@@ -303,6 +303,35 @@ router.patch("/admin/users/:userId/reset-password", async (req, res) => {
 
 // ─── PROPOSTAS ─────────────────────────────────────────────────
 
+// POST /admin/propostas — admin cria proposta para qualquer vendedor
+router.post("/admin/propostas", async (req, res) => {
+  try {
+    const { vendedorId, dadosTitular, dadosDependentes, valorTotal } = req.body as {
+      vendedorId: string;
+      dadosTitular: Record<string, unknown>;
+      dadosDependentes?: Record<string, unknown>[];
+      valorTotal?: string;
+    };
+    if (!vendedorId) return res.status(400).json({ error: "vendedorId é obrigatório" });
+    if (!dadosTitular) return res.status(400).json({ error: "dadosTitular é obrigatório" });
+
+    const id = `prop-${Date.now()}`;
+    const [proposta] = await db.insert(propostasTable).values({
+      id,
+      vendedorId,
+      status: "AGUARDANDO_ENVIO",
+      dadosTitular,
+      dadosDependentes: dadosDependentes ?? [],
+      valorTotal: valorTotal ?? null,
+    }).returning();
+
+    res.status(201).json({ proposta });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 // Listar todas as propostas com dados do vendedor
 router.get("/admin/propostas", async (_req, res) => {
   try {

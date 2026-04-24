@@ -59,7 +59,7 @@ export const propostas: Proposta[] = [
     id: 'prop10', clienteNome: 'LAYSA CRISTINA ROCHA DUARTE', clienteCpf: '952.788.330-0',
     vendedor: 'WLADSON', plano: 'AMBUL+HOSP. C/PARTO ENFERMARIA', codigoPlano: '5252',
     tipo: 'TITULAR', dataEnvio: '05/06/2025', status: 'ENVIADO_OPERADORA',
-    valor: 248.84, telefone: '(85) 99215-8576', observacao: 'Ficha enviada para Hapvida em 08/06/2025',
+    valor: 248.84, telefone: '(85) 99215-8576', observacao: 'Ficha enviada para a operadora em 08/06/2025',
   },
   {
     id: 'prop11', clienteNome: 'ADRIELLE RODRIGUES LOPES', clienteCpf: '295.649.437-6',

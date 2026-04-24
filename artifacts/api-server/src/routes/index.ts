@@ -8,12 +8,14 @@ import comunicacoesRouter from "./comunicacoes.js";
 import adminRouter from "./admin.js";
 import aiRouter from "./ai.js";
 import planosRouter from "./planos.js";
+import clienteRouter from "./cliente.js";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
 router.use(seedRouter);
+router.use(clienteRouter);
 router.use(vendedorRouter);
 router.use(gerenteRouter);
 router.use(comunicacoesRouter);

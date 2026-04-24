@@ -67,7 +67,7 @@ export function GerenteLayout({ children }: { children: React.ReactNode }) {
             <HeartPulse className="w-5 h-5 text-white" strokeWidth={2} />
           </div>
           <div>
-            <p className="text-white font-bold text-base leading-none tracking-tight">Hapvida</p>
+            <p className="text-white font-bold text-base leading-none tracking-tight">Gestão</p>
             <p className="text-amber-300/70 text-[10px] mt-0.5 font-semibold uppercase tracking-widest">Painel Gerente</p>
           </div>
         </div>
@@ -146,7 +146,7 @@ export function GerenteLayout({ children }: { children: React.ReactNode }) {
           </button>
           <div className="flex items-center gap-2">
             <HeartPulse className="h-4 w-4 text-amber-400" />
-            <span className="font-bold text-white text-sm">Hapvida Gerente</span>
+            <span className="font-bold text-white text-sm">Gestão Gerente</span>
           </div>
         </div>
         <main className="flex-1 overflow-auto">

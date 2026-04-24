@@ -40,7 +40,7 @@ const categoriaCor: Record<string, string> = {
 };
 
 const categoriaDesc: Record<string, string> = {
-  "NOSSO PLANO": "Plano básico da rede própria Hapvida. Ideal para quem busca cobertura completa com menor custo.",
+  "NOSSO PLANO": "Plano básico da rede própria. Ideal para quem busca cobertura completa com menor custo.",
   "MIX": "Combina rede própria e credenciada. Mais opções de atendimento.",
   "PLENO": "Cobertura máxima com apartamento e rede ampla. Para quem quer o melhor.",
 };

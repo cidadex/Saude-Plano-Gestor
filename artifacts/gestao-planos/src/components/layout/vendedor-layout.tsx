@@ -64,7 +64,7 @@ export function VendedorLayout({ children }: { children: React.ReactNode }) {
             <HeartPulse className="w-5 h-5 text-white" strokeWidth={2} />
           </div>
           <div>
-            <p className="text-white font-bold text-base leading-none tracking-tight">Hapvida</p>
+            <p className="text-white font-bold text-base leading-none tracking-tight">Gestão</p>
             <p className="text-emerald-300/70 text-[10px] mt-0.5 font-semibold uppercase tracking-widest">Vendedor</p>
           </div>
         </div>

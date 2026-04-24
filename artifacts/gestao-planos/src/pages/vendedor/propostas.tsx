@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { usePropostas, type PropostaAPI } from "@/hooks/useVendedorData";
 import { formatMoney } from "@/lib/format";
 import { apiFetch } from "@/lib/api";
-import { Search, SlidersHorizontal, Plus, Check, Loader2, Sparkles, X, ChevronDown } from "lucide-react";
+import { Search, SlidersHorizontal, Plus, Check, Loader2, Sparkles, X, ChevronDown, UserPlus, Trash2, AlertCircle } from "lucide-react";
 
 type PlanoAPI = {
   id: string;
@@ -22,6 +22,12 @@ type PlanoAPI = {
   valorDependente: string | null;
   ativo: boolean;
 };
+
+type TabelaFaixa = { id: string; tabelaId: string; planoId: string; faixaEtaria: string; valor: string; valorApartamento?: string | null };
+type TabelaVendedor = { id: string; nome: string; tipoPlano?: string | null; faixas: TabelaFaixa[] };
+type DepVendedor = { _id: string; nome: string; cpf: string; dataNascimento: string; grauParentesco: string; faixaId: string; valor: number };
+
+const GRAUS = ["CÔNJUGE", "FILHO(A)", "PAI/MÃE", "OUTRO", "AGREGADO"];
 
 const STATUS_LABEL: Record<string, string> = {
   AGUARDANDO_ENVIO: "Aguardando envio",
@@ -49,16 +55,21 @@ function getCodigoPlano(p: PropostaAPI) { return String((p.dadosTitular as Recor
 export default function VendedorPropostas() {
   const { propostas, loading, reload } = usePropostas();
   const [planosAPI, setPlanosAPI] = useState<PlanoAPI[]>([]);
+  const [tabelas, setTabelas] = useState<TabelaVendedor[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("TODOS");
   const [novaPropostaAberta, setNovaPropostaAberta] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState(false);
+  const [salvarErro, setSalvarErro] = useState("");
 
   useEffect(() => {
     (apiFetch("/planos") as Promise<{ planos: PlanoAPI[] }>)
       .then(d => setPlanosAPI((d.planos ?? []).filter(p => p.ativo)))
+      .catch(console.error);
+    (apiFetch("/vendedor/tabela-preco") as Promise<{ tabelas: TabelaVendedor[] }>)
+      .then(d => setTabelas(d.tabelas ?? []))
       .catch(console.error);
   }, []);
 
@@ -69,17 +80,14 @@ export default function VendedorPropostas() {
   const [iaErro, setIaErro] = useState("");
   const [iaPreenchido, setIaPreenchido] = useState(false);
 
-  const [form, setForm] = useState({
-    clienteNome: "",
-    clienteCpf: "",
-    telefone: "",
-    tipo: "TITULAR" as "TITULAR" | "DEPENDENTE",
-    codigoPlano: "",
-    planoNome: "",
-    formaPagamento: "",
-    valorPrevisto: "",
-    observacao: "",
-  });
+  const FORM_INIT = {
+    clienteNome: "", clienteCpf: "", dataNascimento: "", sexo: "", telefone: "",
+    codigoPlano: "", planoNome: "", planoId: "", tabelaId: "",
+    faixaIdTitular: "", valorTitular: 0,
+    formaPagamento: "", observacao: "",
+    dependentes: [] as DepVendedor[],
+  };
+  const [form, setForm] = useState({ ...FORM_INIT });
 
   const statuses = useMemo(() => Array.from(new Set(propostas.map(p => p.status))), [propostas]);
 
@@ -93,21 +101,37 @@ export default function VendedorPropostas() {
     });
   }, [search, statusFilter, propostas]);
 
-  const handleChange = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
+  // Tabela derivada: faixas do plano selecionado na tabela selecionada
+  const tabelaAtual = tabelas.find(t => t.id === form.tabelaId) ?? tabelas[0];
+  const planosNaTabela = useMemo(() => {
+    if (!tabelaAtual) return planosAPI;
+    const ids = [...new Set(tabelaAtual.faixas.map(f => f.planoId))];
+    return planosAPI.filter(p => ids.includes(p.id));
+  }, [tabelaAtual, planosAPI]);
 
-  const handleSelecionarPlano = (codigo: string) => {
-    const p = planosAPI.find(p => p.codigo === codigo);
-    handleChange("codigoPlano", codigo);
-    handleChange("planoNome", p?.nome ?? "");
-    if (p?.valorTitular) handleChange("valorPrevisto", parseFloat(p.valorTitular).toFixed(2).replace(".", ","));
+  const faixasDoPlanosTabela = useMemo(() => {
+    if (!tabelaAtual || !form.planoId) return [];
+    return tabelaAtual.faixas.filter(f => f.planoId === form.planoId);
+  }, [tabelaAtual, form.planoId]);
+
+  const totalGeral = useMemo(() => {
+    return form.valorTitular + form.dependentes.reduce((s, d) => s + d.valor, 0);
+  }, [form.valorTitular, form.dependentes]);
+
+  const handleSelecionarPlano = (plano: PlanoAPI) => {
+    setForm(f => ({ ...f, planoId: plano.id, codigoPlano: plano.codigo ?? "", planoNome: plano.nome, faixaIdTitular: "", valorTitular: 0,
+      dependentes: f.dependentes.map(d => ({ ...d, faixaId: "", valor: 0 })) }));
+  };
+
+  const handleSelecionarFaixaTitular = (faixaId: string) => {
+    const faixa = faixasDoPlanosTabela.find(f => f.id === faixaId);
+    setForm(f => ({ ...f, faixaIdTitular: faixaId, valorTitular: faixa ? parseFloat(faixa.valor) : 0 }));
   };
 
   // IA: analisar texto colado
   const handleAnalisarIA = async () => {
     if (!iaTexto.trim()) return;
-    setIaAnalisando(true);
-    setIaErro("");
-    setIaPreenchido(false);
+    setIaAnalisando(true); setIaErro(""); setIaPreenchido(false);
     try {
       const res = await apiFetch("/ai/parse-cliente", {
         method: "POST",
@@ -118,10 +142,11 @@ export default function VendedorPropostas() {
         ...prev,
         clienteNome: dados.nome ?? prev.clienteNome,
         clienteCpf: dados.cpf ?? prev.clienteCpf,
+        dataNascimento: dados.dataNascimento ?? prev.dataNascimento,
+        sexo: dados.sexo ?? prev.sexo,
         telefone: dados.telefone ?? prev.telefone,
       }));
       setIaPreenchido(true);
-      // Fecha o painel de IA após 1.2s para o usuário confirmar os dados
       setTimeout(() => setIaAberta(false), 1200);
     } catch (err: unknown) {
       setIaErro(err instanceof Error ? err.message : "Não foi possível analisar o texto.");
@@ -130,8 +155,23 @@ export default function VendedorPropostas() {
     }
   };
 
+  const addDep = () => setForm(f => ({
+    ...f, dependentes: [...f.dependentes, { _id: `d${Date.now()}`, nome: "", cpf: "", dataNascimento: "", grauParentesco: "FILHO(A)", faixaId: "", valor: 0 }],
+  }));
+  const removeDep = (id: string) => setForm(f => ({ ...f, dependentes: f.dependentes.filter(d => d._id !== id) }));
+  const updateDep = (id: string, field: string, val: string | number) => setForm(f => ({
+    ...f, dependentes: f.dependentes.map(d => {
+      if (d._id !== id) return d;
+      if (field === "faixaId") {
+        const faixa = faixasDoPlanosTabela.find(fx => fx.id === val);
+        return { ...d, faixaId: val as string, valor: faixa ? parseFloat(faixa.valor) : 0 };
+      }
+      return { ...d, [field]: val };
+    }),
+  }));
+
   const handleSalvar = async () => {
-    setSalvando(true);
+    setSalvando(true); setSalvarErro("");
     try {
       await apiFetch("/vendedor/propostas", {
         method: "POST",
@@ -139,42 +179,42 @@ export default function VendedorPropostas() {
           dadosTitular: {
             nome: form.clienteNome.toUpperCase(),
             cpf: form.clienteCpf,
+            dataNascimento: form.dataNascimento,
+            sexo: form.sexo,
             telefone: form.telefone,
-            tipo: form.tipo,
+            tipo: "TITULAR",
             plano: form.planoNome,
             codigoPlano: form.codigoPlano,
             formaPagamento: form.formaPagamento,
             observacao: form.observacao,
+            faixaEtaria: faixasDoPlanosTabela.find(f => f.id === form.faixaIdTitular)?.faixaEtaria ?? "",
+            valor: form.valorTitular,
           },
-          dadosDependentes: [],
-          valorTotal: form.valorPrevisto.replace(",", "."),
+          dadosDependentes: form.dependentes.map(d => ({
+            nome: d.nome.toUpperCase(), cpf: d.cpf, dataNascimento: d.dataNascimento,
+            grauParentesco: d.grauParentesco, tipo: "DEPENDENTE",
+            faixaEtaria: faixasDoPlanosTabela.find(f => f.id === d.faixaId)?.faixaEtaria ?? "",
+            valor: d.valor,
+          })),
+          valorTotal: totalGeral > 0 ? totalGeral.toFixed(2) : null,
         }),
       });
       setSalvo(true);
       await reload();
       setTimeout(() => {
-        setSalvo(false);
-        setStep(1);
-        setForm({ clienteNome: "", clienteCpf: "", telefone: "", tipo: "TITULAR", codigoPlano: "", planoNome: "", formaPagamento: "", valorPrevisto: "", observacao: "" });
-        setNovaPropostaAberta(false);
-        setIaTexto("");
-        setIaAberta(false);
-        setIaPreenchido(false);
+        setSalvo(false); setStep(1); setForm({ ...FORM_INIT });
+        setNovaPropostaAberta(false); setIaTexto(""); setIaAberta(false); setIaPreenchido(false);
       }, 1200);
-    } catch (err) {
-      console.error(err);
+    } catch (err: unknown) {
+      setSalvarErro(err instanceof Error ? err.message : String(err));
     } finally {
       setSalvando(false);
     }
   };
 
   const handleFechar = () => {
-    setNovaPropostaAberta(false);
-    setStep(1);
-    setSalvo(false);
-    setIaTexto("");
-    setIaAberta(false);
-    setIaPreenchido(false);
+    setNovaPropostaAberta(false); setStep(1); setSalvo(false); setSalvarErro("");
+    setIaTexto(""); setIaAberta(false); setIaPreenchido(false);
   };
 
   if (loading) return (
@@ -301,17 +341,14 @@ export default function VendedorPropostas() {
             ))}
           </div>
 
-          {/* STEP 1 — Dados do Cliente */}
+          {/* STEP 1 — Dados do Titular */}
           {step === 1 && (
-            <div className="grid gap-4 py-2">
+            <div className="space-y-4 py-2">
               {/* Painel IA */}
               <div className="rounded-lg border border-violet-200 bg-violet-50/60">
-                <button
-                  type="button"
-                  onClick={() => { setIaAberta(prev => !prev); setIaErro(""); }}
+                <button type="button" onClick={() => { setIaAberta(p => !p); setIaErro(""); }}
                   className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-violet-800 hover:bg-violet-100/60 rounded-lg transition-colors"
-                  data-testid="btn-colar-dados-ia"
-                >
+                  data-testid="btn-colar-dados-ia">
                   <span className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-violet-600" />
                     Colar dados com IA
@@ -319,148 +356,264 @@ export default function VendedorPropostas() {
                   </span>
                   <ChevronDown className={`h-4 w-4 text-violet-500 transition-transform ${iaAberta ? "rotate-180" : ""}`} />
                 </button>
-
                 {iaAberta && (
                   <div className="px-4 pb-4 space-y-3">
-                    <Textarea
-                      placeholder="Cole aqui qualquer texto com dados do cliente: mensagem de WhatsApp, e-mail, planilha colada, etc."
-                      value={iaTexto}
-                      onChange={e => { setIaTexto(e.target.value); setIaPreenchido(false); setIaErro(""); }}
-                      className="resize-none bg-white text-sm min-h-[100px]"
-                      rows={4}
-                      data-testid="textarea-ia-dados"
-                    />
+                    <Textarea placeholder="Cole aqui qualquer texto com dados do cliente: mensagem de WhatsApp, e-mail, planilha colada, etc."
+                      value={iaTexto} onChange={e => { setIaTexto(e.target.value); setIaPreenchido(false); setIaErro(""); }}
+                      className="resize-none bg-white text-sm min-h-[100px]" rows={4} data-testid="textarea-ia-dados" />
                     {iaErro && <p className="text-xs text-red-600 flex items-center gap-1"><X className="h-3 w-3" />{iaErro}</p>}
-                    {iaPreenchido && (
-                      <p className="text-xs text-emerald-700 flex items-center gap-1">
-                        <Check className="h-3 w-3" /> Dados preenchidos com sucesso! Confira abaixo.
-                      </p>
-                    )}
-                    <Button
-                      size="sm"
-                      onClick={handleAnalisarIA}
-                      disabled={iaAnalisando || !iaTexto.trim()}
-                      className="gap-2 bg-violet-600 hover:bg-violet-700"
-                      data-testid="btn-analisar-ia"
-                    >
-                      {iaAnalisando ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Analisando...</> : <><Sparkles className="h-3.5 w-3.5" /> Analisar</>}
+                    {iaPreenchido && <p className="text-xs text-emerald-700 flex items-center gap-1"><Check className="h-3 w-3" /> Dados preenchidos! Confira abaixo.</p>}
+                    <Button size="sm" onClick={handleAnalisarIA} disabled={iaAnalisando || !iaTexto.trim()}
+                      className="gap-2 bg-violet-600 hover:bg-violet-700" data-testid="btn-analisar-ia">
+                      {iaAnalisando ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Analisando...</> : <><Sparkles className="h-3.5 w-3.5" />Analisar</>}
                     </Button>
                   </div>
                 )}
               </div>
-
-              {/* Formulário manual */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="prop-nome">Nome Completo *</Label>
-                  <Input id="prop-nome" placeholder="Nome do cliente" value={form.clienteNome} onChange={e => handleChange("clienteNome", e.target.value)} data-testid="input-proposta-nome" />
+              {/* Campos */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs text-muted-foreground">Nome Completo *</Label>
+                  <Input placeholder="NOME COMPLETO" value={form.clienteNome}
+                    onChange={e => setForm(f => ({ ...f, clienteNome: e.target.value }))} data-testid="input-proposta-nome" />
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="prop-cpf">CPF *</Label>
-                  <Input id="prop-cpf" placeholder="000.000.000-00" value={form.clienteCpf} onChange={e => handleChange("clienteCpf", e.target.value)} data-testid="input-proposta-cpf" />
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">CPF *</Label>
+                  <Input placeholder="000.000.000-00" value={form.clienteCpf}
+                    onChange={e => setForm(f => ({ ...f, clienteCpf: e.target.value }))} data-testid="input-proposta-cpf" />
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="prop-tel">Telefone / WhatsApp</Label>
-                  <Input id="prop-tel" placeholder="(85) 99999-9999" value={form.telefone} onChange={e => handleChange("telefone", e.target.value)} data-testid="input-proposta-telefone" />
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Data de Nascimento</Label>
+                  <Input type="date" value={form.dataNascimento}
+                    onChange={e => setForm(f => ({ ...f, dataNascimento: e.target.value }))} />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Tipo de Beneficiário</Label>
-                  <Select value={form.tipo} onValueChange={v => handleChange("tipo", v)}>
-                    <SelectTrigger data-testid="select-proposta-tipo"><SelectValue /></SelectTrigger>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Sexo</Label>
+                  <Select value={form.sexo} onValueChange={v => setForm(f => ({ ...f, sexo: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="TITULAR">Titular</SelectItem>
-                      <SelectItem value="DEPENDENTE">Dependente</SelectItem>
+                      <SelectItem value="M">Masculino</SelectItem>
+                      <SelectItem value="F">Feminino</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Telefone / WhatsApp</Label>
+                  <Input placeholder="(85) 99999-9999" value={form.telefone}
+                    onChange={e => setForm(f => ({ ...f, telefone: e.target.value }))} data-testid="input-proposta-telefone" />
                 </div>
               </div>
             </div>
           )}
 
-          {/* STEP 2 — Plano */}
+          {/* STEP 2 — Plano + Faixa + Dependentes */}
           {step === 2 && (
-            <div className="grid gap-4 py-2">
+            <div className="space-y-5 py-2">
+              {/* Tabela (se múltiplas) */}
+              {tabelas.length > 1 && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Tabela de Preços</Label>
+                  <Select value={form.tabelaId || (tabelaAtual?.id ?? "")} onValueChange={v => setForm(f => ({ ...f, tabelaId: v, planoId: "", codigoPlano: "", planoNome: "", faixaIdTitular: "", valorTitular: 0 }))}>
+                    <SelectTrigger><SelectValue placeholder="Selecione a tabela..." /></SelectTrigger>
+                    <SelectContent>
+                      {tabelas.map(t => <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Planos */}
               <div className="space-y-1.5">
                 <Label>Plano de Saúde *</Label>
-                <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
-                  {planosAPI.length === 0 && (
+                <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                  {planosNaTabela.length === 0 && (
                     <div className="col-span-2 flex items-center justify-center h-16 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando planos...
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando...
                     </div>
                   )}
-                  {planosAPI.map(p => (
-                    <button key={p.codigo} onClick={() => handleSelecionarPlano(p.codigo ?? "")} data-testid={`btn-proposta-plano-${p.codigo}`}
-                      className={`p-3 rounded-lg border text-left transition-all ${form.codigoPlano === p.codigo ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/40"}`}>
+                  {planosNaTabela.map(p => (
+                    <button key={p.id} onClick={() => handleSelecionarPlano(p)} data-testid={`btn-proposta-plano-${p.codigo}`}
+                      className={`p-3 rounded-lg border text-left transition-all ${form.planoId === p.id ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/40"}`}>
                       <div className="font-mono font-bold text-sm">{p.codigo ?? "—"}</div>
                       <div className="text-xs text-muted-foreground mt-0.5 leading-tight line-clamp-2">{p.nome}</div>
-                      <div className="text-xs font-semibold text-primary mt-1">
-                        Tit: R$ {p.valorTitular ? parseFloat(p.valorTitular).toFixed(2).replace(".", ",") : "—"}
-                      </div>
                     </button>
                   ))}
                 </div>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
+
+              {/* Faixa etária titular */}
+              {form.planoId && faixasDoPlanosTabela.length > 0 && (
                 <div className="space-y-1.5">
-                  <Label>Forma de Pagamento</Label>
-                  <Select value={form.formaPagamento} onValueChange={v => handleChange("formaPagamento", v)}>
+                  <Label className="text-xs text-muted-foreground">Faixa Etária do Titular *</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {faixasDoPlanosTabela.map(f => (
+                      <button key={f.id} onClick={() => handleSelecionarFaixaTitular(f.id)}
+                        className={`p-2.5 rounded-lg border text-left transition-all ${form.faixaIdTitular === f.id ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/40"}`}>
+                        <div className="text-xs font-semibold">{f.faixaEtaria}</div>
+                        <div className="text-xs font-bold text-primary mt-0.5">R$ {parseFloat(f.valor).toFixed(2).replace(".", ",")}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Forma pagamento + obs */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Forma de Pagamento</Label>
+                  <Select value={form.formaPagamento} onValueChange={v => setForm(f => ({ ...f, formaPagamento: v }))}>
                     <SelectTrigger data-testid="select-proposta-pagamento"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                     <SelectContent>
                       {formasPagamento.map(fp => <SelectItem key={fp} value={fp}>{fp}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="prop-valor">Valor Previsto (R$)</Label>
-                  <Input id="prop-valor" value={form.valorPrevisto} onChange={e => handleChange("valorPrevisto", e.target.value)} placeholder="0,00" data-testid="input-proposta-valor" />
-                </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label>Observações</Label>
-                  <Textarea placeholder="Informações adicionais..." value={form.observacao} onChange={e => handleChange("observacao", e.target.value)} className="resize-none" rows={3} data-testid="textarea-proposta-obs" />
+                  <Label className="text-xs text-muted-foreground">Observações</Label>
+                  <Textarea placeholder="Informações adicionais..." value={form.observacao}
+                    onChange={e => setForm(f => ({ ...f, observacao: e.target.value }))}
+                    className="resize-none" rows={2} data-testid="textarea-proposta-obs" />
                 </div>
               </div>
+
+              {/* Dependentes */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold">Dependentes</Label>
+                  <Button size="sm" variant="outline" onClick={addDep} className="gap-1.5 text-xs" data-testid="btn-add-dep">
+                    <UserPlus className="h-3.5 w-3.5" /> Adicionar
+                  </Button>
+                </div>
+                {form.dependentes.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic">Nenhum dependente adicionado.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {form.dependentes.map((dep, i) => (
+                      <div key={dep._id} className="rounded-lg border p-3 space-y-2 bg-muted/20">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-muted-foreground">Dependente {i + 1}</span>
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-red-500 hover:bg-red-50"
+                            onClick={() => removeDep(dep._id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <div className="space-y-1 sm:col-span-2">
+                            <Label className="text-xs text-muted-foreground">Nome</Label>
+                            <Input placeholder="Nome completo" value={dep.nome}
+                              onChange={e => updateDep(dep._id, "nome", e.target.value)} className="h-8 text-sm" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">CPF</Label>
+                            <Input placeholder="000.000.000-00" value={dep.cpf}
+                              onChange={e => updateDep(dep._id, "cpf", e.target.value)} className="h-8 text-sm font-mono" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Nascimento</Label>
+                            <Input type="date" value={dep.dataNascimento}
+                              onChange={e => updateDep(dep._id, "dataNascimento", e.target.value)} className="h-8 text-sm" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Parentesco</Label>
+                            <Select value={dep.grauParentesco} onValueChange={v => updateDep(dep._id, "grauParentesco", v)}>
+                              <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                              <SelectContent>{GRAUS.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent>
+                            </Select>
+                          </div>
+                          {form.planoId && faixasDoPlanosTabela.length > 0 && (
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Faixa Etária</Label>
+                              <Select value={dep.faixaId} onValueChange={v => updateDep(dep._id, "faixaId", v)}>
+                                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                                <SelectContent>
+                                  {faixasDoPlanosTabela.map(f => (
+                                    <SelectItem key={f.id} value={f.id}>{f.faixaEtaria} — R$ {parseFloat(f.valor).toFixed(2).replace(".", ",")}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                          {dep.valor > 0 && (
+                            <div className="flex items-center gap-1 text-xs font-bold text-primary">R$ {dep.valor.toFixed(2).replace(".", ",")}</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Total */}
+              {totalGeral > 0 && (
+                <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 flex items-center justify-between">
+                  <span className="text-sm font-medium">Total da proposta</span>
+                  <span className="text-lg font-bold text-primary">R$ {totalGeral.toFixed(2).replace(".", ",")}</span>
+                </div>
+              )}
             </div>
           )}
 
           {/* STEP 3 — Revisão */}
           {step === 3 && (
             <div className="space-y-4 py-2">
-              <div className="rounded-lg border p-4 space-y-3 bg-muted/20">
-                <h3 className="font-semibold text-sm">Dados do Cliente</h3>
+              <div className="rounded-lg border p-4 space-y-2 bg-muted/20">
+                <h3 className="font-semibold text-sm">Titular</h3>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div><span className="text-muted-foreground">Nome:</span> <span className="font-medium">{form.clienteNome || "—"}</span></div>
                   <div><span className="text-muted-foreground">CPF:</span> <span className="font-mono">{form.clienteCpf || "—"}</span></div>
-                  <div><span className="text-muted-foreground">Tipo:</span> <Badge variant="outline" className="text-xs">{form.tipo}</Badge></div>
+                  <div><span className="text-muted-foreground">Nascimento:</span> <span>{form.dataNascimento ? new Date(form.dataNascimento + "T12:00:00").toLocaleDateString("pt-BR") : "—"}</span></div>
                   <div><span className="text-muted-foreground">Telefone:</span> <span>{form.telefone || "—"}</span></div>
                 </div>
               </div>
-              <div className="rounded-lg border p-4 space-y-3 bg-muted/20">
-                <h3 className="font-semibold text-sm">Plano Selecionado</h3>
+              <div className="rounded-lg border p-4 space-y-2 bg-muted/20">
+                <h3 className="font-semibold text-sm">Plano</h3>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div><span className="text-muted-foreground">Código:</span> <span className="font-mono font-bold">{form.codigoPlano || "—"}</span></div>
                   <div><span className="text-muted-foreground">Pagamento:</span> <span>{form.formaPagamento || "—"}</span></div>
-                  <div><span className="text-muted-foreground">Valor:</span> <span className="font-bold text-primary">R$ {form.valorPrevisto || "—"}</span></div>
-                  <div><span className="text-muted-foreground">Status inicial:</span> <Badge variant="outline" className="text-xs border-amber-300 bg-amber-50 text-amber-700">AGUARDANDO ENVIO</Badge></div>
-                  {form.observacao && <div className="col-span-2"><span className="text-muted-foreground">Obs:</span> <span>{form.observacao}</span></div>}
+                  <div><span className="text-muted-foreground">Faixa titular:</span> <span>{faixasDoPlanosTabela.find(f => f.id === form.faixaIdTitular)?.faixaEtaria ?? "—"}</span></div>
+                  <div><span className="text-muted-foreground">Valor titular:</span> <span className="font-bold text-primary">R$ {form.valorTitular > 0 ? form.valorTitular.toFixed(2).replace(".", ",") : "—"}</span></div>
                 </div>
               </div>
+              {form.dependentes.length > 0 && (
+                <div className="rounded-lg border p-4 space-y-2 bg-muted/20">
+                  <h3 className="font-semibold text-sm">Dependentes ({form.dependentes.length})</h3>
+                  {form.dependentes.map((d, i) => (
+                    <div key={d._id} className="text-sm flex flex-wrap gap-2 py-1 border-t first:border-0 items-center">
+                      <span className="text-muted-foreground">{i + 1}.</span>
+                      <span className="font-medium">{d.nome || "—"}</span>
+                      <Badge variant="outline" className="text-xs">{d.grauParentesco}</Badge>
+                      {d.valor > 0 && <span className="font-bold text-primary ml-auto">R$ {d.valor.toFixed(2).replace(".", ",")}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {totalGeral > 0 && (
+                <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 flex items-center justify-between">
+                  <span className="text-sm font-medium">Total da proposta</span>
+                  <span className="text-lg font-bold text-primary">R$ {totalGeral.toFixed(2).replace(".", ",")}</span>
+                </div>
+              )}
               {salvo && (
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700">
-                  <Check className="h-5 w-5" />
-                  <span className="font-medium">Proposta cadastrada com sucesso!</span>
+                  <Check className="h-5 w-5" /><span className="font-medium">Proposta cadastrada com sucesso!</span>
+                </div>
+              )}
+              {salvarErro && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />{salvarErro}
                 </div>
               )}
             </div>
           )}
 
           <DialogFooter className="flex-row gap-2 sm:justify-between">
-            <div>{step > 1 && <Button variant="outline" onClick={() => setStep(s => (s - 1) as 1 | 2 | 3)}>Voltar</Button>}</div>
+            <div>{step > 1 && !salvo && <Button variant="outline" onClick={() => setStep(s => (s - 1) as 1 | 2 | 3)}>Voltar</Button>}</div>
             <div className="flex gap-2">
               <Button variant="ghost" onClick={handleFechar}>Cancelar</Button>
               {step < 3 ? (
-                <Button onClick={() => setStep(s => (s + 1) as 1 | 2 | 3)} data-testid="btn-proximo-proposta">Próximo</Button>
+                <Button onClick={() => setStep(s => (s + 1) as 1 | 2 | 3)}
+                  disabled={step === 1 && (!form.clienteNome || !form.clienteCpf)}
+                  data-testid="btn-proximo-proposta">Próximo</Button>
               ) : (
-                <Button className="bg-primary" onClick={handleSalvar} disabled={salvando || salvo || !form.clienteNome || !form.clienteCpf || !form.codigoPlano} data-testid="btn-salvar-proposta">
+                <Button className="bg-primary" onClick={handleSalvar} disabled={salvando || salvo || !form.clienteNome || !form.clienteCpf || !form.planoId} data-testid="btn-salvar-proposta">
                   {salvando ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Salvando...</> : salvo ? "Salvo!" : "Registrar Proposta"}
                 </Button>
               )}

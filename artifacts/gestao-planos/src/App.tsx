@@ -32,6 +32,10 @@ import AdminFinanceiro from "@/pages/admin/financeiro";
 import AdminComissoes from "@/pages/admin/comissoes";
 import AdminGerentes from "@/pages/admin/gerentes";
 
+import { ClienteLayout } from "@/components/layout/cliente-layout";
+import ClienteDashboard from "@/pages/cliente/dashboard";
+import ClienteFaturas from "@/pages/cliente/faturas";
+
 import { VendedorLayout } from "@/components/layout/vendedor-layout";
 import VendedorDashboard from "@/pages/vendedor/dashboard";
 import VendedorPropostas from "@/pages/vendedor/propostas";
@@ -143,6 +147,23 @@ function VendedorRoutes() {
   );
 }
 
+function ClienteRoutes() {
+  const { user, loading } = useAuth();
+  if (loading) return <LoadingScreen />;
+  if (!user) return <Redirect to="/login" />;
+  if (user.role !== "cliente") return <Redirect to="/login" />;
+
+  return (
+    <ClienteLayout>
+      <Switch>
+        <Route path="/cliente" component={ClienteDashboard} />
+        <Route path="/cliente/faturas" component={ClienteFaturas} />
+        <Route component={NotFound} />
+      </Switch>
+    </ClienteLayout>
+  );
+}
+
 function HomeRedirect() {
   const { user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
@@ -165,6 +186,8 @@ function Router() {
       <Route path="/vendedor/:rest*" component={VendedorRoutes} />
       <Route path="/gerente" component={GerenteRoutes} />
       <Route path="/gerente/:rest*" component={GerenteRoutes} />
+      <Route path="/cliente" component={ClienteRoutes} />
+      <Route path="/cliente/:rest*" component={ClienteRoutes} />
       <Route component={NotFound} />
     </Switch>
   );
