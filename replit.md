@@ -25,3 +25,36 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+## Sistema de Gestão de Vendas de Plano de Saúde
+
+### Arquitetura
+- **API Server** (`artifacts/api-server`): Express 5 + JWT (cookie httpOnly "sid") + Drizzle ORM
+- **Frontend** (`artifacts/gestao-planos`): React + Vite + Wouter + TanStack Query + shadcn/ui
+- **DB** (`lib/db`): PostgreSQL com Drizzle ORM
+
+### Papéis / Rotas
+- `admin` → `/admin/*`
+- `vendedor` → `/vendedor/*`
+- Seed via `POST /api/seed`
+
+### Credenciais de teste
+- `wladson@seacec.com.br` / `123456` (vendedor v1 — 3 clientes)
+- `carol@seacec.com.br` / `123456` (vendedor v2 — 2 clientes)
+
+### Features implementadas
+- Auth JWT (cookie + middleware `requireAuth`)
+- CRUD: propostas, clientes, boletos, comissoes
+- Dados isolados por vendedor (sem cross-contamination)
+- WhatsApp via wa.me com 3 templates (BOLETO, ATRASO, SUSPENSAO)
+- Registro de comunicações no banco (`comunicacoes` table) ao abrir WhatsApp
+- Página `/vendedor/historico` com histórico completo de mensagens enviadas + filtros
+
+### Mapeamento de tipos WhatsApp → DB
+- `BOLETO` → `BOLETO_EMITIDO`
+- `ATRASO` → `ATRASO`
+- `SUSPENSAO` → `AVISO_SUSPENSAO`
+
+### Rotas da API relevantes
+- `POST /api/comunicacoes` — registra envio de mensagem WhatsApp
+- `GET /api/vendedor/comunicacoes` — histórico de comunicações do vendedor

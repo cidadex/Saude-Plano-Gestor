@@ -140,3 +140,21 @@ export function useDashboard() {
   const { data, loading, error, reload } = useResource<DashboardStats>("/vendedor/dashboard");
   return { stats: data, loading, error, reload };
 }
+
+export interface ComunicacaoAPI {
+  id: string;
+  clienteId: string;
+  clienteNome: string;
+  clienteCpf: string;
+  clienteTelefone?: string | null;
+  operadorId?: string | null;
+  tipo: "BOLETO_EMITIDO" | "ATRASO" | "AVISO_SUSPENSAO" | "SUSPENSO";
+  boletoId?: string | null;
+  boleto?: { mesReferencia: string; valor: string } | null;
+  createdAt: string;
+}
+
+export function useComunicacoes() {
+  const { data, loading, error, reload } = useResource<{ comunicacoes: ComunicacaoAPI[] }>("/vendedor/comunicacoes");
+  return { comunicacoes: data?.comunicacoes ?? [], loading, error, reload };
+}

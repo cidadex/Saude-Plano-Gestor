@@ -265,6 +265,7 @@ export default function VendedorCarteira() {
           valor={parseFloat(clienteWpp.valorMensal ?? "0")}
           mesReferencia="Mês atual"
           vencimento={`Dia ${clienteWpp.diaVencimento ?? "—"}`}
+          clienteId={clienteWpp.id}
         />
       )}
     </div>

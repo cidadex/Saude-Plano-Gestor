@@ -3,9 +3,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { MessageCircle, Send, Edit2, Check } from "lucide-react";
+import { MessageCircle, Send, Edit2, Check, CheckCheck } from "lucide-react";
 import { tiposMensagem, gerarMensagem, abrirWhatsapp, type MensagemWhatsapp } from "@/lib/whatsapp";
 import { formatMoney } from "@/lib/format";
+import { apiFetch } from "@/lib/api";
 
 interface WhatsappModalProps {
   open: boolean;
@@ -15,6 +16,8 @@ interface WhatsappModalProps {
   valor: number;
   mesReferencia: string;
   vencimento: string;
+  clienteId?: string;
+  boletoId?: string;
 }
 
 export function WhatsappModal({
@@ -25,11 +28,14 @@ export function WhatsappModal({
   valor,
   mesReferencia,
   vencimento,
+  clienteId,
+  boletoId,
 }: WhatsappModalProps) {
   const [tipoSelecionado, setTipoSelecionado] = useState<MensagemWhatsapp['tipo'] | null>(null);
   const [mensagem, setMensagem] = useState("");
   const [editando, setEditando] = useState(false);
   const [enviado, setEnviado] = useState(false);
+  const [registrado, setRegistrado] = useState(false);
 
   const handleSelecionarTipo = (tipo: MensagemWhatsapp['tipo']) => {
     setTipoSelecionado(tipo);
@@ -37,11 +43,30 @@ export function WhatsappModal({
     setMensagem(msg);
     setEditando(false);
     setEnviado(false);
+    setRegistrado(false);
   };
 
-  const handleEnviar = () => {
+  const handleEnviar = async () => {
     abrirWhatsapp(telefone, mensagem);
     setEnviado(true);
+
+    // Registra a comunicação no banco se tiver clienteId
+    if (clienteId && tipoSelecionado) {
+      try {
+        await apiFetch("/comunicacoes", {
+          method: "POST",
+          body: JSON.stringify({
+            clienteId,
+            tipo: tipoSelecionado,
+            boletoId: boletoId ?? undefined,
+          }),
+        });
+        setRegistrado(true);
+      } catch (err) {
+        console.error("Erro ao registrar comunicação:", err);
+        // Não bloqueia o fluxo — WhatsApp já foi aberto
+      }
+    }
   };
 
   const handleFechar = () => {
@@ -49,6 +74,7 @@ export function WhatsappModal({
     setMensagem("");
     setEditando(false);
     setEnviado(false);
+    setRegistrado(false);
     onClose();
   };
 
@@ -123,18 +149,27 @@ export function WhatsappModal({
                 }`}
                 data-testid="textarea-mensagem-whatsapp"
               />
+
+              {enviado && registrado && (
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs dark:bg-emerald-950/20 dark:border-emerald-800 dark:text-emerald-400">
+                  <CheckCheck className="h-4 w-4 shrink-0" />
+                  <span>Mensagem registrada no histórico de comunicações.</span>
+                </div>
+              )}
+
               <div className="flex items-center justify-between pt-1">
                 <Badge variant="outline" className="text-xs text-green-700 border-green-300 bg-green-50 dark:bg-green-950/20">
                   {tipoAtual?.titulo}
                 </Badge>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={handleFechar}>
-                    Cancelar
+                    {enviado ? 'Fechar' : 'Cancelar'}
                   </Button>
                   <Button
                     size="sm"
                     className="bg-green-600 hover:bg-green-700 text-white gap-2"
-                    onClick={handleEnviar}
+                    onClick={() => void handleEnviar()}
+                    disabled={enviado}
                     data-testid="btn-enviar-whatsapp"
                   >
                     {enviado ? (

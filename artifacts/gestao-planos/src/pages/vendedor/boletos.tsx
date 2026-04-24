@@ -181,6 +181,8 @@ export default function VendedorBoletos() {
           valor={parseFloat(boletoSelecionado.valor)}
           mesReferencia={boletoSelecionado.mesReferencia}
           vencimento={formatDate(boletoSelecionado.vencimento)}
+          clienteId={boletoSelecionado.clienteId}
+          boletoId={boletoSelecionado.id}
         />
       )}
     </div>
