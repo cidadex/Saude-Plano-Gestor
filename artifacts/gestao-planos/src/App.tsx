@@ -10,6 +10,16 @@ import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 
 import { AdminLayout } from "@/components/layout/admin-layout";
+import { GerenteLayout, GerenteGuard } from "@/components/layout/gerente-layout";
+import GerenteDashboard from "@/pages/gerente/dashboard";
+import GerenteEquipe from "@/pages/gerente/equipe";
+import GerenteClientes from "@/pages/gerente/clientes";
+import GerentePropostas from "@/pages/gerente/propostas";
+import GerenteFinanceiro from "@/pages/gerente/financeiro";
+import GerenteComissoes from "@/pages/gerente/comissoes";
+import GerenteCobranca from "@/pages/gerente/cobranca";
+import GerenteRelatorios from "@/pages/gerente/relatorios";
+import GerenteSemPermissao from "@/pages/gerente/sem-permissao";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminClientes from "@/pages/admin/clientes";
 import AdminCancelados from "@/pages/admin/cancelados";
@@ -69,6 +79,44 @@ function AdminRoutes() {
   );
 }
 
+function GerenteRoutes() {
+  const { user, loading } = useAuth();
+  if (loading) return <LoadingScreen />;
+  if (!user) return <Redirect to="/login" />;
+  if (user.role !== "gerente") return <Redirect to="/login" />;
+
+  return (
+    <GerenteLayout>
+      <Switch>
+        <Route path="/gerente" component={GerenteDashboard} />
+        <Route path="/gerente/sem-permissao" component={GerenteSemPermissao} />
+        <Route path="/gerente/equipe">
+          <GerenteGuard permissao="ver_equipe"><GerenteEquipe /></GerenteGuard>
+        </Route>
+        <Route path="/gerente/clientes">
+          <GerenteGuard permissao="ver_clientes"><GerenteClientes /></GerenteGuard>
+        </Route>
+        <Route path="/gerente/propostas">
+          <GerenteGuard permissao="ver_propostas"><GerentePropostas /></GerenteGuard>
+        </Route>
+        <Route path="/gerente/financeiro">
+          <GerenteGuard permissao="ver_financeiro"><GerenteFinanceiro /></GerenteGuard>
+        </Route>
+        <Route path="/gerente/comissoes">
+          <GerenteGuard permissao="ver_comissoes"><GerenteComissoes /></GerenteGuard>
+        </Route>
+        <Route path="/gerente/cobranca">
+          <GerenteGuard permissao="ver_cobranca"><GerenteCobranca /></GerenteGuard>
+        </Route>
+        <Route path="/gerente/relatorios">
+          <GerenteGuard permissao="ver_relatorios"><GerenteRelatorios /></GerenteGuard>
+        </Route>
+        <Route component={NotFound} />
+      </Switch>
+    </GerenteLayout>
+  );
+}
+
 function VendedorRoutes() {
   const { user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
@@ -113,6 +161,8 @@ function Router() {
       <Route path="/admin/:rest*" component={AdminRoutes} />
       <Route path="/vendedor" component={VendedorRoutes} />
       <Route path="/vendedor/:rest*" component={VendedorRoutes} />
+      <Route path="/gerente" component={GerenteRoutes} />
+      <Route path="/gerente/:rest*" component={GerenteRoutes} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { db, usersTable, vendedoresTable, planosTable, tabelasPrecoTable, tabelasPrecoFaixasTable, clientesTable, propostasTable, boletosTable, comissoesTable } from "@workspace/db";
+import { db, usersTable, vendedoresTable, gerentesTable, planosTable, tabelasPrecoTable, tabelasPrecoFaixasTable, clientesTable, propostasTable, boletosTable, comissoesTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 
 const router = Router();
@@ -62,6 +62,28 @@ router.post("/seed", async (_req, res) => {
           id: v.id, userId: `user-${v.id}`, nome: v.nome,
           email: v.email, telefone: v.telefone ?? null,
           comissionado: v.comissionado, tipoComissao: v.tipoComissao,
+        });
+      }
+
+      // Gerentes
+      const gerentesData = [
+        {
+          id: "g1", nome: "MARCOS GERENTE", email: "marcos@seacec.com.br", telefone: "(85) 99800-0101",
+          permissoes: ["ver_dashboard", "ver_clientes", "ver_financeiro", "ver_comissoes", "ver_relatorios", "ver_equipe", "ver_propostas", "ver_cobranca"],
+        },
+        {
+          id: "g2", nome: "SILVIA GERENTE", email: "silvia@seacec.com.br", telefone: "(85) 99800-0102",
+          permissoes: ["ver_dashboard", "ver_clientes", "ver_propostas"],
+        },
+      ];
+      for (const g of gerentesData) {
+        await tx.insert(usersTable).values({
+          id: `user-${g.id}`, email: g.email, passwordHash: hash,
+          role: "gerente", nome: g.nome, active: true,
+        });
+        await tx.insert(gerentesTable).values({
+          id: g.id, userId: `user-${g.id}`, nome: g.nome,
+          email: g.email, telefone: g.telefone, permissoes: g.permissoes,
         });
       }
 
