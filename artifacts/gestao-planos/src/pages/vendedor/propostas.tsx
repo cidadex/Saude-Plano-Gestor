@@ -171,7 +171,22 @@ export default function VendedorPropostas() {
   }));
 
   const handleSalvar = async () => {
-    setSalvando(true); setSalvarErro("");
+    setSalvarErro("");
+    // Validação de faixa etária e valor
+    if (form.planoId && faixasDoPlanosTabela.length > 0 && !form.faixaIdTitular) {
+      setSalvarErro("Selecione a faixa etária do titular antes de salvar.");
+      return;
+    }
+    const depSemFaixa = form.dependentes.filter(d => faixasDoPlanosTabela.length > 0 && !d.faixaId);
+    if (depSemFaixa.length > 0) {
+      setSalvarErro(`Selecione a faixa etária de todos os dependentes (${depSemFaixa.length} pendente${depSemFaixa.length > 1 ? "s" : ""}).`);
+      return;
+    }
+    if (form.planoId && totalGeral <= 0) {
+      setSalvarErro("O valor total da proposta não pode ser zero. Selecione as faixas etárias.");
+      return;
+    }
+    setSalvando(true);
     try {
       await apiFetch("/vendedor/propostas", {
         method: "POST",

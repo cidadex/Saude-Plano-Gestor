@@ -379,6 +379,25 @@ router.patch("/admin/propostas/:id/status", async (req, res) => {
       return res.status(400).json({ error: "Para ativar, use a rota PATCH /admin/propostas/:id/ativar" });
     }
 
+    // Matriz de transições válidas
+    const transicoesValidas: Record<string, string[]> = {
+      AGUARDANDO_ENVIO: ["ENVIADA_OPERADORA"],
+      ENVIADA_OPERADORA: ["ACEITA", "RECUSADA"],
+      ACEITA: [],
+      RECUSADA: [],
+      ATIVA: [],
+    };
+    const permitidas = transicoesValidas[proposta.status] ?? [];
+    if (!permitidas.includes(status)) {
+      return res.status(400).json({
+        error: `Transição inválida: ${proposta.status} → ${status}. Transições permitidas: ${permitidas.join(", ") || "nenhuma"}`,
+      });
+    }
+
+    if (status === "RECUSADA" && !motivoRecusa?.trim()) {
+      return res.status(400).json({ error: "motivoRecusa é obrigatório ao recusar uma proposta" });
+    }
+
     const updateData: Partial<typeof propostasTable.$inferInsert> = {
       status,
       updatedAt: new Date(),
@@ -390,7 +409,7 @@ router.patch("/admin/propostas/:id/status", async (req, res) => {
       updateData.dataRetorno = new Date();
     }
 
-    if (status === "RECUSADA" && motivoRecusa) {
+    if (status === "RECUSADA") {
       updateData.motivoRecusa = motivoRecusa;
     }
 
