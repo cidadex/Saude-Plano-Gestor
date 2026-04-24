@@ -79,6 +79,12 @@ export default function AdminPropostas() {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
 
+  // Edit dados
+  const [dadosEditando, setDadosEditando] = useState<PropostaAdmin | null>(null);
+  const [dadosForm, setDadosForm] = useState({ nome: "", cpf: "", telefone: "", plano: "", codigoPlano: "", observacao: "", formaPagamento: "", valorTotal: "" });
+  const [dadosSalvando, setDadosSalvando] = useState(false);
+  const [dadosErro, setDadosErro] = useState("");
+
   // Campos de ativação
   const [matricula, setMatricula] = useState("");
   const [dataAtivacao, setDataAtivacao] = useState("");
@@ -150,6 +156,51 @@ export default function AdminPropostas() {
       setErro(msg);
     } finally {
       setSalvando(false);
+    }
+  };
+
+  const handleAbrirDadosEdicao = (p: PropostaAdmin) => {
+    const dt = p.dadosTitular as Record<string, unknown>;
+    setDadosEditando(p);
+    setDadosErro("");
+    setDadosForm({
+      nome: String(dt.nome ?? ""),
+      cpf: String(dt.cpf ?? ""),
+      telefone: String(dt.telefone ?? ""),
+      plano: String(dt.plano ?? ""),
+      codigoPlano: String(dt.codigoPlano ?? ""),
+      observacao: String(dt.observacao ?? ""),
+      formaPagamento: String(dt.formaPagamento ?? ""),
+      valorTotal: p.valorTotal ?? "",
+    });
+  };
+
+  const handleSalvarDados = async () => {
+    if (!dadosEditando) return;
+    setDadosSalvando(true);
+    setDadosErro("");
+    try {
+      await apiFetch(`/admin/propostas/${dadosEditando.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          dadosTitular: {
+            nome: dadosForm.nome,
+            cpf: dadosForm.cpf,
+            telefone: dadosForm.telefone,
+            plano: dadosForm.plano,
+            codigoPlano: dadosForm.codigoPlano,
+            observacao: dadosForm.observacao,
+            formaPagamento: dadosForm.formaPagamento,
+          },
+          valorTotal: dadosForm.valorTotal || undefined,
+        }),
+      });
+      await carregarPropostas();
+      setDadosEditando(null);
+    } catch (err: unknown) {
+      setDadosErro(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDadosSalvando(false);
     }
   };
 
@@ -428,9 +479,12 @@ export default function AdminPropostas() {
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1.5">
+                      <Button size="sm" variant="ghost" className="gap-1 text-muted-foreground hover:text-foreground" onClick={() => handleAbrirDadosEdicao(prop)} data-testid={`btn-editar-dados-proposta-${prop.id}`}>
+                        Dados
+                      </Button>
                       {PROXIMOS_STATUS[prop.status]?.length > 0 && (
                         <Button size="sm" variant="outline" onClick={() => handleAbrirEdicao(prop)} data-testid={`btn-editar-proposta-${prop.id}`}>
-                          Atualizar
+                          Status
                         </Button>
                       )}
                       {prop.status === "ATIVA" && (
@@ -906,6 +960,64 @@ export default function AdminPropostas() {
               data-testid="btn-confirmar-status"
             >
               {salvando ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Salvando...</> : "Confirmar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Editar Dados da Proposta */}
+      <Dialog open={!!dadosEditando} onOpenChange={() => setDadosEditando(null)}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Dados da Proposta</DialogTitle>
+            <DialogDescription className="font-mono text-xs">{dadosEditando?.dadosTitular && String((dadosEditando.dadosTitular as Record<string, unknown>).cpf ?? "")} — {dadosEditando?.dadosTitular && String((dadosEditando.dadosTitular as Record<string, unknown>).nome ?? "")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2 text-sm">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1 sm:col-span-2">
+                <Label className="text-xs text-muted-foreground">Nome</Label>
+                <Input value={dadosForm.nome} onChange={e => setDadosForm(f => ({ ...f, nome: e.target.value }))} data-testid="input-dados-nome" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">CPF</Label>
+                <Input value={dadosForm.cpf} onChange={e => setDadosForm(f => ({ ...f, cpf: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Telefone</Label>
+                <Input value={dadosForm.telefone} onChange={e => setDadosForm(f => ({ ...f, telefone: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Plano (nome)</Label>
+                <Input value={dadosForm.plano} onChange={e => setDadosForm(f => ({ ...f, plano: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Código do Plano</Label>
+                <Input className="font-mono" value={dadosForm.codigoPlano} onChange={e => setDadosForm(f => ({ ...f, codigoPlano: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Valor Total (R$)</Label>
+                <Input type="number" step="0.01" value={dadosForm.valorTotal} onChange={e => setDadosForm(f => ({ ...f, valorTotal: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Forma de Pagamento</Label>
+                <Select value={dadosForm.formaPagamento} onValueChange={v => setDadosForm(f => ({ ...f, formaPagamento: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent>
+                    {FORMAS_PAGAMENTO.map(fp => <SelectItem key={fp} value={fp}>{fp}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <Label className="text-xs text-muted-foreground">Observação</Label>
+                <Textarea value={dadosForm.observacao} onChange={e => setDadosForm(f => ({ ...f, observacao: e.target.value }))} rows={2} />
+              </div>
+            </div>
+            {dadosErro && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">{dadosErro}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDadosEditando(null)}>Cancelar</Button>
+            <Button onClick={handleSalvarDados} disabled={dadosSalvando} data-testid="btn-salvar-dados-proposta">
+              {dadosSalvando ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Salvando...</> : "Salvar"}
             </Button>
           </DialogFooter>
         </DialogContent>

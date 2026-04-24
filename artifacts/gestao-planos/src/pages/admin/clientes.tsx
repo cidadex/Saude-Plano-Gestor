@@ -72,8 +72,12 @@ export default function AdminClientes() {
   const [editSalvando, setEditSalvando] = useState(false);
   const [editErro, setEditErro] = useState("");
   const [editForm, setEditForm] = useState({
-    nome: "", telefone: "", email: "", dataNascimento: "",
-    cep: "", logradouro: "", numero: "", bairro: "", cidade: "", estado: "", observacao: "",
+    nome: "", telefone: "", email: "", dataNascimento: "", sexo: "", tipo: "",
+    cep: "", logradouro: "", numero: "", bairro: "", cidade: "", estado: "",
+    matricula: "", planoCode: "", codigoPlano: "", valorMensal: "", dataAtivacao: "",
+    formaPagamento: "", diaVencimento: "",
+    vrPl: "", saldo: "", valor2026: "", comissao: "", representante: "",
+    observacao: "",
   });
 
   const [togglendoId, setTogglendoId] = useState<string | null>(null);
@@ -118,12 +122,26 @@ export default function AdminClientes() {
       telefone: c.telefone ?? "",
       email: c.email ?? "",
       dataNascimento: c.dataNascimento ?? "",
+      sexo: c.sexo ?? "",
+      tipo: c.tipo ?? "",
       cep: c.cep ?? "",
       logradouro: c.logradouro ?? "",
       numero: c.numero ?? "",
       bairro: c.bairro ?? "",
       cidade: c.cidade ?? "",
       estado: c.estado ?? "",
+      matricula: c.matricula ?? "",
+      planoCode: c.planoCode ?? "",
+      codigoPlano: c.codigoPlano ?? "",
+      valorMensal: c.valorMensal ?? "",
+      dataAtivacao: c.dataAtivacao ? c.dataAtivacao.split("T")[0] : "",
+      formaPagamento: c.formaPagamento ?? "",
+      diaVencimento: c.diaVencimento != null ? String(c.diaVencimento) : "",
+      vrPl: c.vrPl ?? "",
+      saldo: c.saldo ?? "",
+      valor2026: c.valor2026 ?? "",
+      comissao: c.comissao ?? "",
+      representante: c.representante ?? "",
       observacao: c.observacao ?? "",
     });
   };
@@ -385,61 +403,165 @@ export default function AdminClientes() {
 
       {/* Modal Editar */}
       <Dialog open={!!editandoCliente} onOpenChange={() => setEditandoCliente(null)}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="h-4 w-4 text-primary" /> Editar Dados do Cliente
             </DialogTitle>
-            <DialogDescription className="font-mono text-xs">{editandoCliente?.cpf}</DialogDescription>
+            <DialogDescription className="font-mono text-xs">{editandoCliente?.cpf} — {editandoCliente?.nome}</DialogDescription>
           </DialogHeader>
           {editandoCliente && (
-            <div className="grid gap-3 py-2 text-sm">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1 sm:col-span-2">
-                  <Label className="text-xs text-muted-foreground">Nome Completo</Label>
-                  <Input value={editForm.nome} onChange={e => setEditForm(f => ({ ...f, nome: e.target.value }))} data-testid="input-edit-nome" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Data de Nascimento</Label>
-                  <Input value={editForm.dataNascimento} onChange={e => setEditForm(f => ({ ...f, dataNascimento: e.target.value }))} placeholder="AAAA-MM-DD" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Telefone</Label>
-                  <Input value={editForm.telefone} onChange={e => setEditForm(f => ({ ...f, telefone: e.target.value }))} data-testid="input-edit-telefone" />
-                </div>
-                <div className="space-y-1 sm:col-span-2">
-                  <Label className="text-xs text-muted-foreground">E-mail</Label>
-                  <Input value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">CEP</Label>
-                  <Input value={editForm.cep} onChange={e => setEditForm(f => ({ ...f, cep: e.target.value }))} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Número</Label>
-                  <Input value={editForm.numero} onChange={e => setEditForm(f => ({ ...f, numero: e.target.value }))} />
-                </div>
-                <div className="space-y-1 sm:col-span-2">
-                  <Label className="text-xs text-muted-foreground">Logradouro</Label>
-                  <Input value={editForm.logradouro} onChange={e => setEditForm(f => ({ ...f, logradouro: e.target.value }))} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Bairro</Label>
-                  <Input value={editForm.bairro} onChange={e => setEditForm(f => ({ ...f, bairro: e.target.value }))} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Cidade</Label>
-                  <Input value={editForm.cidade} onChange={e => setEditForm(f => ({ ...f, cidade: e.target.value }))} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Estado</Label>
-                  <Input value={editForm.estado} onChange={e => setEditForm(f => ({ ...f, estado: e.target.value }))} maxLength={2} placeholder="CE" />
-                </div>
-                <div className="space-y-1 sm:col-span-2">
-                  <Label className="text-xs text-muted-foreground">Observação</Label>
-                  <Textarea value={editForm.observacao} onChange={e => setEditForm(f => ({ ...f, observacao: e.target.value }))} rows={2} />
+            <div className="space-y-5 py-1 text-sm">
+
+              {/* Dados Pessoais */}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 border-b pb-1">Dados Pessoais</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label className="text-xs text-muted-foreground">Nome Completo</Label>
+                    <Input value={editForm.nome} onChange={e => setEditForm(f => ({ ...f, nome: e.target.value }))} data-testid="input-edit-nome" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Data de Nascimento</Label>
+                    <Input type="date" value={editForm.dataNascimento} onChange={e => setEditForm(f => ({ ...f, dataNascimento: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Sexo</Label>
+                    <Select value={editForm.sexo} onValueChange={v => setEditForm(f => ({ ...f, sexo: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="M">Masculino</SelectItem>
+                        <SelectItem value="F">Feminino</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Telefone</Label>
+                    <Input value={editForm.telefone} onChange={e => setEditForm(f => ({ ...f, telefone: e.target.value }))} data-testid="input-edit-telefone" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">E-mail</Label>
+                    <Input value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Tipo</Label>
+                    <Select value={editForm.tipo} onValueChange={v => setEditForm(f => ({ ...f, tipo: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="TITULAR">Titular</SelectItem>
+                        <SelectItem value="DEPENDENTE">Dependente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Representante</Label>
+                    <Input value={editForm.representante} onChange={e => setEditForm(f => ({ ...f, representante: e.target.value }))} placeholder="Nome do representante" />
+                  </div>
                 </div>
               </div>
+
+              {/* Plano */}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 border-b pb-1">Plano de Saúde</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Matrícula (14 dígitos)</Label>
+                    <Input className="font-mono" value={editForm.matricula} onChange={e => setEditForm(f => ({ ...f, matricula: e.target.value.replace(/\D/g, "") }))} maxLength={14} placeholder="00000000000000" data-testid="input-edit-matricula" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Código do Plano (4 dígitos)</Label>
+                    <Input className="font-mono" value={editForm.planoCode} onChange={e => setEditForm(f => ({ ...f, planoCode: e.target.value }))} maxLength={4} placeholder="0000" />
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label className="text-xs text-muted-foreground">Código Completo do Plano</Label>
+                    <Input className="font-mono" value={editForm.codigoPlano} onChange={e => setEditForm(f => ({ ...f, codigoPlano: e.target.value }))} placeholder="Ex: 406.000/57-4" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Valor Mensal (R$)</Label>
+                    <Input type="number" step="0.01" value={editForm.valorMensal} onChange={e => setEditForm(f => ({ ...f, valorMensal: e.target.value }))} placeholder="0.00" data-testid="input-edit-valor-mensal" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Data de Ativação</Label>
+                    <Input type="date" value={editForm.dataAtivacao} onChange={e => setEditForm(f => ({ ...f, dataAtivacao: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Forma de Pagamento</Label>
+                    <Select value={editForm.formaPagamento} onValueChange={v => setEditForm(f => ({ ...f, formaPagamento: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                      <SelectContent>
+                        {["BOLETO", "CORA", "C6", "BTG", "PIX", "DÉBITO EM FOLHA"].map(fp => (
+                          <SelectItem key={fp} value={fp}>{fp}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Dia de Vencimento</Label>
+                    <Input type="number" min={1} max={31} value={editForm.diaVencimento} onChange={e => setEditForm(f => ({ ...f, diaVencimento: e.target.value }))} placeholder="Ex: 10" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Financeiro */}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 border-b pb-1">Financeiro</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">VR/PL</Label>
+                    <Input type="number" step="0.01" value={editForm.vrPl} onChange={e => setEditForm(f => ({ ...f, vrPl: e.target.value }))} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Saldo</Label>
+                    <Input type="number" step="0.01" value={editForm.saldo} onChange={e => setEditForm(f => ({ ...f, saldo: e.target.value }))} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Valor 2026</Label>
+                    <Input type="number" step="0.01" value={editForm.valor2026} onChange={e => setEditForm(f => ({ ...f, valor2026: e.target.value }))} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Comissão</Label>
+                    <Input type="number" step="0.01" value={editForm.comissao} onChange={e => setEditForm(f => ({ ...f, comissao: e.target.value }))} placeholder="0.00" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Endereço */}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 border-b pb-1">Endereço</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">CEP</Label>
+                    <Input value={editForm.cep} onChange={e => setEditForm(f => ({ ...f, cep: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Número</Label>
+                    <Input value={editForm.numero} onChange={e => setEditForm(f => ({ ...f, numero: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label className="text-xs text-muted-foreground">Logradouro</Label>
+                    <Input value={editForm.logradouro} onChange={e => setEditForm(f => ({ ...f, logradouro: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Bairro</Label>
+                    <Input value={editForm.bairro} onChange={e => setEditForm(f => ({ ...f, bairro: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Cidade</Label>
+                    <Input value={editForm.cidade} onChange={e => setEditForm(f => ({ ...f, cidade: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Estado (UF)</Label>
+                    <Input value={editForm.estado} onChange={e => setEditForm(f => ({ ...f, estado: e.target.value.toUpperCase() }))} maxLength={2} placeholder="CE" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Observação */}
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Observação</Label>
+                <Textarea value={editForm.observacao} onChange={e => setEditForm(f => ({ ...f, observacao: e.target.value }))} rows={2} />
+              </div>
+
               {editErro && (
                 <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">{editErro}</p>
               )}

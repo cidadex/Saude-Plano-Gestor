@@ -59,6 +59,12 @@ export default function VendedorPropostas() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("TODOS");
   const [novaPropostaAberta, setNovaPropostaAberta] = useState(false);
+
+  // Edit proposta
+  const [editandoProposta, setEditandoProposta] = useState<PropostaAPI | null>(null);
+  const [editForm2, setEditForm2] = useState({ nome: "", cpf: "", telefone: "", planoNome: "", codigoPlano: "", formaPagamento: "", observacao: "", valorTotal: "" });
+  const [editSalvando, setEditSalvando] = useState(false);
+  const [editErro, setEditErro] = useState("");
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState(false);

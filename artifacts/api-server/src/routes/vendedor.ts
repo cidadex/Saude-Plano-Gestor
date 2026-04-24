@@ -173,4 +173,42 @@ router.post("/vendedor/propostas", async (req, res) => {
   }
 });
 
+// PATCH /vendedor/propostas/:id — editar dados da própria proposta (só AGUARDANDO_ENVIO)
+router.patch("/vendedor/propostas/:id", async (req, res) => {
+  try {
+    const vendedorId = req.user!.vendedorId;
+    if (!vendedorId) return res.status(403).json({ error: "Somente vendedores" });
+
+    const { id } = req.params;
+    const [proposta] = await db.select().from(propostasTable)
+      .where(eq(propostasTable.id, id)).limit(1);
+
+    if (!proposta) return res.status(404).json({ error: "Proposta não encontrada" });
+    if (proposta.vendedorId !== vendedorId) return res.status(403).json({ error: "Sem permissão" });
+    if (proposta.status !== "AGUARDANDO_ENVIO") {
+      return res.status(400).json({ error: "Só é possível editar propostas com status AGUARDANDO_ENVIO" });
+    }
+
+    const { dadosTitular, dadosDependentes, valorTotal } = req.body as {
+      dadosTitular?: Record<string, unknown>;
+      dadosDependentes?: Record<string, unknown>[];
+      valorTotal?: string;
+    };
+
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (dadosTitular !== undefined) {
+      updates.dadosTitular = { ...(proposta.dadosTitular as Record<string, unknown>), ...dadosTitular };
+    }
+    if (dadosDependentes !== undefined) updates.dadosDependentes = dadosDependentes;
+    if (valorTotal !== undefined) updates.valorTotal = valorTotal;
+
+    await db.update(propostasTable).set(updates as never).where(eq(propostasTable.id, id));
+    const [updated] = await db.select().from(propostasTable).where(eq(propostasTable.id, id)).limit(1);
+    res.json({ proposta: updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 export default router;

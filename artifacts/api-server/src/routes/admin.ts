@@ -363,6 +363,33 @@ router.get("/admin/propostas", async (_req, res) => {
   }
 });
 
+// PATCH /admin/propostas/:id — editar dados da proposta (dadosTitular + valorTotal)
+router.patch("/admin/propostas/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { dadosTitular, valorTotal } = req.body as {
+      dadosTitular?: Record<string, unknown>;
+      valorTotal?: string;
+    };
+
+    const [proposta] = await db.select().from(propostasTable).where(eq(propostasTable.id, id)).limit(1);
+    if (!proposta) return res.status(404).json({ error: "Proposta não encontrada" });
+
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (dadosTitular !== undefined) {
+      updates.dadosTitular = { ...(proposta.dadosTitular as Record<string, unknown>), ...dadosTitular };
+    }
+    if (valorTotal !== undefined) updates.valorTotal = valorTotal;
+
+    await db.update(propostasTable).set(updates as never).where(eq(propostasTable.id, id));
+    const [updated] = await db.select().from(propostasTable).where(eq(propostasTable.id, id)).limit(1);
+    res.json({ proposta: updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 // Atualizar status geral de uma proposta
 router.patch("/admin/propostas/:id/status", async (req, res) => {
   try {
@@ -602,26 +629,19 @@ router.patch("/admin/clientes/:id/status", async (req, res) => {
 router.patch("/admin/clientes/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const {
-      nome, telefone, email, dataNascimento,
-      cep, logradouro, numero, bairro, cidade, estado,
-      observacao, formaPagamento, diaVencimento,
-    } = req.body as Record<string, string | number | undefined>;
+    const body = req.body as Record<string, string | number | undefined | null>;
 
     const updates: Record<string, unknown> = {};
-    if (nome !== undefined) updates.nome = nome;
-    if (telefone !== undefined) updates.telefone = telefone;
-    if (email !== undefined) updates.email = email;
-    if (dataNascimento !== undefined) updates.dataNascimento = dataNascimento;
-    if (cep !== undefined) updates.cep = cep;
-    if (logradouro !== undefined) updates.logradouro = logradouro;
-    if (numero !== undefined) updates.numero = String(numero);
-    if (bairro !== undefined) updates.bairro = bairro;
-    if (cidade !== undefined) updates.cidade = cidade;
-    if (estado !== undefined) updates.estado = estado;
-    if (observacao !== undefined) updates.observacao = observacao;
-    if (formaPagamento !== undefined) updates.formaPagamento = formaPagamento;
-    if (diaVencimento !== undefined) updates.diaVencimento = Number(diaVencimento);
+    const str = (k: string) => { if (body[k] !== undefined) updates[k] = body[k] ?? null; };
+    const num = (k: string) => { if (body[k] !== undefined) updates[k] = body[k] != null ? Number(body[k]) : null; };
+
+    str("nome"); str("telefone"); str("email"); str("dataNascimento");
+    str("cep"); str("logradouro"); str("numero"); str("bairro"); str("cidade"); str("estado");
+    str("observacao"); str("formaPagamento"); num("diaVencimento");
+    str("sexo"); str("representante"); str("tipo");
+    str("matricula"); str("planoCode"); str("codigoPlano");
+    str("valorMensal"); str("dataAtivacao");
+    str("vrPl"); str("saldo"); str("valor2026"); str("comissao");
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: "Nenhum campo para atualizar" });
