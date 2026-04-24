@@ -5,10 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { apiFetch } from "@/lib/api";
 import { formatMoney } from "@/lib/format";
-import { Pencil, PauseCircle, PlayCircle, Check, AlertTriangle, Loader2, RefreshCw } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Pencil, PauseCircle, PlayCircle, Check, AlertTriangle, Loader2, RefreshCw, Plus, Trash2, X } from "lucide-react";
 
 type PlanoAPI = {
   id: string;
@@ -29,6 +32,7 @@ type TabelaFaixa = {
   faixaEtaria: string;
   valor: string;
   valorApartamento: string | null;
+  planoId: string;
 };
 
 type TabelaPreco = {
@@ -36,8 +40,18 @@ type TabelaPreco = {
   nome: string;
   tipoPlano: string | null;
   ano: number | null;
+  vendedorId: string | null;
   vendedorNome: string | null;
   faixas: TabelaFaixa[];
+};
+
+type Vendedor = { id: string; nome: string };
+
+type FaixaForm = {
+  faixaEtaria: string;
+  valor: string;
+  valorApartamento: string;
+  planoId: string;
 };
 
 const categoriaCor: Record<string, string> = {
@@ -48,9 +62,239 @@ const categoriaCor: Record<string, string> = {
 
 const CATEGORIAS = ["NOSSO PLANO", "MIX", "PLENO"];
 
+const FAIXAS_DEFAULT: FaixaForm[] = [
+  { faixaEtaria: "Até 29 anos", valor: "", valorApartamento: "", planoId: "" },
+  { faixaEtaria: "30 a 39 anos", valor: "", valorApartamento: "", planoId: "" },
+  { faixaEtaria: "40 a 49 anos", valor: "", valorApartamento: "", planoId: "" },
+  { faixaEtaria: "50 anos ou mais", valor: "", valorApartamento: "", planoId: "" },
+  { faixaEtaria: "DEPENDENTE (fixo)", valor: "", valorApartamento: "", planoId: "" },
+];
+
+function TabelaModal({
+  open, onClose, tabela, vendedores, planos, onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  tabela?: TabelaPreco;
+  vendedores: Vendedor[];
+  planos: PlanoAPI[];
+  onSaved: () => void;
+}) {
+  const { toast } = useToast();
+  const isEdit = !!tabela;
+
+  const [form, setForm] = useState({
+    vendedorId: tabela?.vendedorId ?? "",
+    nome: tabela?.nome ?? "",
+    tipoPlano: tabela?.tipoPlano ?? "",
+    ano: tabela?.ano ? String(tabela.ano) : String(new Date().getFullYear()),
+  });
+
+  const [faixas, setFaixas] = useState<FaixaForm[]>(
+    tabela?.faixas.length
+      ? tabela.faixas.map(f => ({
+          faixaEtaria: f.faixaEtaria,
+          valor: f.valor,
+          valorApartamento: f.valorApartamento ?? "",
+          planoId: f.planoId,
+        }))
+      : FAIXAS_DEFAULT
+  );
+
+  const [saving, setSaving] = useState(false);
+
+  const setField = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  const setFaixa = (i: number, k: keyof FaixaForm, v: string) =>
+    setFaixas(prev => prev.map((f, idx) => idx === i ? { ...f, [k]: v } : f));
+
+  const addFaixa = () =>
+    setFaixas(prev => [...prev, { faixaEtaria: "", valor: "", valorApartamento: "", planoId: "" }]);
+
+  const removeFaixa = (i: number) =>
+    setFaixas(prev => prev.filter((_, idx) => idx !== i));
+
+  const handleSave = async (): Promise<void> => {
+    if (!form.vendedorId) { toast({ variant: "destructive", title: "Selecione um vendedor" }); return; }
+    if (!form.nome.trim()) { toast({ variant: "destructive", title: "Informe o nome da tabela" }); return; }
+
+    const validFaixas = faixas.filter(f => f.faixaEtaria && f.valor && f.planoId);
+    if (validFaixas.length === 0) { toast({ variant: "destructive", title: "Adicione ao menos uma faixa com faixa etária, valor e plano" }); return; }
+
+    setSaving(true);
+    try {
+      const body = {
+        vendedorId: form.vendedorId,
+        nome: form.nome,
+        tipoPlano: form.tipoPlano || null,
+        ano: form.ano ? parseInt(form.ano) : null,
+        faixas: validFaixas.map(f => ({
+          faixaEtaria: f.faixaEtaria,
+          valor: f.valor.replace(",", "."),
+          valorApartamento: f.valorApartamento ? f.valorApartamento.replace(",", ".") : undefined,
+          planoId: f.planoId,
+        })),
+      };
+
+      if (isEdit) {
+        await apiFetch(`/admin/tabelas-preco/${tabela.id}`, { method: "PUT", body: JSON.stringify(body) });
+        toast({ title: "Tabela atualizada com sucesso" });
+      } else {
+        await apiFetch("/admin/tabelas-preco", { method: "POST", body: JSON.stringify(body) });
+        toast({ title: "Tabela criada com sucesso" });
+      }
+      onSaved();
+      onClose();
+    } catch (err) {
+      toast({ variant: "destructive", title: String(err) });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const activePlanos = planos.filter(p => p.ativo);
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? "Editar Tabela de Preço" : "Nova Tabela de Preço"}</DialogTitle>
+          <DialogDescription>
+            Defina o vendedor, tipo de plano e os valores por faixa etária.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Vendedor *</Label>
+              <Select value={form.vendedorId} onValueChange={v => setField("vendedorId", v)} disabled={isEdit}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecionar vendedor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {vendedores.map(v => (
+                    <SelectItem key={v.id} value={v.id}>{v.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Nome da tabela *</Label>
+              <Input value={form.nome} onChange={e => setField("nome", e.target.value)} placeholder="Ex: NOSSO PLANO (SEM OBSTETRÍCIA)" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Tipo do plano</Label>
+              <Input value={form.tipoPlano} onChange={e => setField("tipoPlano", e.target.value)} placeholder="Ex: NOSSO PLANO" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Ano de vigência</Label>
+              <Input type="number" value={form.ano} onChange={e => setField("ano", e.target.value)} placeholder="2026" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold">Faixas Etárias e Valores</Label>
+              <Button type="button" variant="outline" size="sm" onClick={addFaixa} className="gap-1 h-7 text-xs">
+                <Plus className="h-3 w-3" /> Adicionar faixa
+              </Button>
+            </div>
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="text-xs">Faixa etária</TableHead>
+                    <TableHead className="text-xs">Plano</TableHead>
+                    <TableHead className="text-xs text-right">Enf. (R$)</TableHead>
+                    <TableHead className="text-xs text-right">Apto. (R$)</TableHead>
+                    <TableHead className="w-8" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {faixas.map((f, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="p-1.5">
+                        <Input
+                          value={f.faixaEtaria}
+                          onChange={e => setFaixa(i, "faixaEtaria", e.target.value)}
+                          placeholder="Ex: Até 29 anos"
+                          className="h-8 text-xs"
+                        />
+                      </TableCell>
+                      <TableCell className="p-1.5 min-w-[140px]">
+                        <Select value={f.planoId} onValueChange={v => setFaixa(i, "planoId", v)}>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Plano..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {activePlanos.map(p => (
+                              <SelectItem key={p.id} value={p.id} className="text-xs">
+                                <span className="font-mono mr-1">{p.codigo}</span> {p.nome.slice(0, 30)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="p-1.5">
+                        <Input
+                          value={f.valor}
+                          onChange={e => setFaixa(i, "valor", e.target.value)}
+                          placeholder="0,00"
+                          className="h-8 text-xs font-mono text-right"
+                        />
+                      </TableCell>
+                      <TableCell className="p-1.5">
+                        <Input
+                          value={f.valorApartamento}
+                          onChange={e => setFaixa(i, "valorApartamento", e.target.value)}
+                          placeholder="0,00"
+                          className="h-8 text-xs font-mono text-right"
+                        />
+                      </TableCell>
+                      <TableCell className="p-1.5">
+                        <Button
+                          type="button" variant="ghost" size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-red-500"
+                          onClick={() => removeFaixa(i)}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {faixas.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-4 text-sm text-muted-foreground">
+                        Nenhuma faixa. Clique em "Adicionar faixa" para começar.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button onClick={() => void handleSave()} disabled={saving}>
+            {saving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Salvando...</> : isEdit ? "Salvar alterações" : "Criar tabela"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function AdminPlanos() {
+  const { toast } = useToast();
   const [planos, setPlanos] = useState<PlanoAPI[]>([]);
   const [tabelas, setTabelas] = useState<TabelaPreco[]>([]);
+  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [planoEditando, setPlanoEditando] = useState<PlanoAPI | null>(null);
@@ -62,15 +306,22 @@ export default function AdminPlanos() {
   const [planoSuspendendo, setPlanoSuspendendo] = useState<PlanoAPI | null>(null);
   const [suspendendo, setSuspendendo] = useState(false);
 
+  const [tabelaModalOpen, setTabelaModalOpen] = useState(false);
+  const [tabelaEditando, setTabelaEditando] = useState<TabelaPreco | undefined>();
+  const [tabelaExcluindo, setTabelaExcluindo] = useState<TabelaPreco | null>(null);
+  const [excluindo, setExcluindo] = useState(false);
+
   const carregar = useCallback(async () => {
     setLoading(true);
     try {
-      const [dadosPlanos, dadosTabelas] = await Promise.all([
+      const [dadosPlanos, dadosTabelas, dadosVendedores] = await Promise.all([
         apiFetch("/admin/planos") as Promise<{ planos: PlanoAPI[] }>,
         apiFetch("/admin/tabelas-preco") as Promise<{ tabelas: TabelaPreco[] }>,
+        apiFetch("/admin/vendedores") as Promise<{ vendedores: Vendedor[] }>,
       ]);
       setPlanos(dadosPlanos.planos ?? []);
       setTabelas(dadosTabelas.tabelas ?? []);
+      setVendedores(dadosVendedores.vendedores ?? []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -122,6 +373,21 @@ export default function AdminPlanos() {
       console.error(err);
     } finally {
       setSuspendendo(false);
+    }
+  };
+
+  const handleExcluirTabela = async () => {
+    if (!tabelaExcluindo) return;
+    setExcluindo(true);
+    try {
+      await apiFetch(`/admin/tabelas-preco/${tabelaExcluindo.id}`, { method: "DELETE" });
+      toast({ title: "Tabela excluída com sucesso" });
+      await carregar();
+      setTabelaExcluindo(null);
+    } catch (err) {
+      toast({ variant: "destructive", title: String(err) });
+    } finally {
+      setExcluindo(false);
     }
   };
 
@@ -239,19 +505,57 @@ export default function AdminPlanos() {
       })}
 
       {/* Tabelas de preço por faixa etária */}
-      {tabelas.length > 0 && (
-        <div className="space-y-3 pt-2">
-          <h3 className="text-lg font-bold text-foreground">Tabelas de Preço por Faixa Etária</h3>
-          <p className="text-sm text-muted-foreground">Preços específicos por vendedor, definidos por faixa de idade.</p>
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-foreground">Tabelas de Preço por Faixa Etária</h3>
+            <p className="text-sm text-muted-foreground">Preços específicos por vendedor, definidos por faixa de idade.</p>
+          </div>
+          <Button
+            size="sm" className="gap-2"
+            onClick={() => { setTabelaEditando(undefined); setTabelaModalOpen(true); }}
+            data-testid="btn-nova-tabela"
+          >
+            <Plus className="h-4 w-4" /> Nova Tabela
+          </Button>
+        </div>
+
+        {tabelas.length === 0 ? (
+          <Card>
+            <CardContent className="py-10 text-center text-muted-foreground text-sm">
+              Nenhuma tabela de preço cadastrada. Clique em "Nova Tabela" para criar uma.
+            </CardContent>
+          </Card>
+        ) : (
           <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
             {tabelas.map(tabela => (
               <Card key={tabela.id} className="overflow-hidden">
                 <CardHeader className="bg-primary/5 pb-3 border-b">
-                  <CardTitle className="text-sm">
-                    <span className="font-bold">{tabela.vendedorNome}</span>
-                    <span className="text-muted-foreground font-normal"> — {tabela.tipoPlano}</span>
-                    {tabela.ano && <span className="ml-1 text-xs text-muted-foreground">({tabela.ano})</span>}
-                  </CardTitle>
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-sm">
+                      <span className="font-bold">{tabela.vendedorNome}</span>
+                      <span className="text-muted-foreground font-normal"> — {tabela.tipoPlano ?? tabela.nome}</span>
+                      {tabela.ano && <span className="ml-1 text-xs text-muted-foreground">({tabela.ano})</span>}
+                    </CardTitle>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
+                        title="Editar tabela"
+                        onClick={() => { setTabelaEditando(tabela); setTabelaModalOpen(true); }}
+                        data-testid={`btn-editar-tabela-${tabela.id}`}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500"
+                        title="Excluir tabela"
+                        onClick={() => setTabelaExcluindo(tabela)}
+                        data-testid={`btn-excluir-tabela-${tabela.id}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
                 </CardHeader>
                 <Table>
                   <TableHeader>
@@ -276,10 +580,10 @@ export default function AdminPlanos() {
               </Card>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Modal Editar Valores */}
+      {/* Modal Editar Valores do Plano */}
       <Dialog open={!!planoEditando} onOpenChange={() => { setPlanoEditando(null); setSalvo(false); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -290,7 +594,6 @@ export default function AdminPlanos() {
               <span className="font-mono font-bold">{planoEditando?.codigo}</span> — {planoEditando?.nome}
             </DialogDescription>
           </DialogHeader>
-
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
@@ -330,7 +633,6 @@ export default function AdminPlanos() {
               </div>
             )}
           </div>
-
           <DialogFooter>
             <Button variant="ghost" onClick={() => setPlanoEditando(null)}>Cancelar</Button>
             <Button onClick={handleSalvarEdicao} disabled={salvando || salvo} data-testid="btn-confirmar-edicao-plano">
@@ -340,7 +642,7 @@ export default function AdminPlanos() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal Suspender/Reativar */}
+      {/* Modal Suspender/Reativar Plano */}
       <Dialog open={!!planoSuspendendo} onOpenChange={() => setPlanoSuspendendo(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -377,6 +679,40 @@ export default function AdminPlanos() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal Criar/Editar Tabela de Preço */}
+      {tabelaModalOpen && (
+        <TabelaModal
+          open={tabelaModalOpen}
+          onClose={() => { setTabelaModalOpen(false); setTabelaEditando(undefined); }}
+          tabela={tabelaEditando}
+          vendedores={vendedores}
+          planos={planos}
+          onSaved={carregar}
+        />
+      )}
+
+      {/* Confirmação de Exclusão de Tabela */}
+      <AlertDialog open={!!tabelaExcluindo} onOpenChange={() => setTabelaExcluindo(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir tabela de preço</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir a tabela <strong>{tabelaExcluindo?.nome}</strong> do vendedor <strong>{tabelaExcluindo?.vendedorNome}</strong>? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => void handleExcluirTabela()}
+              disabled={excluindo}
+            >
+              {excluindo ? <Loader2 className="h-4 w-4 animate-spin" /> : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

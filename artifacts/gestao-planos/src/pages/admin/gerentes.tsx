@@ -68,9 +68,9 @@ function GerenteModal({
     }));
   };
 
-  const handleSave = async () => {
-    if (!form.nome || !form.email) return toast({ variant: "destructive", title: "Nome e e-mail são obrigatórios" });
-    if (!isEdit && !form.senha) return toast({ variant: "destructive", title: "Informe a senha inicial" });
+  const handleSave = async (): Promise<void> => {
+    if (!form.nome || !form.email) { toast({ variant: "destructive", title: "Nome e e-mail são obrigatórios" }); return; }
+    if (!isEdit && !form.senha) { toast({ variant: "destructive", title: "Informe a senha inicial" }); return; }
     setSaving(true);
     try {
       if (isEdit) {
@@ -147,8 +147,8 @@ function ResetPasswordModal({ open, onClose, userId, nome }: { open: boolean; on
   const [nova, setNova] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const handleSave = async () => {
-    if (nova.length < 6) return toast({ variant: "destructive", title: "A senha deve ter no mínimo 6 caracteres" });
+  const handleSave = async (): Promise<void> => {
+    if (nova.length < 6) { toast({ variant: "destructive", title: "A senha deve ter no mínimo 6 caracteres" }); return; }
     setSaving(true);
     try {
       await apiFetch(`/admin/users/${userId}/reset-password`, { method: "PATCH", body: JSON.stringify({ novaSenha: nova }) });
@@ -193,7 +193,7 @@ export default function AdminGerentes() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-gerentes"],
-    queryFn: () => apiFetch("/admin/gerentes").then(r => r.json()) as Promise<{ gerentes: Gerente[] }>,
+    queryFn: () => apiFetch("/admin/gerentes") as Promise<{ gerentes: Gerente[] }>,
   });
 
   const statusMutation = useMutation({

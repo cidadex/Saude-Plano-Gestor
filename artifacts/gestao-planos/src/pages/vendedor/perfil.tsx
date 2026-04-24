@@ -17,15 +17,15 @@ export default function VendedorPerfil() {
 
   const set = (k: string, v: string) => { setForm(f => ({ ...f, [k]: v })); setSuccess(false); };
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     if (!form.senhaAtual || !form.novaSenha || !form.confirmar) {
-      return toast({ variant: "destructive", title: "Preencha todos os campos" });
+      toast({ variant: "destructive", title: "Preencha todos os campos" }); return;
     }
     if (form.novaSenha !== form.confirmar) {
-      return toast({ variant: "destructive", title: "A nova senha e a confirmação não coincidem" });
+      toast({ variant: "destructive", title: "A nova senha e a confirmação não coincidem" }); return;
     }
     if (form.novaSenha.length < 6) {
-      return toast({ variant: "destructive", title: "A nova senha deve ter no mínimo 6 caracteres" });
+      toast({ variant: "destructive", title: "A nova senha deve ter no mínimo 6 caracteres" }); return;
     }
     setSaving(true);
     try {

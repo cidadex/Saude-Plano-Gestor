@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { eq, asc } from "drizzle-orm";
+import { randomUUID } from "crypto";
 import {
   db, planosTable, tabelasPrecoTable, tabelasPrecoFaixasTable, vendedoresTable,
 } from "@workspace/db";
@@ -92,6 +93,96 @@ router.get("/admin/tabelas-preco", async (req, res) => {
     );
 
     res.json({ tabelas: tabelasComFaixas });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// POST /api/admin/tabelas-preco — criar nova tabela de preço por vendedor
+router.post("/admin/tabelas-preco", async (req, res) => {
+  if (req.user?.role !== "admin") return res.status(403).json({ error: "Acesso negado" });
+  try {
+    const { vendedorId, nome, tipoPlano, ano, faixas } = req.body as {
+      vendedorId: string;
+      nome: string;
+      tipoPlano?: string;
+      ano?: number;
+      faixas: { faixaEtaria: string; valor: string; valorApartamento?: string; planoId: string }[];
+    };
+    if (!vendedorId || !nome) return res.status(400).json({ error: "vendedorId e nome são obrigatórios" });
+
+    const tabelaId = randomUUID();
+    await db.insert(tabelasPrecoTable).values({ id: tabelaId, vendedorId, nome, tipoPlano, ano });
+
+    for (const f of (faixas ?? [])) {
+      await db.insert(tabelasPrecoFaixasTable).values({
+        id: randomUUID(),
+        tabelaId,
+        planoId: f.planoId,
+        faixaEtaria: f.faixaEtaria,
+        valor: f.valor,
+        valorApartamento: f.valorApartamento ?? null,
+      });
+    }
+    res.status(201).json({ ok: true, tabelaId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// PUT /api/admin/tabelas-preco/:id — editar tabela e substituir faixas
+router.put("/admin/tabelas-preco/:id", async (req, res) => {
+  if (req.user?.role !== "admin") return res.status(403).json({ error: "Acesso negado" });
+  try {
+    const { id } = req.params;
+    const { nome, tipoPlano, ano, faixas } = req.body as {
+      nome?: string;
+      tipoPlano?: string;
+      ano?: number;
+      faixas?: { faixaEtaria: string; valor: string; valorApartamento?: string; planoId: string }[];
+    };
+
+    const [tabela] = await db.select({ id: tabelasPrecoTable.id }).from(tabelasPrecoTable).where(eq(tabelasPrecoTable.id, id)).limit(1);
+    if (!tabela) return res.status(404).json({ error: "Tabela não encontrada" });
+
+    const updates: Record<string, unknown> = {};
+    if (nome !== undefined) updates.nome = nome;
+    if (tipoPlano !== undefined) updates.tipoPlano = tipoPlano;
+    if (ano !== undefined) updates.ano = ano;
+    if (Object.keys(updates).length > 0) {
+      await db.update(tabelasPrecoTable).set(updates).where(eq(tabelasPrecoTable.id, id));
+    }
+
+    if (faixas !== undefined) {
+      await db.delete(tabelasPrecoFaixasTable).where(eq(tabelasPrecoFaixasTable.tabelaId, id));
+      for (const f of faixas) {
+        await db.insert(tabelasPrecoFaixasTable).values({
+          id: randomUUID(),
+          tabelaId: id,
+          planoId: f.planoId,
+          faixaEtaria: f.faixaEtaria,
+          valor: f.valor,
+          valorApartamento: f.valorApartamento ?? null,
+        });
+      }
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// DELETE /api/admin/tabelas-preco/:id — excluir tabela e suas faixas
+router.delete("/admin/tabelas-preco/:id", async (req, res) => {
+  if (req.user?.role !== "admin") return res.status(403).json({ error: "Acesso negado" });
+  try {
+    const { id } = req.params;
+    await db.delete(tabelasPrecoFaixasTable).where(eq(tabelasPrecoFaixasTable.tabelaId, id));
+    await db.delete(tabelasPrecoTable).where(eq(tabelasPrecoTable.id, id));
+    res.json({ ok: true });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: String(err) });
