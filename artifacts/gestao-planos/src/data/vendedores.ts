@@ -4,7 +4,7 @@ export const vendedores: Vendedor[] = [
   {
     id: 'v1',
     nome: 'WLADSON',
-    email: 'wladson@seacec.com.br',
+    email: 'wladson@teste.com',
     telefone: '(85) 99900-0001',
     comissionado: true,
     tipoComissao: 'AMBOS',
@@ -17,7 +17,7 @@ export const vendedores: Vendedor[] = [
   {
     id: 'v2',
     nome: 'CAROL',
-    email: 'carol@seacec.com.br',
+    email: 'carol@teste.com',
     telefone: '(85) 99900-0002',
     comissionado: true,
     tipoComissao: 'VENDA',
@@ -30,7 +30,7 @@ export const vendedores: Vendedor[] = [
   {
     id: 'v3',
     nome: 'LUCAS',
-    email: 'lucas@seacec.com.br',
+    email: 'lucas@teste.com',
     telefone: '(85) 99900-0003',
     comissionado: true,
     tipoComissao: 'AMBOS',
@@ -43,7 +43,7 @@ export const vendedores: Vendedor[] = [
   {
     id: 'v4',
     nome: 'NICOLLY',
-    email: 'nicolly@seacec.com.br',
+    email: 'nicolly@teste.com',
     telefone: '(85) 99900-0004',
     comissionado: true,
     tipoComissao: 'VENDA',
@@ -56,7 +56,7 @@ export const vendedores: Vendedor[] = [
   {
     id: 'v5',
     nome: 'CLEBIA',
-    email: 'clebia@seacec.com.br',
+    email: 'clebia@teste.com',
     telefone: '(85) 99900-0005',
     comissionado: true,
     tipoComissao: 'SERVICO',
@@ -69,7 +69,7 @@ export const vendedores: Vendedor[] = [
   {
     id: 'v6',
     nome: 'F2',
-    email: 'f2@seacec.com.br',
+    email: 'f2@teste.com',
     telefone: '(85) 99900-0006',
     comissionado: false,
     tipoComissao: null,
@@ -82,7 +82,7 @@ export const vendedores: Vendedor[] = [
   {
     id: 'v7',
     nome: 'ADRIANA',
-    email: 'adriana@seacec.com.br',
+    email: 'adriana@teste.com',
     telefone: '(85) 99900-0007',
     comissionado: true,
     tipoComissao: 'VENDA',
@@ -95,7 +95,7 @@ export const vendedores: Vendedor[] = [
   {
     id: 'v8',
     nome: 'LIS',
-    email: 'lis@seacec.com.br',
+    email: 'lis@teste.com',
     telefone: '(85) 99900-0008',
     comissionado: true,
     tipoComissao: 'AMBOS',
@@ -108,7 +108,7 @@ export const vendedores: Vendedor[] = [
   {
     id: 'v9',
     nome: 'ALISSON',
-    email: 'alisson@seacec.com.br',
+    email: 'alisson@teste.com',
     telefone: '(85) 99900-0009',
     comissionado: false,
     tipoComissao: null,
@@ -121,7 +121,7 @@ export const vendedores: Vendedor[] = [
   {
     id: 'v10',
     nome: 'AIRTON',
-    email: 'airton@seacec.com.br',
+    email: 'airton@teste.com',
     telefone: '(85) 99900-0010',
     comissionado: false,
     tipoComissao: null,

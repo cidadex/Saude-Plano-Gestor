@@ -35,22 +35,22 @@ router.post("/seed", async (_req, res) => {
 
       // Admin
       await tx.insert(usersTable).values({
-        id: "user-admin", email: "admin@seacec.com.br",
+        id: "user-admin", email: "admin@teste.com",
         passwordHash: hash, role: "admin", nome: "Administrador Geral", active: true,
       });
 
       // Vendedores
       const vendedoresData = [
-        { id: "v1", nome: "WLADSON", email: "wladson@seacec.com.br", telefone: "(85) 99900-0001", comissionado: true, tipoComissao: "AMBOS" as const },
-        { id: "v2", nome: "CAROL", email: "carol@seacec.com.br", telefone: "(85) 99900-0002", comissionado: true, tipoComissao: "VENDA" as const },
-        { id: "v3", nome: "LUCAS", email: "lucas@seacec.com.br", telefone: "(85) 99900-0003", comissionado: true, tipoComissao: "AMBOS" as const },
-        { id: "v4", nome: "NICOLLY", email: "nicolly@seacec.com.br", telefone: "(85) 99900-0004", comissionado: true, tipoComissao: "VENDA" as const },
-        { id: "v5", nome: "CLEBIA", email: "clebia@seacec.com.br", telefone: "(85) 99900-0005", comissionado: true, tipoComissao: "SERVICO" as const },
-        { id: "v6", nome: "F2", email: "f2@seacec.com.br", telefone: "(85) 99900-0006", comissionado: false, tipoComissao: null },
-        { id: "v7", nome: "ADRIANA", email: "adriana@seacec.com.br", telefone: "(85) 99900-0007", comissionado: true, tipoComissao: "VENDA" as const },
-        { id: "v8", nome: "LIS", email: "lis@seacec.com.br", telefone: "(85) 99900-0008", comissionado: true, tipoComissao: "AMBOS" as const },
-        { id: "v9", nome: "ALISSON", email: "alisson@seacec.com.br", telefone: "(85) 99900-0009", comissionado: false, tipoComissao: null },
-        { id: "v10", nome: "AIRTON", email: "airton@seacec.com.br", telefone: "(85) 99900-0010", comissionado: false, tipoComissao: null },
+        { id: "v1", nome: "WLADSON", email: "wladson@teste.com", telefone: "(85) 99900-0001", comissionado: true, tipoComissao: "AMBOS" as const },
+        { id: "v2", nome: "CAROL", email: "carol@teste.com", telefone: "(85) 99900-0002", comissionado: true, tipoComissao: "VENDA" as const },
+        { id: "v3", nome: "LUCAS", email: "lucas@teste.com", telefone: "(85) 99900-0003", comissionado: true, tipoComissao: "AMBOS" as const },
+        { id: "v4", nome: "NICOLLY", email: "nicolly@teste.com", telefone: "(85) 99900-0004", comissionado: true, tipoComissao: "VENDA" as const },
+        { id: "v5", nome: "CLEBIA", email: "clebia@teste.com", telefone: "(85) 99900-0005", comissionado: true, tipoComissao: "SERVICO" as const },
+        { id: "v6", nome: "F2", email: "f2@teste.com", telefone: "(85) 99900-0006", comissionado: false, tipoComissao: null },
+        { id: "v7", nome: "ADRIANA", email: "adriana@teste.com", telefone: "(85) 99900-0007", comissionado: true, tipoComissao: "VENDA" as const },
+        { id: "v8", nome: "LIS", email: "lis@teste.com", telefone: "(85) 99900-0008", comissionado: true, tipoComissao: "AMBOS" as const },
+        { id: "v9", nome: "ALISSON", email: "alisson@teste.com", telefone: "(85) 99900-0009", comissionado: false, tipoComissao: null },
+        { id: "v10", nome: "AIRTON", email: "airton@teste.com", telefone: "(85) 99900-0010", comissionado: false, tipoComissao: null },
       ];
 
       for (const v of vendedoresData) {
@@ -68,11 +68,11 @@ router.post("/seed", async (_req, res) => {
       // Gerentes
       const gerentesData = [
         {
-          id: "g1", nome: "MARCOS GERENTE", email: "marcos@seacec.com.br", telefone: "(85) 99800-0101",
+          id: "g1", nome: "MARCOS GERENTE", email: "marcos@teste.com", telefone: "(85) 99800-0101",
           permissoes: ["ver_dashboard", "ver_clientes", "ver_financeiro", "ver_comissoes", "ver_relatorios", "ver_equipe", "ver_propostas", "ver_cobranca"],
         },
         {
-          id: "g2", nome: "SILVIA GERENTE", email: "silvia@seacec.com.br", telefone: "(85) 99800-0102",
+          id: "g2", nome: "SILVIA GERENTE", email: "silvia@teste.com", telefone: "(85) 99800-0102",
           permissoes: ["ver_dashboard", "ver_clientes", "ver_propostas"],
         },
       ];
