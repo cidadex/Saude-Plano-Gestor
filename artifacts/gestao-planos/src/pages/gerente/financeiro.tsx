@@ -24,7 +24,8 @@ export default function GerenteFinanceiro() {
   });
 
   const boletos = (data as { boletos: Boleto[] } | undefined)?.boletos ?? [];
-  const mesAtual = "04/2026";
+  const now = new Date();
+  const mesAtual = `${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
   const boletosMes = boletos.filter(b => b.mesReferencia === mesAtual);
 
   const pagos = boletosMes.filter(b => b.status === "PAGO");

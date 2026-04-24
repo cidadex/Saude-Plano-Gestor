@@ -35,11 +35,14 @@ router.get("/gerente/stats", async (req, res) => {
       result.comissoesPendentes = comissoes.filter(c => c.status === "PENDENTE").reduce((s, c) => s + parseFloat(c.valor ?? "0"), 0);
     }
     if (hasPermissao(req, "ver_financeiro") || hasPermissao(req, "ver_cobranca")) {
+      const now = new Date();
+      const mesAtual = `${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
       const boletos = await db.select().from(boletosTable);
-      const boletosMes = boletos.filter(b => b.mesReferencia === "04/2026");
+      const boletosMes = boletos.filter(b => b.mesReferencia === mesAtual);
       result.boletosEmDia = boletosMes.filter(b => b.status === "PAGO").length;
       result.boletosVencidos = boletosMes.filter(b => b.status === "VENCIDO").length;
       result.boletosAVencer = boletosMes.filter(b => b.status === "PENDENTE").length;
+      result.mesReferencia = mesAtual;
     }
 
     res.json(result);
