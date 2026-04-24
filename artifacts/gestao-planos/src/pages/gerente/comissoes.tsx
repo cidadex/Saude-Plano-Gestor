@@ -25,7 +25,7 @@ export default function GerenteComissoes() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["gerente-comissoes"],
-    queryFn: () => apiFetch("/api/gerente/comissoes") as Promise<{ comissoes: Comissao[] }>,
+    queryFn: () => apiFetch("/gerente/comissoes") as Promise<{ comissoes: Comissao[] }>,
   });
 
   const comissoes = (data as { comissoes: Comissao[] } | undefined)?.comissoes ?? [];

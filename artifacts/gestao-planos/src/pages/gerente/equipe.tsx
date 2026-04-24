@@ -19,7 +19,7 @@ export default function GerenteEquipe() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["gerente-vendedores"],
-    queryFn: () => apiFetch("/api/gerente/vendedores") as Promise<{ vendedores: Vendedor[] }>,
+    queryFn: () => apiFetch("/gerente/vendedores") as Promise<{ vendedores: Vendedor[] }>,
   });
 
   const vendedores = (data as { vendedores: Vendedor[] } | undefined)?.vendedores ?? [];

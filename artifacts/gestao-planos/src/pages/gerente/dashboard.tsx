@@ -51,7 +51,7 @@ export default function GerenteDashboard() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["gerente-stats"],
-    queryFn: () => apiFetch("/api/gerente/stats") as Promise<Stats>,
+    queryFn: () => apiFetch("/gerente/stats") as Promise<Stats>,
   });
 
   if (isLoading) {

@@ -26,7 +26,7 @@ export default function GerenteClientes() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["gerente-clientes"],
-    queryFn: () => apiFetch("/api/gerente/clientes") as Promise<{ clientes: Cliente[] }>,
+    queryFn: () => apiFetch("/gerente/clientes") as Promise<{ clientes: Cliente[] }>,
   });
 
   const clientes = (data as { clientes: Cliente[] } | undefined)?.clientes ?? [];

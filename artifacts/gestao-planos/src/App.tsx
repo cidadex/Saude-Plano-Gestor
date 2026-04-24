@@ -88,8 +88,10 @@ function GerenteRoutes() {
   return (
     <GerenteLayout>
       <Switch>
-        <Route path="/gerente" component={GerenteDashboard} />
         <Route path="/gerente/sem-permissao" component={GerenteSemPermissao} />
+        <Route path="/gerente">
+          <GerenteGuard permissao="ver_dashboard"><GerenteDashboard /></GerenteGuard>
+        </Route>
         <Route path="/gerente/equipe">
           <GerenteGuard permissao="ver_equipe"><GerenteEquipe /></GerenteGuard>
         </Route>

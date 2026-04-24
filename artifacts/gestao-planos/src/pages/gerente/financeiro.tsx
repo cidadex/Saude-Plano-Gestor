@@ -20,7 +20,7 @@ const STATUS_BADGE: Record<string, { label: string; cls: string; icon: React.Ele
 export default function GerenteFinanceiro() {
   const { data, isLoading } = useQuery({
     queryKey: ["gerente-boletos"],
-    queryFn: () => apiFetch("/api/gerente/boletos") as Promise<{ boletos: Boleto[] }>,
+    queryFn: () => apiFetch("/gerente/boletos") as Promise<{ boletos: Boleto[] }>,
   });
 
   const boletos = (data as { boletos: Boleto[] } | undefined)?.boletos ?? [];

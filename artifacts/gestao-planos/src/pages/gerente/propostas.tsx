@@ -31,7 +31,7 @@ export default function GerentePropostas() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["gerente-propostas"],
-    queryFn: () => apiFetch("/api/gerente/propostas") as Promise<{ propostas: Proposta[] }>,
+    queryFn: () => apiFetch("/gerente/propostas") as Promise<{ propostas: Proposta[] }>,
   });
 
   const propostas = (data as { propostas: Proposta[] } | undefined)?.propostas ?? [];

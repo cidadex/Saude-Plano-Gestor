@@ -20,11 +20,11 @@ interface Comissao {
 export default function GerenteRelatorios() {
   const { data: dvend, isLoading: lv } = useQuery({
     queryKey: ["gerente-vendedores-rel"],
-    queryFn: () => apiFetch("/api/gerente/vendedores") as Promise<{ vendedores: Vendedor[] }>,
+    queryFn: () => apiFetch("/gerente/vendedores") as Promise<{ vendedores: Vendedor[] }>,
   });
   const { data: dcom, isLoading: lc } = useQuery({
     queryKey: ["gerente-comissoes-rel"],
-    queryFn: () => apiFetch("/api/gerente/comissoes") as Promise<{ comissoes: Comissao[] }>,
+    queryFn: () => apiFetch("/gerente/comissoes") as Promise<{ comissoes: Comissao[] }>,
   });
 
   const loading = lv || lc;

@@ -14,7 +14,7 @@ interface Boleto {
 export default function GerenteCobranca() {
   const { data, isLoading } = useQuery({
     queryKey: ["gerente-boletos-cobranca"],
-    queryFn: () => apiFetch("/api/gerente/boletos") as Promise<{ boletos: Boleto[] }>,
+    queryFn: () => apiFetch("/gerente/boletos") as Promise<{ boletos: Boleto[] }>,
   });
 
   const boletos = (data as { boletos: Boleto[] } | undefined)?.boletos ?? [];
