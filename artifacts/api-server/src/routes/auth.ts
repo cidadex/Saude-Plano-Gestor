@@ -79,6 +79,34 @@ router.post("/auth/logout", (_req, res) => {
   res.json({ ok: true });
 });
 
+// Troca de senha pelo próprio usuário
+router.patch("/auth/change-password", requireAuth, async (req, res) => {
+  try {
+    const { senhaAtual, novaSenha } = req.body as { senhaAtual: string; novaSenha: string };
+
+    if (!senhaAtual || !novaSenha) {
+      return res.status(400).json({ error: "Senha atual e nova senha são obrigatórias" });
+    }
+    if (novaSenha.length < 6) {
+      return res.status(400).json({ error: "A nova senha deve ter no mínimo 6 caracteres" });
+    }
+
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.user!.userId)).limit(1);
+    if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
+
+    const valid = await bcrypt.compare(senhaAtual, user.passwordHash);
+    if (!valid) return res.status(400).json({ error: "Senha atual incorreta" });
+
+    const passwordHash = await bcrypt.hash(novaSenha, 10);
+    await db.update(usersTable).set({ passwordHash, updatedAt: new Date() }).where(eq(usersTable.id, user.id));
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
 router.get("/auth/me", requireAuth, async (req, res) => {
   const user = req.user!;
 

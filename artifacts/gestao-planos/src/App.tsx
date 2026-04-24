@@ -20,6 +20,7 @@ import AdminCobranca from "@/pages/admin/cobranca";
 import AdminRelatorios from "@/pages/admin/relatorios";
 import AdminFinanceiro from "@/pages/admin/financeiro";
 import AdminComissoes from "@/pages/admin/comissoes";
+import AdminGerentes from "@/pages/admin/gerentes";
 
 import { VendedorLayout } from "@/components/layout/vendedor-layout";
 import VendedorDashboard from "@/pages/vendedor/dashboard";
@@ -30,6 +31,7 @@ import VendedorCobranca from "@/pages/vendedor/cobranca";
 import VendedorPlanos from "@/pages/vendedor/planos";
 import VendedorCarteira from "@/pages/vendedor/carteira";
 import VendedorHistorico from "@/pages/vendedor/historico";
+import VendedorPerfil from "@/pages/vendedor/perfil";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +62,7 @@ function AdminRoutes() {
         <Route path="/admin/relatorios" component={AdminRelatorios} />
         <Route path="/admin/financeiro" component={AdminFinanceiro} />
         <Route path="/admin/comissoes" component={AdminComissoes} />
+        <Route path="/admin/gerentes" component={AdminGerentes} />
         <Route component={NotFound} />
       </Switch>
     </AdminLayout>
@@ -83,6 +86,7 @@ function VendedorRoutes() {
         <Route path="/vendedor/cobranca" component={VendedorCobranca} />
         <Route path="/vendedor/planos" component={VendedorPlanos} />
         <Route path="/vendedor/historico" component={VendedorHistorico} />
+        <Route path="/vendedor/perfil" component={VendedorPerfil} />
         <Route component={NotFound} />
       </Switch>
     </VendedorLayout>

@@ -14,6 +14,7 @@ const rotulos: Record<string, string> = {
   '/admin/cancelados': 'Cancelados',
   '/admin/planos': 'Planos',
   '/admin/vendedores': 'Equipe de Vendas',
+  '/admin/gerentes': 'Gerentes',
   '/admin/propostas': 'Propostas',
   '/admin/cobranca': 'Cobrança',
   '/admin/relatorios': 'Relatórios',
@@ -36,7 +37,13 @@ const navItems: NavItem[] = [
   { href: "/admin/comissoes", label: "Comissões", icon: BellRing },
   { href: "/admin/propostas", label: "Propostas", icon: FileText },
   { href: "/admin/planos", label: "Planos", icon: ClipboardList },
-  { href: "/admin/vendedores", label: "Equipe", icon: Briefcase },
+  {
+    href: "/admin/vendedores", label: "Equipe", icon: Briefcase,
+    sub: [
+      { href: "/admin/vendedores", label: "Vendedores" },
+      { href: "/admin/gerentes", label: "Gerentes" },
+    ],
+  },
   { href: "/admin/relatorios", label: "Relatórios", icon: BarChart3 },
 ];
 

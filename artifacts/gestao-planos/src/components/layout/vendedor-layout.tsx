@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, FileText, DollarSign, Receipt, LogOut,
   BellRing, ChevronRight, Home, Shield, HeartPulse, Menu,
-  Users, Sun, Moon, History,
+  Users, Sun, Moon, History, UserCircle,
 } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "@/hooks/useTheme";
@@ -17,6 +17,7 @@ const rotulos: Record<string, string> = {
   '/vendedor/cobranca': 'Cobrança',
   '/vendedor/planos': 'Tabela de Planos',
   '/vendedor/historico': 'Histórico de Comunicações',
+  '/vendedor/perfil': 'Meu Perfil',
 };
 
 const navItems = [
@@ -28,6 +29,7 @@ const navItems = [
   { href: "/vendedor/comissoes", label: "Comissões", icon: DollarSign },
   { href: "/vendedor/cobranca", label: "Cobrança", icon: BellRing },
   { href: "/vendedor/historico", label: "Histórico WhatsApp", icon: History },
+  { href: "/vendedor/perfil", label: "Meu Perfil", icon: UserCircle },
 ];
 
 function Breadcrumb({ location }: { location: string }) {
