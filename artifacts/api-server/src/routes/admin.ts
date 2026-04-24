@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { eq, sql, desc } from "drizzle-orm";
+import { eq, sql, desc, and, or, inArray } from "drizzle-orm";
 import {
   db,
   usersTable,
@@ -8,6 +8,7 @@ import {
   gerentesTable,
   clientesTable,
   propostasTable,
+  boletosTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth.js";
 
@@ -411,6 +412,211 @@ router.patch("/admin/propostas/:id/ativar", async (req, res) => {
     }).where(eq(propostasTable.id, id));
 
     res.json({ ok: true, status: "ATIVA" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// POST /admin/propostas/:id/gerar-boleto — gera boleto após ativação
+router.post("/admin/propostas/:id/gerar-boleto", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const adminUserId = req.user!.userId;
+
+    const [proposta] = await db.select().from(propostasTable).where(eq(propostasTable.id, id)).limit(1);
+    if (!proposta) return res.status(404).json({ error: "Proposta não encontrada" });
+    if (proposta.status !== "ATIVA") return res.status(400).json({ error: "Apenas propostas ativas podem gerar boleto" });
+
+    const dadosTitular = proposta.dadosTitular as Record<string, unknown>;
+    const valorTotal = proposta.valorTotal ?? "0";
+
+    // Calcular mês de referência atual
+    const agora = new Date();
+    const mes = String(agora.getMonth() + 1).padStart(2, "0");
+    const ano = agora.getFullYear();
+    const mesReferencia = `${mes}/${ano}`;
+
+    // Vencimento padrão: dia 10 do mês atual (ou próximo mês se já passou)
+    let vencimento = new Date(agora.getFullYear(), agora.getMonth(), 10);
+    if (vencimento < agora) {
+      vencimento = new Date(agora.getFullYear(), agora.getMonth() + 1, 10);
+    }
+    const vencimentoStr = vencimento.toISOString().split("T")[0];
+
+    // Se há clienteId, usar diretamente; caso contrário buscar pelo nome/cpf
+    let clienteId = proposta.clienteId ?? null;
+    if (!clienteId && dadosTitular.cpf) {
+      const [cliente] = await db
+        .select({ id: clientesTable.id })
+        .from(clientesTable)
+        .where(eq(clientesTable.cpf, String(dadosTitular.cpf)))
+        .limit(1);
+      clienteId = cliente?.id ?? null;
+    }
+    if (!clienteId) return res.status(400).json({ error: "Cliente não encontrado para gerar o boleto" });
+
+    // Verificar se já existe boleto para este mês
+    const existente = await db
+      .select({ id: boletosTable.id })
+      .from(boletosTable)
+      .where(and(eq(boletosTable.clienteId, clienteId), eq(boletosTable.mesReferencia, mesReferencia)))
+      .limit(1);
+    if (existente.length > 0) {
+      return res.status(409).json({ error: `Já existe um boleto para ${mesReferencia}` });
+    }
+
+    const boletoId = `bol-${Date.now()}`;
+    const [boleto] = await db.insert(boletosTable).values({
+      id: boletoId,
+      clienteId,
+      geradoPorId: adminUserId,
+      valor: valorTotal,
+      vencimento: vencimentoStr,
+      status: "PENDENTE",
+      mesReferencia,
+    }).returning();
+
+    res.status(201).json({ boleto });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── CLIENTES ──────────────────────────────────────────────────
+
+// GET /admin/clientes — listar todos os clientes com nome do vendedor
+router.get("/admin/clientes", async (_req, res) => {
+  try {
+    const rows = await db
+      .select({
+        id: clientesTable.id,
+        nome: clientesTable.nome,
+        cpf: clientesTable.cpf,
+        sexo: clientesTable.sexo,
+        dataNascimento: clientesTable.dataNascimento,
+        telefone: clientesTable.telefone,
+        email: clientesTable.email,
+        cep: clientesTable.cep,
+        logradouro: clientesTable.logradouro,
+        numero: clientesTable.numero,
+        bairro: clientesTable.bairro,
+        cidade: clientesTable.cidade,
+        estado: clientesTable.estado,
+        matricula: clientesTable.matricula,
+        valorMensal: clientesTable.valorMensal,
+        dataAtivacao: clientesTable.dataAtivacao,
+        codigo: clientesTable.codigo,
+        tipo: clientesTable.tipo,
+        representante: clientesTable.representante,
+        formaPagamento: clientesTable.formaPagamento,
+        diaVencimento: clientesTable.diaVencimento,
+        vrPl: clientesTable.vrPl,
+        saldo: clientesTable.saldo,
+        valor2026: clientesTable.valor2026,
+        comissao: clientesTable.comissao,
+        planoCode: clientesTable.planoCode,
+        codigoPlano: clientesTable.codigoPlano,
+        status: clientesTable.status,
+        observacao: clientesTable.observacao,
+        vendedorId: clientesTable.vendedorId,
+        vendedorNome: vendedoresTable.nome,
+      })
+      .from(clientesTable)
+      .leftJoin(vendedoresTable, eq(vendedoresTable.id, clientesTable.vendedorId))
+      .orderBy(clientesTable.nome);
+
+    res.json({ clientes: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// PATCH /admin/clientes/:id/status — suspender ou reativar
+router.patch("/admin/clientes/:id/status", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body as { status: "ATIVO" | "SUSPENSO" | "CANCELADO" };
+    if (!["ATIVO", "SUSPENSO", "CANCELADO"].includes(status)) {
+      return res.status(400).json({ error: "Status inválido" });
+    }
+    await db.update(clientesTable).set({ status }).where(eq(clientesTable.id, id));
+    res.json({ ok: true, status });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// PATCH /admin/clientes/:id — editar dados do cliente
+router.patch("/admin/clientes/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      nome, telefone, email, dataNascimento,
+      cep, logradouro, numero, bairro, cidade, estado,
+      observacao, formaPagamento, diaVencimento,
+    } = req.body as Record<string, string | number | undefined>;
+
+    const updates: Record<string, unknown> = {};
+    if (nome !== undefined) updates.nome = nome;
+    if (telefone !== undefined) updates.telefone = telefone;
+    if (email !== undefined) updates.email = email;
+    if (dataNascimento !== undefined) updates.dataNascimento = dataNascimento;
+    if (cep !== undefined) updates.cep = cep;
+    if (logradouro !== undefined) updates.logradouro = logradouro;
+    if (numero !== undefined) updates.numero = String(numero);
+    if (bairro !== undefined) updates.bairro = bairro;
+    if (cidade !== undefined) updates.cidade = cidade;
+    if (estado !== undefined) updates.estado = estado;
+    if (observacao !== undefined) updates.observacao = observacao;
+    if (formaPagamento !== undefined) updates.formaPagamento = formaPagamento;
+    if (diaVencimento !== undefined) updates.diaVencimento = Number(diaVencimento);
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: "Nenhum campo para atualizar" });
+    }
+
+    await db.update(clientesTable).set(updates as never).where(eq(clientesTable.id, id));
+    const [updated] = await db.select().from(clientesTable).where(eq(clientesTable.id, id)).limit(1);
+    res.json({ cliente: updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── BOLETOS (admin) ──────────────────────────────────────────
+
+// GET /admin/boletos — listar todos os boletos com dados do cliente e vendedor
+router.get("/admin/boletos", async (_req, res) => {
+  try {
+    const rows = await db
+      .select({
+        id: boletosTable.id,
+        clienteId: boletosTable.clienteId,
+        clienteNome: clientesTable.nome,
+        clienteCpf: clientesTable.cpf,
+        clienteTelefone: clientesTable.telefone,
+        vendedorNome: vendedoresTable.nome,
+        planoCode: clientesTable.planoCode,
+        valor: boletosTable.valor,
+        vencimento: boletosTable.vencimento,
+        status: boletosTable.status,
+        codigoBarras: boletosTable.codigoBarras,
+        mesReferencia: boletosTable.mesReferencia,
+        linkPagamento: boletosTable.linkPagamento,
+        dataPagamento: boletosTable.dataPagamento,
+        createdAt: boletosTable.createdAt,
+      })
+      .from(boletosTable)
+      .innerJoin(clientesTable, eq(boletosTable.clienteId, clientesTable.id))
+      .leftJoin(vendedoresTable, eq(vendedoresTable.id, clientesTable.vendedorId))
+      .orderBy(desc(boletosTable.createdAt));
+
+    res.json({ boletos: rows });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: String(err) });

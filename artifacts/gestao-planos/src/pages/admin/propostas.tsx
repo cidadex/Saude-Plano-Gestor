@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { apiFetch } from "@/lib/api";
 import { formatMoney } from "@/lib/format";
 import { planos } from "@/data/planos";
-import { Search, SlidersHorizontal, Loader2, RefreshCw, AlertCircle } from "lucide-react";
+import { Search, SlidersHorizontal, Loader2, RefreshCw, AlertCircle, Receipt } from "lucide-react";
 
 const STATUS_LABEL: Record<string, string> = {
   AGUARDANDO_ENVIO: "Aguardando envio",
@@ -144,6 +144,28 @@ export default function AdminPropostas() {
     ? matricula.replace(/\D/g, "").length === 14 && !!dataAtivacao && planoCodeFinal.trim().length >= 4
     : !!novoStatus;
 
+  // Gerar boleto
+  const [gerandoBoletoId, setGerandoBoletoId] = useState<string | null>(null);
+  const [boletoCriadoId, setBoletoCriadoId] = useState<string | null>(null);
+  const [boletoErro, setBoletoErro] = useState<string | null>(null);
+
+  const handleGerarBoleto = async (propostaId: string) => {
+    setGerandoBoletoId(propostaId);
+    setBoletoErro(null);
+    setBoletoCriadoId(null);
+    try {
+      await apiFetch(`/admin/propostas/${propostaId}/gerar-boleto`, { method: "POST" });
+      setBoletoCriadoId(propostaId);
+      setTimeout(() => setBoletoCriadoId(null), 3000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setBoletoErro(msg);
+      setTimeout(() => setBoletoErro(null), 4000);
+    } finally {
+      setGerandoBoletoId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between pb-4 border-b">
@@ -194,6 +216,13 @@ export default function AdminPropostas() {
           </div>
         </CardContent>
       </Card>
+
+      {boletoErro && (
+        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span><strong>Erro ao gerar boleto:</strong> {boletoErro}</span>
+        </div>
+      )}
 
       <Card className="border shadow-sm">
         {loading ? (
@@ -252,11 +281,28 @@ export default function AdminPropostas() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-center">
-                    {PROXIMOS_STATUS[prop.status]?.length > 0 && (
-                      <Button size="sm" variant="outline" onClick={() => handleAbrirEdicao(prop)} data-testid={`btn-editar-proposta-${prop.id}`}>
-                        Atualizar
-                      </Button>
-                    )}
+                    <div className="flex items-center justify-center gap-1.5">
+                      {PROXIMOS_STATUS[prop.status]?.length > 0 && (
+                        <Button size="sm" variant="outline" onClick={() => handleAbrirEdicao(prop)} data-testid={`btn-editar-proposta-${prop.id}`}>
+                          Atualizar
+                        </Button>
+                      )}
+                      {prop.status === "ATIVA" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className={`gap-1 ${boletoCriadoId === prop.id ? "border-emerald-400 text-emerald-700 bg-emerald-50" : "border-blue-300 text-blue-700 hover:bg-blue-50"}`}
+                          onClick={() => handleGerarBoleto(prop.id)}
+                          disabled={gerandoBoletoId === prop.id}
+                          data-testid={`btn-gerar-boleto-${prop.id}`}
+                        >
+                          {gerandoBoletoId === prop.id
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <Receipt className="h-3.5 w-3.5" />}
+                          {boletoCriadoId === prop.id ? "Criado!" : "Boleto"}
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
