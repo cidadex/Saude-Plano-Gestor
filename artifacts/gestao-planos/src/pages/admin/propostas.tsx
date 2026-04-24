@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -6,68 +6,143 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { propostas as propostasIniciais } from "@/data/propostas";
-import type { Proposta } from "@/data/types";
-import { formatMoney, getStatusBadgeVariant } from "@/lib/format";
-import { Search, SlidersHorizontal, Upload, FileUp, CheckCircle2, X } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { apiFetch } from "@/lib/api";
+import { formatMoney } from "@/lib/format";
+import { planos } from "@/data/planos";
+import { Search, SlidersHorizontal, Loader2, RefreshCw, AlertCircle } from "lucide-react";
 
-const statusDisponiveis = ['ATIVO', 'PENDENTE', 'EM_ANALISE', 'ENVIADO_OPERADORA', 'CANCELADO'];
+const STATUS_LABEL: Record<string, string> = {
+  AGUARDANDO_ENVIO: "Aguardando envio",
+  ENVIADA_OPERADORA: "Enviada à operadora",
+  ACEITA: "Aceita",
+  RECUSADA: "Recusada",
+  ATIVA: "Ativa",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  ATIVA: "border-emerald-300 bg-emerald-50 text-emerald-700",
+  AGUARDANDO_ENVIO: "border-amber-300 bg-amber-50 text-amber-700",
+  ENVIADA_OPERADORA: "border-blue-300 bg-blue-50 text-blue-700",
+  ACEITA: "border-teal-300 bg-teal-50 text-teal-700",
+  RECUSADA: "border-red-300 bg-red-50 text-red-700",
+};
+
+// Transições permitidas por status
+const PROXIMOS_STATUS: Record<string, string[]> = {
+  AGUARDANDO_ENVIO: ["ENVIADA_OPERADORA", "RECUSADA"],
+  ENVIADA_OPERADORA: ["ACEITA", "RECUSADA"],
+  ACEITA: ["ATIVA", "RECUSADA"],
+  RECUSADA: [],
+  ATIVA: [],
+};
+
+type PropostaAdmin = {
+  id: string;
+  status: string;
+  dadosTitular: Record<string, unknown>;
+  valorTotal: string | null;
+  createdAt: string;
+  vendedorId: string;
+  vendedorNome: string | null;
+  vendedorEmail: string | null;
+  dataEnvioOperadora: string | null;
+  dataAtivacao: string | null;
+  motivoRecusa: string | null;
+};
 
 export default function AdminPropostas() {
-  const [propostasState, setPropostasState] = useState<Proposta[]>(propostasIniciais);
+  const [propostas, setPropostas] = useState<PropostaAdmin[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [vendedorFilter, setVendedorFilter] = useState("TODOS");
   const [statusFilter, setStatusFilter] = useState("TODOS");
 
-  const [uploadAberto, setUploadAberto] = useState(false);
-  const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(null);
-  const [uploadStatus, setUploadStatus] = useState<'idle' | 'carregando' | 'concluido'>('idle');
-  const [propostaEditando, setPropostaEditando] = useState<Proposta | null>(null);
+  const [propostaEditando, setPropostaEditando] = useState<PropostaAdmin | null>(null);
   const [novoStatus, setNovoStatus] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [motivoRecusa, setMotivoRecusa] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
 
-  const vendedores = useMemo(() => Array.from(new Set(propostasState.map(p => p.vendedor))), [propostasState]);
-  const statuses = useMemo(() => Array.from(new Set(propostasState.map(p => p.status))), [propostasState]);
+  // Campos de ativação
+  const [matricula, setMatricula] = useState("");
+  const [dataAtivacao, setDataAtivacao] = useState("");
+  const [planoCodeSelecionado, setPlanoCodeSelecionado] = useState("");
+  const [planoCodeManual, setPlanoCodeManual] = useState("");
+  const [usarManual, setUsarManual] = useState(false);
+
+  const carregarPropostas = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await apiFetch("/admin/propostas") as { propostas: PropostaAdmin[] };
+      setPropostas(data.propostas ?? []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { carregarPropostas(); }, [carregarPropostas]);
+
+  const vendedores = useMemo(() => Array.from(new Set(propostas.map(p => p.vendedorNome ?? "—"))), [propostas]);
 
   const filteredPropostas = useMemo(() => {
-    return propostasState.filter(p => {
-      const matchSearch = p.clienteNome.toLowerCase().includes(search.toLowerCase()) || p.clienteCpf.includes(search);
-      const matchVendedor = vendedorFilter === "TODOS" || p.vendedor === vendedorFilter;
+    return propostas.filter(p => {
+      const nome = String(p.dadosTitular?.nome ?? "").toLowerCase();
+      const cpf = String(p.dadosTitular?.cpf ?? "");
+      const vendedor = p.vendedorNome ?? "";
+      const matchSearch = nome.includes(search.toLowerCase()) || cpf.includes(search);
+      const matchVendedor = vendedorFilter === "TODOS" || vendedor === vendedorFilter;
       const matchStatus = statusFilter === "TODOS" || p.status === statusFilter;
       return matchSearch && matchVendedor && matchStatus;
     });
-  }, [search, vendedorFilter, statusFilter, propostasState]);
+  }, [search, vendedorFilter, statusFilter, propostas]);
 
-  const handleArquivo = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) setArquivoSelecionado(file);
-  };
-
-  const handleUpload = () => {
-    if (!arquivoSelecionado) return;
-    setUploadStatus('carregando');
-    setTimeout(() => {
-      setUploadStatus('concluido');
-    }, 1500);
-  };
-
-  const handleFecharUpload = () => {
-    setUploadAberto(false);
-    setArquivoSelecionado(null);
-    setUploadStatus('idle');
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const handleAtualizarStatus = () => {
-    if (!propostaEditando || !novoStatus) return;
-    setPropostasState(prev =>
-      prev.map(p =>
-        p.id === propostaEditando.id ? { ...p, status: novoStatus as Proposta['status'] } : p
-      )
-    );
-    setPropostaEditando(null);
+  const handleAbrirEdicao = (p: PropostaAdmin) => {
+    setPropostaEditando(p);
     setNovoStatus("");
+    setMotivoRecusa("");
+    setMatricula("");
+    setDataAtivacao(new Date().toISOString().split("T")[0]);
+    setPlanoCodeSelecionado("");
+    setPlanoCodeManual("");
+    setUsarManual(false);
+    setErro("");
   };
+
+  const handleAtualizarStatus = async () => {
+    if (!propostaEditando || !novoStatus) return;
+    setSalvando(true);
+    setErro("");
+    try {
+      if (novoStatus === "ATIVA") {
+        const codigoFinal = usarManual ? planoCodeManual : planoCodeSelecionado;
+        await apiFetch(`/admin/propostas/${propostaEditando.id}/ativar`, {
+          method: "PATCH",
+          body: JSON.stringify({ matricula, dataAtivacao, planoCode: codigoFinal }),
+        });
+      } else {
+        await apiFetch(`/admin/propostas/${propostaEditando.id}/status`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: novoStatus, motivoRecusa }),
+        });
+      }
+      await carregarPropostas();
+      setPropostaEditando(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErro(msg);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const proximosStatus = propostaEditando ? (PROXIMOS_STATUS[propostaEditando.status] ?? []) : [];
+  const planoCodeFinal = usarManual ? planoCodeManual : planoCodeSelecionado;
+  const podeAtivar = novoStatus === "ATIVA"
+    ? matricula.replace(/\D/g, "").length === 14 && !!dataAtivacao && planoCodeFinal.trim().length >= 4
+    : !!novoStatus;
 
   return (
     <div className="space-y-6">
@@ -76,65 +151,43 @@ export default function AdminPropostas() {
           <h2 className="text-3xl font-bold tracking-tight text-foreground">Propostas</h2>
           <p className="text-muted-foreground">Acompanhamento do funil de vendas e envios para operadora.</p>
         </div>
-        <Button
-          onClick={() => setUploadAberto(true)}
-          className="flex items-center gap-2 shrink-0"
-          variant="outline"
-          data-testid="btn-upload-propostas"
-        >
-          <FileUp className="h-4 w-4" />
-          Atualizar Planilha
+        <Button variant="outline" size="sm" onClick={carregarPropostas} className="gap-2" data-testid="btn-reload-propostas">
+          <RefreshCw className="h-4 w-4" /> Atualizar
         </Button>
       </div>
 
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <SlidersHorizontal className="h-5 w-5" /> Filtros
+        <CardHeader className="pb-3 bg-muted/20">
+          <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground uppercase tracking-wider">
+            <SlidersHorizontal className="h-4 w-4" /> Filtros
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
           <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Buscar Cliente</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground">Buscar</label>
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Nome ou CPF..." 
-                  className="pl-9" 
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  data-testid="input-search-propostas"
-                />
+                <Input placeholder="Nome ou CPF..." className="pl-9 bg-background" value={search} onChange={e => setSearch(e.target.value)} data-testid="input-search-propostas" />
               </div>
             </div>
-            
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Vendedor</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground">Vendedor</label>
               <Select value={vendedorFilter} onValueChange={setVendedorFilter}>
-                <SelectTrigger data-testid="select-vendedor-prop">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
+                <SelectTrigger className="bg-background"><SelectValue placeholder="Todos" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="TODOS">Todos os vendedores</SelectItem>
-                  {vendedores.map(v => (
-                    <SelectItem key={v} value={v}>{v}</SelectItem>
-                  ))}
+                  {vendedores.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Status</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground">Status</label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger data-testid="select-status-prop">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
+                <SelectTrigger className="bg-background"><SelectValue placeholder="Todos" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="TODOS">Todos os status</SelectItem>
-                  {statuses.map(s => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
+                  {Object.entries(STATUS_LABEL).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -142,189 +195,219 @@ export default function AdminPropostas() {
         </CardContent>
       </Card>
 
-      <Card>
-        <div className="rounded-md border border-border">
+      <Card className="border shadow-sm">
+        {loading ? (
+          <div className="flex items-center justify-center h-48">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/50 hover:bg-muted/50">
-                <TableHead>Cliente</TableHead>
-                <TableHead>Vendedor</TableHead>
-                <TableHead>Plano (Cód)</TableHead>
-                <TableHead>Data Envio</TableHead>
-                <TableHead>Valor Prev.</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-center">Ações</TableHead>
+              <TableRow className="bg-muted/50 hover:bg-muted/50 border-b-2">
+                <TableHead className="font-semibold text-foreground">Cliente / CPF</TableHead>
+                <TableHead className="font-semibold text-foreground">Plano</TableHead>
+                <TableHead className="font-semibold text-foreground">Vendedor</TableHead>
+                <TableHead className="font-semibold text-foreground">Data</TableHead>
+                <TableHead className="font-semibold text-foreground text-right">Valor</TableHead>
+                <TableHead className="font-semibold text-foreground text-center">Status</TableHead>
+                <TableHead className="font-semibold text-foreground text-center">Ação</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredPropostas.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                    Nenhuma proposta encontrada.
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Search className="h-8 w-8 text-muted-foreground/30" />
+                      <p>Nenhuma proposta encontrada.</p>
+                    </div>
                   </TableCell>
                 </TableRow>
-              ) : (
-                filteredPropostas.map((prop) => (
-                  <TableRow key={prop.id} data-testid={`row-proposta-${prop.id}`}>
-                    <TableCell className="font-medium">
-                      <div className="flex flex-col">
-                        <span>{prop.clienteNome}</span>
-                        <span className="text-xs text-muted-foreground">{prop.clienteCpf}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{prop.vendedor}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="text-xs truncate max-w-[180px]" title={prop.plano}>{prop.plano}</span>
-                        <span className="text-xs text-muted-foreground font-mono">{prop.codigoPlano}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{prop.dataEnvio}</TableCell>
-                    <TableCell className="font-semibold">{formatMoney(prop.valor)}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={getStatusBadgeVariant(prop.status)}>
-                        {prop.status.replace('_', ' ')}
-                      </Badge>
-                      {prop.observacao && (
-                        <p className="text-[10px] text-muted-foreground mt-1 max-w-[150px] truncate" title={prop.observacao}>
-                          {prop.observacao}
-                        </p>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 text-xs text-primary hover:text-primary hover:bg-primary/10"
-                        onClick={() => { setPropostaEditando(prop); setNovoStatus(prop.status); }}
-                        data-testid={`btn-editar-status-${prop.id}`}
-                      >
-                        Alterar Status
+              ) : filteredPropostas.map(prop => (
+                <TableRow key={prop.id} className="hover:bg-muted/30 transition-colors" data-testid={`row-proposta-${prop.id}`}>
+                  <TableCell className="font-medium py-4">
+                    <div className="flex flex-col gap-0.5">
+                      <span>{String(prop.dadosTitular?.nome ?? "—")}</span>
+                      <span className="text-xs text-muted-foreground font-mono">{String(prop.dadosTitular?.cpf ?? "—")}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-sm">{String(prop.dadosTitular?.plano ?? "—")}</span>
+                      <span className="text-xs text-muted-foreground font-mono bg-muted px-1 py-0.5 rounded w-fit">
+                        {String(prop.dadosTitular?.codigoPlano ?? prop.dadosTitular?.planoCode ?? "—")}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{prop.vendedorNome ?? "—"}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                    {prop.createdAt ? new Date(prop.createdAt).toLocaleDateString("pt-BR") : "—"}
+                  </TableCell>
+                  <TableCell className="font-bold text-right">
+                    {formatMoney(parseFloat(prop.valorTotal ?? "0"))}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant="outline" className={`font-medium border whitespace-nowrap ${STATUS_COLORS[prop.status] ?? ""}`}>
+                      {STATUS_LABEL[prop.status] ?? prop.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {PROXIMOS_STATUS[prop.status]?.length > 0 && (
+                      <Button size="sm" variant="outline" onClick={() => handleAbrirEdicao(prop)} data-testid={`btn-editar-proposta-${prop.id}`}>
+                        Atualizar
                       </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
-        </div>
+        )}
       </Card>
 
-      {/* Modal Upload Planilha */}
-      <Dialog open={uploadAberto} onOpenChange={handleFecharUpload}>
-        <DialogContent className="max-w-md">
+      {/* Modal de atualização de status */}
+      <Dialog open={!!propostaEditando} onOpenChange={() => setPropostaEditando(null)}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5 text-primary" />
-              Atualizar Planilha de Propostas
-            </DialogTitle>
+            <DialogTitle>Atualizar Proposta</DialogTitle>
             <DialogDescription>
-              Envie um arquivo .xlsx ou .csv com as propostas atualizadas.
+              {String(propostaEditando?.dadosTitular?.nome ?? "")} — Status atual:{" "}
+              <Badge variant="outline" className={`ml-1 ${STATUS_COLORS[propostaEditando?.status ?? ""] ?? ""}`}>
+                {STATUS_LABEL[propostaEditando?.status ?? ""] ?? propostaEditando?.status}
+              </Badge>
             </DialogDescription>
           </DialogHeader>
 
-          {uploadStatus === 'concluido' ? (
-            <div className="flex flex-col items-center gap-3 py-6 text-center">
-              <CheckCircle2 className="h-12 w-12 text-emerald-500" />
-              <div>
-                <p className="font-semibold text-foreground">Planilha importada com sucesso!</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Arquivo: <span className="font-mono text-xs">{arquivoSelecionado?.name}</span>
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Os dados serão processados e as propostas atualizadas em breve.
-                </p>
-              </div>
-              <Button onClick={handleFecharUpload} className="mt-2">Fechar</Button>
-            </div>
-          ) : (
-            <>
-              <div
-                className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all hover:border-primary/50 hover:bg-muted/20 ${arquivoSelecionado ? 'border-primary bg-primary/5' : 'border-muted-foreground/30'}`}
-                onClick={() => fileInputRef.current?.click()}
-                data-testid="dropzone-upload"
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  className="hidden"
-                  onChange={handleArquivo}
-                  data-testid="input-file-propostas"
-                />
-                {arquivoSelecionado ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <FileUp className="h-8 w-8 text-primary" />
-                    <p className="font-medium text-primary text-sm">{arquivoSelecionado.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {(arquivoSelecionado.size / 1024).toFixed(1)} KB
-                    </p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 text-xs text-red-500 hover:text-red-600 gap-1"
-                      onClick={(e) => { e.stopPropagation(); setArquivoSelecionado(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                    >
-                      <X className="h-3 w-3" /> Remover
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-2">
-                    <Upload className="h-8 w-8 text-muted-foreground/50" />
-                    <p className="text-sm font-medium text-muted-foreground">Clique para selecionar o arquivo</p>
-                    <p className="text-xs text-muted-foreground/70">.xlsx, .xls ou .csv</p>
-                  </div>
-                )}
-              </div>
-              <DialogFooter>
-                <Button variant="ghost" onClick={handleFecharUpload}>Cancelar</Button>
-                <Button
-                  onClick={handleUpload}
-                  disabled={!arquivoSelecionado || uploadStatus === 'carregando'}
-                  data-testid="btn-confirmar-upload"
-                >
-                  {uploadStatus === 'carregando' ? 'Importando...' : 'Importar Planilha'}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal Alterar Status da Proposta */}
-      <Dialog open={!!propostaEditando} onOpenChange={() => { setPropostaEditando(null); setNovoStatus(""); }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Alterar Status da Proposta</DialogTitle>
-            <DialogDescription>
-              {propostaEditando?.clienteNome}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <p className="text-sm text-muted-foreground">Status atual:</p>
-            <Badge variant="outline" className={getStatusBadgeVariant(propostaEditando?.status || '')}>
-              {propostaEditando?.status?.replace('_', ' ')}
-            </Badge>
+          <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Novo status:</label>
-              <Select value={novoStatus} onValueChange={setNovoStatus}>
+              <Label>Novo status</Label>
+              <Select value={novoStatus} onValueChange={v => { setNovoStatus(v); setErro(""); }}>
                 <SelectTrigger data-testid="select-novo-status">
-                  <SelectValue placeholder="Selecione..." />
+                  <SelectValue placeholder="Selecione o próximo status..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {statusDisponiveis.map(s => (
-                    <SelectItem key={s} value={s}>
-                      {s.replace('_', ' ')}
-                    </SelectItem>
+                  {proximosStatus.map(s => (
+                    <SelectItem key={s} value={s}>{STATUS_LABEL[s] ?? s}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
+            {novoStatus === "RECUSADA" && (
+              <div className="space-y-1.5">
+                <Label>Motivo da recusa</Label>
+                <Input
+                  placeholder="Informe o motivo..."
+                  value={motivoRecusa}
+                  onChange={e => setMotivoRecusa(e.target.value)}
+                  data-testid="input-motivo-recusa"
+                />
+              </div>
+            )}
+
+            {novoStatus === "ATIVA" && (
+              <div className="space-y-4 rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
+                <p className="text-sm font-semibold text-emerald-800 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                  Dados de Ativação — obrigatórios
+                </p>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="matricula">
+                    Código do Usuário <span className="text-xs text-muted-foreground">(14 dígitos)</span>
+                  </Label>
+                  <Input
+                    id="matricula"
+                    placeholder="00000000000000"
+                    maxLength={14}
+                    value={matricula}
+                    onChange={e => setMatricula(e.target.value.replace(/\D/g, ""))}
+                    className={`font-mono ${matricula && matricula.length !== 14 ? "border-red-400" : ""}`}
+                    data-testid="input-matricula"
+                  />
+                  {matricula && matricula.length !== 14 && (
+                    <p className="text-xs text-red-500">{matricula.length}/14 dígitos</p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="dataAtivacao">Data de Ativação</Label>
+                  <Input
+                    id="dataAtivacao"
+                    type="date"
+                    value={dataAtivacao}
+                    onChange={e => setDataAtivacao(e.target.value)}
+                    data-testid="input-data-ativacao"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>
+                    Código do Plano <span className="text-xs text-muted-foreground">(4 dígitos)</span>
+                  </Label>
+                  {!usarManual ? (
+                    <div className="space-y-2">
+                      <Select value={planoCodeSelecionado} onValueChange={setPlanoCodeSelecionado}>
+                        <SelectTrigger data-testid="select-plano-code">
+                          <SelectValue placeholder="Selecione o plano..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {planos.map(p => (
+                            <SelectItem key={p.codigo} value={p.codigo}>
+                              <span className="font-mono font-bold">{p.codigo}</span>
+                              <span className="ml-2 text-muted-foreground text-xs">{p.nome}</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <button
+                        type="button"
+                        className="text-xs text-primary underline underline-offset-2"
+                        onClick={() => setUsarManual(true)}
+                      >
+                        Inserir código manualmente
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Input
+                        placeholder="Ex: 5254"
+                        maxLength={6}
+                        value={planoCodeManual}
+                        onChange={e => setPlanoCodeManual(e.target.value)}
+                        className="font-mono"
+                        data-testid="input-plano-code-manual"
+                      />
+                      <button
+                        type="button"
+                        className="text-xs text-primary underline underline-offset-2"
+                        onClick={() => { setUsarManual(false); setPlanoCodeManual(""); }}
+                      >
+                        Selecionar da lista
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {erro && (
+              <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                {erro}
+              </div>
+            )}
           </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => { setPropostaEditando(null); setNovoStatus(""); }}>Cancelar</Button>
-            <Button onClick={handleAtualizarStatus} disabled={!novoStatus} data-testid="btn-confirmar-status">
-              Atualizar
+
+          <DialogFooter className="flex-row gap-2 sm:justify-end">
+            <Button variant="ghost" onClick={() => setPropostaEditando(null)}>Cancelar</Button>
+            <Button
+              onClick={handleAtualizarStatus}
+              disabled={salvando || !podeAtivar}
+              className={novoStatus === "ATIVA" ? "bg-emerald-600 hover:bg-emerald-700" : novoStatus === "RECUSADA" ? "bg-red-600 hover:bg-red-700" : ""}
+              data-testid="btn-confirmar-status"
+            >
+              {salvando ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Salvando...</> : "Confirmar"}
             </Button>
           </DialogFooter>
         </DialogContent>

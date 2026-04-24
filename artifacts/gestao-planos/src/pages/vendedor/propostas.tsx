@@ -12,7 +12,7 @@ import { usePropostas, type PropostaAPI } from "@/hooks/useVendedorData";
 import { planos } from "@/data/planos";
 import { formatMoney } from "@/lib/format";
 import { apiFetch } from "@/lib/api";
-import { Search, SlidersHorizontal, Plus, Check, Loader2 } from "lucide-react";
+import { Search, SlidersHorizontal, Plus, Check, Loader2, Sparkles, X, ChevronDown } from "lucide-react";
 
 const STATUS_LABEL: Record<string, string> = {
   AGUARDANDO_ENVIO: "Aguardando envio",
@@ -32,18 +32,10 @@ const STATUS_COLORS: Record<string, string> = {
 
 const formasPagamento = ["BOLETO", "CORA", "C6", "BTG", "PIX", "DÉBITO EM FOLHA"];
 
-function getNome(p: PropostaAPI) {
-  return String((p.dadosTitular as Record<string, unknown>).nome ?? "—");
-}
-function getCpf(p: PropostaAPI) {
-  return String((p.dadosTitular as Record<string, unknown>).cpf ?? "—");
-}
-function getPlanoNome(p: PropostaAPI) {
-  return String((p.dadosTitular as Record<string, unknown>).plano ?? "—");
-}
-function getCodigoPlano(p: PropostaAPI) {
-  return String((p.dadosTitular as Record<string, unknown>).codigoPlano ?? "—");
-}
+function getNome(p: PropostaAPI) { return String((p.dadosTitular as Record<string, unknown>).nome ?? "—"); }
+function getCpf(p: PropostaAPI) { return String((p.dadosTitular as Record<string, unknown>).cpf ?? "—"); }
+function getPlanoNome(p: PropostaAPI) { return String((p.dadosTitular as Record<string, unknown>).plano ?? "—"); }
+function getCodigoPlano(p: PropostaAPI) { return String((p.dadosTitular as Record<string, unknown>).codigoPlano ?? "—"); }
 
 export default function VendedorPropostas() {
   const { propostas, loading, reload } = usePropostas();
@@ -53,6 +45,13 @@ export default function VendedorPropostas() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState(false);
+
+  // IA — colar dados
+  const [iaAberta, setIaAberta] = useState(false);
+  const [iaTexto, setIaTexto] = useState("");
+  const [iaAnalisando, setIaAnalisando] = useState(false);
+  const [iaErro, setIaErro] = useState("");
+  const [iaPreenchido, setIaPreenchido] = useState(false);
 
   const [form, setForm] = useState({
     clienteNome: "",
@@ -87,6 +86,34 @@ export default function VendedorPropostas() {
     if (p) handleChange("valorPrevisto", p.valorTitular.toFixed(2).replace(".", ","));
   };
 
+  // IA: analisar texto colado
+  const handleAnalisarIA = async () => {
+    if (!iaTexto.trim()) return;
+    setIaAnalisando(true);
+    setIaErro("");
+    setIaPreenchido(false);
+    try {
+      const res = await apiFetch("/ai/parse-cliente", {
+        method: "POST",
+        body: JSON.stringify({ texto: iaTexto }),
+      }) as { dados: Record<string, string | null> };
+      const dados = res.dados ?? {};
+      setForm(prev => ({
+        ...prev,
+        clienteNome: dados.nome ?? prev.clienteNome,
+        clienteCpf: dados.cpf ?? prev.clienteCpf,
+        telefone: dados.telefone ?? prev.telefone,
+      }));
+      setIaPreenchido(true);
+      // Fecha o painel de IA após 1.2s para o usuário confirmar os dados
+      setTimeout(() => setIaAberta(false), 1200);
+    } catch (err: unknown) {
+      setIaErro(err instanceof Error ? err.message : "Não foi possível analisar o texto.");
+    } finally {
+      setIaAnalisando(false);
+    }
+  };
+
   const handleSalvar = async () => {
     setSalvando(true);
     try {
@@ -114,6 +141,9 @@ export default function VendedorPropostas() {
         setStep(1);
         setForm({ clienteNome: "", clienteCpf: "", telefone: "", tipo: "TITULAR", codigoPlano: "", planoNome: "", formaPagamento: "", valorPrevisto: "", observacao: "" });
         setNovaPropostaAberta(false);
+        setIaTexto("");
+        setIaAberta(false);
+        setIaPreenchido(false);
       }, 1200);
     } catch (err) {
       console.error(err);
@@ -122,7 +152,14 @@ export default function VendedorPropostas() {
     }
   };
 
-  const handleFechar = () => { setNovaPropostaAberta(false); setStep(1); setSalvo(false); };
+  const handleFechar = () => {
+    setNovaPropostaAberta(false);
+    setStep(1);
+    setSalvo(false);
+    setIaTexto("");
+    setIaAberta(false);
+    setIaPreenchido(false);
+  };
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -233,6 +270,7 @@ export default function VendedorPropostas() {
             <DialogDescription>Preencha os dados do cliente e do plano para registrar a proposta.</DialogDescription>
           </DialogHeader>
 
+          {/* Stepper */}
           <div className="flex items-center gap-2 py-2">
             {[1, 2, 3].map(s => (
               <div key={s} className="flex items-center gap-2">
@@ -247,8 +285,55 @@ export default function VendedorPropostas() {
             ))}
           </div>
 
+          {/* STEP 1 — Dados do Cliente */}
           {step === 1 && (
             <div className="grid gap-4 py-2">
+              {/* Painel IA */}
+              <div className="rounded-lg border border-violet-200 bg-violet-50/60">
+                <button
+                  type="button"
+                  onClick={() => { setIaAberta(prev => !prev); setIaErro(""); }}
+                  className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-violet-800 hover:bg-violet-100/60 rounded-lg transition-colors"
+                  data-testid="btn-colar-dados-ia"
+                >
+                  <span className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-violet-600" />
+                    Colar dados com IA
+                    <span className="text-xs font-normal text-violet-600">— cole texto e a IA preenche o formulário</span>
+                  </span>
+                  <ChevronDown className={`h-4 w-4 text-violet-500 transition-transform ${iaAberta ? "rotate-180" : ""}`} />
+                </button>
+
+                {iaAberta && (
+                  <div className="px-4 pb-4 space-y-3">
+                    <Textarea
+                      placeholder="Cole aqui qualquer texto com dados do cliente: mensagem de WhatsApp, e-mail, planilha colada, etc."
+                      value={iaTexto}
+                      onChange={e => { setIaTexto(e.target.value); setIaPreenchido(false); setIaErro(""); }}
+                      className="resize-none bg-white text-sm min-h-[100px]"
+                      rows={4}
+                      data-testid="textarea-ia-dados"
+                    />
+                    {iaErro && <p className="text-xs text-red-600 flex items-center gap-1"><X className="h-3 w-3" />{iaErro}</p>}
+                    {iaPreenchido && (
+                      <p className="text-xs text-emerald-700 flex items-center gap-1">
+                        <Check className="h-3 w-3" /> Dados preenchidos com sucesso! Confira abaixo.
+                      </p>
+                    )}
+                    <Button
+                      size="sm"
+                      onClick={handleAnalisarIA}
+                      disabled={iaAnalisando || !iaTexto.trim()}
+                      className="gap-2 bg-violet-600 hover:bg-violet-700"
+                      data-testid="btn-analisar-ia"
+                    >
+                      {iaAnalisando ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Analisando...</> : <><Sparkles className="h-3.5 w-3.5" /> Analisar</>}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Formulário manual */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label htmlFor="prop-nome">Nome Completo *</Label>
@@ -276,6 +361,7 @@ export default function VendedorPropostas() {
             </div>
           )}
 
+          {/* STEP 2 — Plano */}
           {step === 2 && (
             <div className="grid gap-4 py-2">
               <div className="space-y-1.5">
@@ -313,6 +399,7 @@ export default function VendedorPropostas() {
             </div>
           )}
 
+          {/* STEP 3 — Revisão */}
           {step === 3 && (
             <div className="space-y-4 py-2">
               <div className="rounded-lg border p-4 space-y-3 bg-muted/20">

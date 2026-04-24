@@ -1,12 +1,13 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, desc } from "drizzle-orm";
 import {
   db,
   usersTable,
   vendedoresTable,
   gerentesTable,
   clientesTable,
+  propostasTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth.js";
 
@@ -293,6 +294,123 @@ router.patch("/admin/users/:userId/reset-password", async (req, res) => {
     await db.update(usersTable).set({ passwordHash, updatedAt: new Date() }).where(eq(usersTable.id, userId));
 
     res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── PROPOSTAS ─────────────────────────────────────────────────
+
+// Listar todas as propostas com dados do vendedor
+router.get("/admin/propostas", async (_req, res) => {
+  try {
+    const rows = await db
+      .select({
+        id: propostasTable.id,
+        status: propostasTable.status,
+        dadosTitular: propostasTable.dadosTitular,
+        dadosDependentes: propostasTable.dadosDependentes,
+        valorTotal: propostasTable.valorTotal,
+        dataEnvioOperadora: propostasTable.dataEnvioOperadora,
+        dataRetorno: propostasTable.dataRetorno,
+        dataAtivacao: propostasTable.dataAtivacao,
+        motivoRecusa: propostasTable.motivoRecusa,
+        clienteId: propostasTable.clienteId,
+        createdAt: propostasTable.createdAt,
+        vendedorId: propostasTable.vendedorId,
+        vendedorNome: vendedoresTable.nome,
+        vendedorEmail: vendedoresTable.email,
+      })
+      .from(propostasTable)
+      .leftJoin(vendedoresTable, eq(vendedoresTable.id, propostasTable.vendedorId))
+      .orderBy(desc(propostasTable.createdAt));
+
+    res.json({ propostas: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// Atualizar status geral de uma proposta
+router.patch("/admin/propostas/:id/status", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, motivoRecusa } = req.body as {
+      status: "AGUARDANDO_ENVIO" | "ENVIADA_OPERADORA" | "ACEITA" | "RECUSADA" | "ATIVA";
+      motivoRecusa?: string;
+    };
+
+    const [proposta] = await db.select().from(propostasTable).where(eq(propostasTable.id, id)).limit(1);
+    if (!proposta) return res.status(404).json({ error: "Proposta não encontrada" });
+
+    if (status === "ATIVA") {
+      return res.status(400).json({ error: "Para ativar, use a rota PATCH /admin/propostas/:id/ativar" });
+    }
+
+    const updateData: Partial<typeof propostasTable.$inferInsert> = {
+      status,
+      updatedAt: new Date(),
+    };
+
+    if (status === "ENVIADA_OPERADORA") {
+      updateData.dataEnvioOperadora = new Date();
+    } else if (status === "ACEITA" || status === "RECUSADA") {
+      updateData.dataRetorno = new Date();
+    }
+
+    if (status === "RECUSADA" && motivoRecusa) {
+      updateData.motivoRecusa = motivoRecusa;
+    }
+
+    await db.update(propostasTable).set(updateData).where(eq(propostasTable.id, id));
+    res.json({ ok: true, status });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// Ativar proposta com campos obrigatórios de ativação
+router.patch("/admin/propostas/:id/ativar", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { matricula, dataAtivacao, planoCode } = req.body as {
+      matricula: string;       // 14 dígitos — código do usuário
+      dataAtivacao: string;    // YYYY-MM-DD
+      planoCode: string;       // 4 dígitos — código do plano
+    };
+
+    if (!matricula || matricula.replace(/\D/g, "").length !== 14) {
+      return res.status(400).json({ error: "Código do usuário deve ter 14 dígitos" });
+    }
+    if (!dataAtivacao) {
+      return res.status(400).json({ error: "Data de ativação é obrigatória" });
+    }
+    if (!planoCode || planoCode.trim().length < 4) {
+      return res.status(400).json({ error: "Código do plano deve ter 4 dígitos" });
+    }
+
+    const [proposta] = await db.select().from(propostasTable).where(eq(propostasTable.id, id)).limit(1);
+    if (!proposta) return res.status(404).json({ error: "Proposta não encontrada" });
+
+    // Salva os dados de ativação no dadosTitular e atualiza status
+    const dadosAtualizados = {
+      ...(proposta.dadosTitular as Record<string, unknown>),
+      matricula,
+      dataAtivacao,
+      planoCode,
+    };
+
+    await db.update(propostasTable).set({
+      status: "ATIVA",
+      dadosTitular: dadosAtualizados,
+      dataAtivacao: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(propostasTable.id, id));
+
+    res.json({ ok: true, status: "ATIVA" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: String(err) });

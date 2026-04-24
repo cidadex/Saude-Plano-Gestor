@@ -5,6 +5,7 @@ import seedRouter from "./seed.js";
 import vendedorRouter from "./vendedor.js";
 import comunicacoesRouter from "./comunicacoes.js";
 import adminRouter from "./admin.js";
+import aiRouter from "./ai.js";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(seedRouter);
 router.use(vendedorRouter);
 router.use(comunicacoesRouter);
 router.use(adminRouter);
+router.use(aiRouter);
 
 export default router;
