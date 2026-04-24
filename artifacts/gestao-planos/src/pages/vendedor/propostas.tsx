@@ -238,6 +238,51 @@ export default function VendedorPropostas() {
     setIaTexto(""); setIaAberta(false); setIaPreenchido(false);
   };
 
+  const handleAbrirEdit = (p: PropostaAPI) => {
+    const dt = p.dadosTitular as Record<string, unknown>;
+    setEditandoProposta(p);
+    setEditErro("");
+    setEditForm2({
+      nome: String(dt.nome ?? ""),
+      cpf: String(dt.cpf ?? ""),
+      telefone: String(dt.telefone ?? ""),
+      planoNome: String(dt.plano ?? ""),
+      codigoPlano: String(dt.codigoPlano ?? ""),
+      formaPagamento: String(dt.formaPagamento ?? ""),
+      observacao: String(dt.observacao ?? ""),
+      valorTotal: p.valorTotal ?? "",
+    });
+  };
+
+  const handleSalvarEdit = async () => {
+    if (!editandoProposta) return;
+    setEditSalvando(true);
+    setEditErro("");
+    try {
+      await apiFetch(`/vendedor/propostas/${editandoProposta.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          dadosTitular: {
+            nome: editForm2.nome,
+            cpf: editForm2.cpf,
+            telefone: editForm2.telefone,
+            plano: editForm2.planoNome,
+            codigoPlano: editForm2.codigoPlano,
+            formaPagamento: editForm2.formaPagamento,
+            observacao: editForm2.observacao,
+          },
+          valorTotal: editForm2.valorTotal || undefined,
+        }),
+      });
+      await reload();
+      setEditandoProposta(null);
+    } catch (err: unknown) {
+      setEditErro(err instanceof Error ? err.message : String(err));
+    } finally {
+      setEditSalvando(false);
+    }
+  };
+
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
