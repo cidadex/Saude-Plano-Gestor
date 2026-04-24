@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 import NotFound from "@/pages/not-found";
 
 import Login from "@/pages/login";
+import AcessoPage from "@/pages/acesso";
 
 import { AdminLayout } from "@/components/layout/admin-layout";
 import { GerenteLayout, GerenteGuard } from "@/components/layout/gerente-layout";
@@ -180,6 +181,7 @@ function Router() {
     <Switch>
       <Route path="/" component={HomeRedirect} />
       <Route path="/login" component={Login} />
+      <Route path="/acesso" component={AcessoPage} />
       <Route path="/admin" component={AdminRoutes} />
       <Route path="/admin/:rest*" component={AdminRoutes} />
       <Route path="/vendedor" component={VendedorRoutes} />

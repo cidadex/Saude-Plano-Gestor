@@ -1,6 +1,6 @@
 import { useState, FormEvent } from "react";
-import { useLocation } from "wouter";
-import { HeartPulse, Eye, EyeOff, Loader2, Users, Building2 } from "lucide-react";
+import { useLocation, Link } from "wouter";
+import { HeartPulse, Eye, EyeOff, Loader2, Users, Building2, KeyRound } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function Login() {
@@ -211,6 +211,12 @@ export default function Login() {
           </form>
         )}
 
+        <Link href="/acesso">
+          <button className="w-full flex items-center justify-center gap-1.5 text-xs text-slate-600 hover:text-slate-400 transition-colors py-1">
+            <KeyRound className="h-3 w-3" />
+            Ver credenciais de acesso / Executar seed
+          </button>
+        </Link>
         <p className="text-center text-slate-600 text-xs">© 2026 Gestão de Planos de Saúde</p>
       </div>
     </div>
