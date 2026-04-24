@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { db, usersTable, vendedoresTable, planosTable, clientesTable, propostasTable, boletosTable, comissoesTable } from "@workspace/db";
+import { db, usersTable, vendedoresTable, planosTable, tabelasPrecoTable, tabelasPrecoFaixasTable, clientesTable, propostasTable, boletosTable, comissoesTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 
 const router = Router();
@@ -65,17 +65,58 @@ router.post("/seed", async (_req, res) => {
         });
       }
 
-      // Planos
+      // Planos — todos os 12 com preços reais
       const planosData = [
-        { id: "p1", nome: "AMBU. S/PARTO", tipo: "AMBULATORIAL" as const, operadora: "Hapvida" },
-        { id: "p2", nome: "AMBU. C/PARTO", tipo: "AMBULATORIAL" as const, operadora: "Hapvida" },
-        { id: "p3", nome: "AMBUL+HOSP. S/PARTO", tipo: "AMBULATORIAL_HOSPITALAR" as const, operadora: "Hapvida" },
-        { id: "p4", nome: "AMBUL+HOSP. C/PARTO", tipo: "AMBULATORIAL_HOSPITALAR" as const, operadora: "Hapvida" },
-        { id: "p5", nome: "AMBUL+HOSP. C/PARTO ENFERMARIA", tipo: "AMBULATORIAL_HOSPITALAR" as const, operadora: "Hapvida" },
-        { id: "p6", nome: "ODONTOLÓGICO", tipo: "ODONTOLOGICO" as const, operadora: "Hapvida" },
-        { id: "p7", nome: "COMPLETO", tipo: "COMPLETO" as const, operadora: "Hapvida" },
+        { id: "p1",  codigo: "5254", nome: "AMBUL+HOSP. S/PARTO ENFERMARIA",     tipo: "AMBULATORIAL_HOSPITALAR" as const, operadora: "Hapvida", categoria: "NOSSO PLANO", acomodacao: "ENFERMARIA",  valorTitular: "143.12", valorDependente: "143.12", coberturas: "Ambulatorial,Hospitalar sem parto,Rede própria",                                ativo: true },
+        { id: "p2",  codigo: "5285", nome: "AMBUL+HOSP. S/PARTO APARTAMENTO",    tipo: "AMBULATORIAL_HOSPITALAR" as const, operadora: "Hapvida", categoria: "NOSSO PLANO", acomodacao: "APARTAMENTO", valorTitular: "207.53", valorDependente: "207.53", coberturas: "Ambulatorial,Hospitalar sem parto,Apartamento,Rede própria",                      ativo: true },
+        { id: "p3",  codigo: "5252", nome: "AMBUL+HOSP. C/PARTO ENFERMARIA",     tipo: "AMBULATORIAL_HOSPITALAR" as const, operadora: "Hapvida", categoria: "NOSSO PLANO", acomodacao: "ENFERMARIA",  valorTitular: "153.92", valorDependente: "153.92", coberturas: "Ambulatorial,Hospitalar com parto,Rede própria",                                ativo: true },
+        { id: "p4",  codigo: "9714", nome: "AMBUL+HOSP. C/PARTO APARTAMENTO",    tipo: "AMBULATORIAL_HOSPITALAR" as const, operadora: "Hapvida", categoria: "NOSSO PLANO", acomodacao: "APARTAMENTO", valorTitular: "223.20", valorDependente: "223.20", coberturas: "Ambulatorial,Hospitalar com parto,Apartamento,Rede própria",                      ativo: true },
+        { id: "p5",  codigo: "5403", nome: "AMBUL+HOSP. S/PARTO ENFERMARIA MIX", tipo: "AMBULATORIAL_HOSPITALAR" as const, operadora: "Hapvida", categoria: "MIX",         acomodacao: "ENFERMARIA",  valorTitular: "186.07", valorDependente: "186.07", coberturas: "Ambulatorial,Hospitalar sem parto,Rede própria + credenciada",                  ativo: true },
+        { id: "p6",  codigo: "5404", nome: "AMBUL+HOSP. S/PARTO APARTAMENTO MIX",tipo: "AMBULATORIAL_HOSPITALAR" as const, operadora: "Hapvida", categoria: "MIX",         acomodacao: "APARTAMENTO", valorTitular: "269.81", valorDependente: "269.81", coberturas: "Ambulatorial,Hospitalar sem parto,Apartamento,Rede própria + credenciada",          ativo: true },
+        { id: "p7",  codigo: "5123", nome: "AMBUL+HOSP. C/PARTO ENFERMARIA MIX", tipo: "AMBULATORIAL_HOSPITALAR" as const, operadora: "Hapvida", categoria: "MIX",         acomodacao: "ENFERMARIA",  valorTitular: "200.10", valorDependente: "200.10", coberturas: "Ambulatorial,Hospitalar com parto,Rede própria + credenciada",                  ativo: true },
+        { id: "p8",  codigo: "9717", nome: "AMBUL+HOSP. C/PARTO APARTAMENTO MIX",tipo: "AMBULATORIAL_HOSPITALAR" as const, operadora: "Hapvida", categoria: "MIX",         acomodacao: "APARTAMENTO", valorTitular: "290.18", valorDependente: "290.18", coberturas: "Ambulatorial,Hospitalar com parto,Apartamento,Rede própria + credenciada",          ativo: true },
+        { id: "p9",  codigo: "5397", nome: "AMBUL+HOSP. S/PARTO ENFERMARIA PLENO",tipo: "AMBULATORIAL_HOSPITALAR" as const, operadora: "Hapvida", categoria: "PLENO",       acomodacao: "ENFERMARIA",  valorTitular: "286.27", valorDependente: "286.27", coberturas: "Ambulatorial,Hospitalar sem parto,Cobertura plena",                             ativo: true },
+        { id: "p10", codigo: "5402", nome: "AMBUL+HOSP. S/PARTO APARTAMENTO PLENO",tipo: "AMBULATORIAL_HOSPITALAR" as const,operadora: "Hapvida", categoria: "PLENO",       acomodacao: "APARTAMENTO", valorTitular: "415.04", valorDependente: "415.04", coberturas: "Ambulatorial,Hospitalar sem parto,Apartamento,Cobertura plena",                  ativo: true },
+        { id: "p11", codigo: "5127", nome: "AMBUL+HOSP. C/PARTO ENFERMARIA PLENO",tipo: "AMBULATORIAL_HOSPITALAR" as const, operadora: "Hapvida", categoria: "PLENO",       acomodacao: "ENFERMARIA",  valorTitular: "307.85", valorDependente: "307.85", coberturas: "Ambulatorial,Hospitalar com parto,Cobertura plena",                             ativo: true },
+        { id: "p12", codigo: "5283", nome: "AMBUL+HOSP. C/PARTO APARTAMENTO PLENO",tipo: "AMBULATORIAL_HOSPITALAR" as const,operadora: "Hapvida", categoria: "PLENO",       acomodacao: "APARTAMENTO", valorTitular: "446.39", valorDependente: "446.39", coberturas: "Ambulatorial,Hospitalar com parto,Apartamento,Cobertura plena",                  ativo: true },
       ];
       for (const p of planosData) await tx.insert(planosTable).values(p);
+
+      // Tabelas de preço por faixa etária — por vendedor
+      const tabelaCarolId = "tab-carol-np";
+      const tabelaLisId1  = "tab-lis-np-sem";
+      const tabelaLisId2  = "tab-lis-np-com";
+
+      await tx.insert(tabelasPrecoTable).values([
+        { id: tabelaCarolId, vendedorId: "v2", nome: "CAROL — NOSSO PLANO",              tipoPlano: "NOSSO PLANO",                   ano: 2026 },
+        { id: tabelaLisId1,  vendedorId: "v8", nome: "LIS — NOSSO PLANO SEM OBSTETRÍCIA", tipoPlano: "NOSSO PLANO (SEM OBSTETRÍCIA)", ano: 2026 },
+        { id: tabelaLisId2,  vendedorId: "v8", nome: "LIS — NOSSO PLANO COM OBSTETRÍCIA", tipoPlano: "NOSSO PLANO (COM OBSTETRÍCIA)", ano: 2026 },
+      ]);
+
+      const faixasCarol = [
+        { id: "fc1", tabelaId: tabelaCarolId, planoId: "p1", faixaEtaria: "Até 29 anos",      valor: "302.40", valorApartamento: "423.36" },
+        { id: "fc2", tabelaId: tabelaCarolId, planoId: "p1", faixaEtaria: "30 a 39 anos",     valor: "341.29", valorApartamento: "477.81" },
+        { id: "fc3", tabelaId: tabelaCarolId, planoId: "p1", faixaEtaria: "40 a 49 anos",     valor: "385.28", valorApartamento: "539.39" },
+        { id: "fc4", tabelaId: tabelaCarolId, planoId: "p1", faixaEtaria: "50 anos ou mais",  valor: "600.00", valorApartamento: "780.00" },
+        { id: "fc5", tabelaId: tabelaCarolId, planoId: "p3", faixaEtaria: "DEPENDENTE (fixo)", valor: "260.00", valorApartamento: null },
+      ];
+      const faixasLisSem = [
+        { id: "fl1", tabelaId: tabelaLisId1, planoId: "p1", faixaEtaria: "14 a 29 anos",     valor: "341.67", valorApartamento: "478.35" },
+        { id: "fl2", tabelaId: tabelaLisId1, planoId: "p1", faixaEtaria: "30 a 49 anos",     valor: "406.52", valorApartamento: "569.13" },
+        { id: "fl3", tabelaId: tabelaLisId1, planoId: "p1", faixaEtaria: "50 a 59 anos",     valor: "626.67", valorApartamento: "814.08" },
+        { id: "fl4", tabelaId: tabelaLisId1, planoId: "p1", faixaEtaria: "60 anos ou mais",  valor: "750.90", valorApartamento: "917.90" },
+        { id: "fl5", tabelaId: tabelaLisId1, planoId: "p3", faixaEtaria: "DEPENDENTE (fixo)", valor: "304.89", valorApartamento: null },
+      ];
+      const faixasLisCom = [
+        { id: "flc1", tabelaId: tabelaLisId2, planoId: "p3", faixaEtaria: "14 a 29 anos",     valor: "367.45", valorApartamento: "532.84" },
+        { id: "flc2", tabelaId: tabelaLisId2, planoId: "p3", faixaEtaria: "30 a 49 anos",     valor: "425.31", valorApartamento: "595.44" },
+        { id: "flc3", tabelaId: tabelaLisId2, planoId: "p3", faixaEtaria: "50 a 59 anos",     valor: "679.75", valorApartamento: "883.03" },
+        { id: "flc4", tabelaId: tabelaLisId2, planoId: "p3", faixaEtaria: "60 anos ou mais",  valor: "814.67", valorApartamento: "999.98" },
+        { id: "flc5", tabelaId: tabelaLisId2, planoId: "p3", faixaEtaria: "DEPENDENTE (fixo)", valor: "318.99", valorApartamento: null },
+      ];
+      for (const f of [...faixasCarol, ...faixasLisSem, ...faixasLisCom]) {
+        await tx.insert(tabelasPrecoFaixasTable).values(f);
+      }
 
       // Clientes
       const clientesData = [

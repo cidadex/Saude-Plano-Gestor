@@ -173,15 +173,4 @@ router.post("/vendedor/propostas", async (req, res) => {
   }
 });
 
-// GET /api/planos  — all plans (any authenticated user)
-router.get("/planos", async (_req, res) => {
-  try {
-    const planos = await db.select().from(planosTable);
-    res.json({ planos });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: String(err) });
-  }
-});
-
 export default router;

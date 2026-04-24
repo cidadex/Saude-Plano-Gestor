@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,10 +9,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { usePropostas, type PropostaAPI } from "@/hooks/useVendedorData";
-import { planos } from "@/data/planos";
 import { formatMoney } from "@/lib/format";
 import { apiFetch } from "@/lib/api";
 import { Search, SlidersHorizontal, Plus, Check, Loader2, Sparkles, X, ChevronDown } from "lucide-react";
+
+type PlanoAPI = {
+  id: string;
+  codigo: string | null;
+  nome: string;
+  categoria: string | null;
+  valorTitular: string | null;
+  valorDependente: string | null;
+  ativo: boolean;
+};
 
 const STATUS_LABEL: Record<string, string> = {
   AGUARDANDO_ENVIO: "Aguardando envio",
@@ -39,12 +48,19 @@ function getCodigoPlano(p: PropostaAPI) { return String((p.dadosTitular as Recor
 
 export default function VendedorPropostas() {
   const { propostas, loading, reload } = usePropostas();
+  const [planosAPI, setPlanosAPI] = useState<PlanoAPI[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("TODOS");
   const [novaPropostaAberta, setNovaPropostaAberta] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState(false);
+
+  useEffect(() => {
+    (apiFetch("/planos") as Promise<{ planos: PlanoAPI[] }>)
+      .then(d => setPlanosAPI((d.planos ?? []).filter(p => p.ativo)))
+      .catch(console.error);
+  }, []);
 
   // IA — colar dados
   const [iaAberta, setIaAberta] = useState(false);
@@ -80,10 +96,10 @@ export default function VendedorPropostas() {
   const handleChange = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
 
   const handleSelecionarPlano = (codigo: string) => {
-    const p = planos.find(p => p.codigo === codigo);
+    const p = planosAPI.find(p => p.codigo === codigo);
     handleChange("codigoPlano", codigo);
     handleChange("planoNome", p?.nome ?? "");
-    if (p) handleChange("valorPrevisto", p.valorTitular.toFixed(2).replace(".", ","));
+    if (p?.valorTitular) handleChange("valorPrevisto", parseFloat(p.valorTitular).toFixed(2).replace(".", ","));
   };
 
   // IA: analisar texto colado
@@ -367,12 +383,19 @@ export default function VendedorPropostas() {
               <div className="space-y-1.5">
                 <Label>Plano de Saúde *</Label>
                 <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
-                  {planos.map(p => (
-                    <button key={p.codigo} onClick={() => handleSelecionarPlano(p.codigo)} data-testid={`btn-proposta-plano-${p.codigo}`}
+                  {planosAPI.length === 0 && (
+                    <div className="col-span-2 flex items-center justify-center h-16 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando planos...
+                    </div>
+                  )}
+                  {planosAPI.map(p => (
+                    <button key={p.codigo} onClick={() => handleSelecionarPlano(p.codigo ?? "")} data-testid={`btn-proposta-plano-${p.codigo}`}
                       className={`p-3 rounded-lg border text-left transition-all ${form.codigoPlano === p.codigo ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/40"}`}>
-                      <div className="font-mono font-bold text-sm">{p.codigo}</div>
+                      <div className="font-mono font-bold text-sm">{p.codigo ?? "—"}</div>
                       <div className="text-xs text-muted-foreground mt-0.5 leading-tight line-clamp-2">{p.nome}</div>
-                      <div className="text-xs font-semibold text-primary mt-1">Tit: R$ {p.valorTitular.toFixed(2).replace(".", ",")}</div>
+                      <div className="text-xs font-semibold text-primary mt-1">
+                        Tit: R$ {p.valorTitular ? parseFloat(p.valorTitular).toFixed(2).replace(".", ",") : "—"}
+                      </div>
                     </button>
                   ))}
                 </div>
