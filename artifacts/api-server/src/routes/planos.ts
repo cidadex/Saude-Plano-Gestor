@@ -99,32 +99,54 @@ router.get("/admin/tabelas-preco", async (req, res) => {
   }
 });
 
+type FaixaInput = { faixaEtaria: string; valor: string; valorApartamento?: string; planoId: string };
+
+function validarFaixas(faixas: unknown): { ok: true; faixas: FaixaInput[] } | { ok: false; error: string } {
+  if (!Array.isArray(faixas)) return { ok: false, error: "faixas deve ser um array" };
+  for (const f of faixas) {
+    if (typeof f !== "object" || f === null) return { ok: false, error: "Cada faixa deve ser um objeto" };
+    const fx = f as Record<string, unknown>;
+    if (!fx.faixaEtaria || typeof fx.faixaEtaria !== "string") return { ok: false, error: "faixaEtaria é obrigatória" };
+    if (!fx.planoId || typeof fx.planoId !== "string") return { ok: false, error: "planoId é obrigatório em cada faixa" };
+    if (!fx.valor || isNaN(parseFloat(String(fx.valor)))) return { ok: false, error: `Valor inválido na faixa "${fx.faixaEtaria}"` };
+    if (fx.valorApartamento !== undefined && fx.valorApartamento !== null && isNaN(parseFloat(String(fx.valorApartamento)))) {
+      return { ok: false, error: `valorApartamento inválido na faixa "${fx.faixaEtaria}"` };
+    }
+  }
+  return { ok: true, faixas: faixas as FaixaInput[] };
+}
+
 // POST /api/admin/tabelas-preco — criar nova tabela de preço por vendedor
 router.post("/admin/tabelas-preco", async (req, res) => {
   if (req.user?.role !== "admin") return res.status(403).json({ error: "Acesso negado" });
   try {
-    const { vendedorId, nome, tipoPlano, ano, faixas } = req.body as {
-      vendedorId: string;
-      nome: string;
+    const { vendedorId, nome, tipoPlano, ano, faixas: faixasRaw } = req.body as {
+      vendedorId?: string;
+      nome?: string;
       tipoPlano?: string;
       ano?: number;
-      faixas: { faixaEtaria: string; valor: string; valorApartamento?: string; planoId: string }[];
+      faixas?: unknown;
     };
-    if (!vendedorId || !nome) return res.status(400).json({ error: "vendedorId e nome são obrigatórios" });
+    if (!vendedorId || typeof vendedorId !== "string") return res.status(400).json({ error: "vendedorId é obrigatório" });
+    if (!nome || typeof nome !== "string") return res.status(400).json({ error: "nome é obrigatório" });
+
+    const faixasCheck = validarFaixas(faixasRaw ?? []);
+    if (!faixasCheck.ok) return res.status(400).json({ error: faixasCheck.error });
 
     const tabelaId = randomUUID();
-    await db.insert(tabelasPrecoTable).values({ id: tabelaId, vendedorId, nome, tipoPlano, ano });
-
-    for (const f of (faixas ?? [])) {
-      await db.insert(tabelasPrecoFaixasTable).values({
-        id: randomUUID(),
-        tabelaId,
-        planoId: f.planoId,
-        faixaEtaria: f.faixaEtaria,
-        valor: f.valor,
-        valorApartamento: f.valorApartamento ?? null,
-      });
-    }
+    await db.transaction(async (tx) => {
+      await tx.insert(tabelasPrecoTable).values({ id: tabelaId, vendedorId, nome, tipoPlano, ano });
+      for (const f of faixasCheck.faixas) {
+        await tx.insert(tabelasPrecoFaixasTable).values({
+          id: randomUUID(),
+          tabelaId,
+          planoId: f.planoId,
+          faixaEtaria: f.faixaEtaria,
+          valor: String(parseFloat(f.valor)),
+          valorApartamento: f.valorApartamento ? String(parseFloat(f.valorApartamento)) : null,
+        });
+      }
+    });
     res.status(201).json({ ok: true, tabelaId });
   } catch (err) {
     console.error(err);
@@ -137,35 +159,47 @@ router.put("/admin/tabelas-preco/:id", async (req, res) => {
   if (req.user?.role !== "admin") return res.status(403).json({ error: "Acesso negado" });
   try {
     const { id } = req.params;
-    const { nome, tipoPlano, ano, faixas } = req.body as {
+    const { nome, tipoPlano, ano, faixas: faixasRaw } = req.body as {
       nome?: string;
       tipoPlano?: string;
       ano?: number;
-      faixas?: { faixaEtaria: string; valor: string; valorApartamento?: string; planoId: string }[];
+      faixas?: unknown;
     };
 
     const [tabela] = await db.select({ id: tabelasPrecoTable.id }).from(tabelasPrecoTable).where(eq(tabelasPrecoTable.id, id)).limit(1);
     if (!tabela) return res.status(404).json({ error: "Tabela não encontrada" });
 
-    const updates: Record<string, unknown> = {};
-    if (nome !== undefined) updates.nome = nome;
-    if (tipoPlano !== undefined) updates.tipoPlano = tipoPlano;
-    if (ano !== undefined) updates.ano = ano;
-    if (Object.keys(updates).length > 0) {
-      await db.update(tabelasPrecoTable).set(updates).where(eq(tabelasPrecoTable.id, id));
-    }
+    if (faixasRaw !== undefined) {
+      const faixasCheck = validarFaixas(faixasRaw);
+      if (!faixasCheck.ok) return res.status(400).json({ error: faixasCheck.error });
 
-    if (faixas !== undefined) {
-      await db.delete(tabelasPrecoFaixasTable).where(eq(tabelasPrecoFaixasTable.tabelaId, id));
-      for (const f of faixas) {
-        await db.insert(tabelasPrecoFaixasTable).values({
-          id: randomUUID(),
-          tabelaId: id,
-          planoId: f.planoId,
-          faixaEtaria: f.faixaEtaria,
-          valor: f.valor,
-          valorApartamento: f.valorApartamento ?? null,
-        });
+      await db.transaction(async (tx) => {
+        const updates: Record<string, unknown> = {};
+        if (nome !== undefined) updates.nome = nome;
+        if (tipoPlano !== undefined) updates.tipoPlano = tipoPlano;
+        if (ano !== undefined) updates.ano = ano;
+        if (Object.keys(updates).length > 0) {
+          await tx.update(tabelasPrecoTable).set(updates).where(eq(tabelasPrecoTable.id, id));
+        }
+        await tx.delete(tabelasPrecoFaixasTable).where(eq(tabelasPrecoFaixasTable.tabelaId, id));
+        for (const f of faixasCheck.faixas) {
+          await tx.insert(tabelasPrecoFaixasTable).values({
+            id: randomUUID(),
+            tabelaId: id,
+            planoId: f.planoId,
+            faixaEtaria: f.faixaEtaria,
+            valor: String(parseFloat(f.valor)),
+            valorApartamento: f.valorApartamento ? String(parseFloat(f.valorApartamento)) : null,
+          });
+        }
+      });
+    } else {
+      const updates: Record<string, unknown> = {};
+      if (nome !== undefined) updates.nome = nome;
+      if (tipoPlano !== undefined) updates.tipoPlano = tipoPlano;
+      if (ano !== undefined) updates.ano = ano;
+      if (Object.keys(updates).length > 0) {
+        await db.update(tabelasPrecoTable).set(updates).where(eq(tabelasPrecoTable.id, id));
       }
     }
     res.json({ ok: true });
@@ -180,8 +214,12 @@ router.delete("/admin/tabelas-preco/:id", async (req, res) => {
   if (req.user?.role !== "admin") return res.status(403).json({ error: "Acesso negado" });
   try {
     const { id } = req.params;
-    await db.delete(tabelasPrecoFaixasTable).where(eq(tabelasPrecoFaixasTable.tabelaId, id));
-    await db.delete(tabelasPrecoTable).where(eq(tabelasPrecoTable.id, id));
+    const [tabela] = await db.select({ id: tabelasPrecoTable.id }).from(tabelasPrecoTable).where(eq(tabelasPrecoTable.id, id)).limit(1);
+    if (!tabela) return res.status(404).json({ error: "Tabela não encontrada" });
+    await db.transaction(async (tx) => {
+      await tx.delete(tabelasPrecoFaixasTable).where(eq(tabelasPrecoFaixasTable.tabelaId, id));
+      await tx.delete(tabelasPrecoTable).where(eq(tabelasPrecoTable.id, id));
+    });
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
