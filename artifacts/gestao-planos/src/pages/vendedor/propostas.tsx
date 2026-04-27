@@ -57,6 +57,7 @@ export default function VendedorPropostas() {
   const { propostas, loading, reload } = usePropostas();
   const [planosAPI, setPlanosAPI] = useState<PlanoAPI[]>([]);
   const [tabelas, setTabelas] = useState<TabelaVendedor[]>([]);
+  const [loadingPlanos, setLoadingPlanos] = useState(true);
   const [contratosList, setContratosList] = useState<Array<{ id: string; nome: string; asaasModo?: string }>>([]);
   const [responsaveisList, setResponsaveisList] = useState<Array<{ id: string; nome: string; tipo: string }>>([]);
   const [search, setSearch] = useState("");
@@ -74,12 +75,12 @@ export default function VendedorPropostas() {
   const [salvarErro, setSalvarErro] = useState("");
 
   useEffect(() => {
-    (apiFetch("/planos") as Promise<{ planos: PlanoAPI[] }>)
-      .then(d => setPlanosAPI((d.planos ?? []).filter(p => p.ativo)))
-      .catch(console.error);
-    (apiFetch("/vendedor/tabela-preco") as Promise<{ tabelas: TabelaVendedor[] }>)
-      .then(d => setTabelas(d.tabelas ?? []))
-      .catch(console.error);
+    Promise.all([
+      (apiFetch("/planos") as Promise<{ planos: PlanoAPI[] }>).then(d => setPlanosAPI((d.planos ?? []).filter(p => p.ativo))),
+      (apiFetch("/vendedor/tabela-preco") as Promise<{ tabelas: TabelaVendedor[] }>).then(d => setTabelas(d.tabelas ?? [])),
+    ])
+      .catch(console.error)
+      .finally(() => setLoadingPlanos(false));
     (apiFetch("/contratos") as Promise<{ contratos: Array<{ id: string; nome: string; asaasModo?: string }> }>)
       .then(d => setContratosList(d.contratos ?? []))
       .catch(console.error);
@@ -121,9 +122,10 @@ export default function VendedorPropostas() {
   // Tabela derivada: faixas do plano selecionado na tabela selecionada
   const tabelaAtual = tabelas.find(t => t.id === form.tabelaId) ?? tabelas[0];
   const planosNaTabela = useMemo(() => {
-    if (!tabelaAtual) return planosAPI;
+    if (!tabelaAtual || tabelaAtual.faixas.length === 0) return planosAPI;
     const ids = [...new Set(tabelaAtual.faixas.map(f => f.planoId))];
-    return planosAPI.filter(p => ids.includes(p.id));
+    const filtrados = planosAPI.filter(p => ids.includes(p.id));
+    return filtrados.length > 0 ? filtrados : planosAPI;
   }, [tabelaAtual, planosAPI]);
 
   const faixasDoPlanosTabela = useMemo(() => {
@@ -621,12 +623,15 @@ export default function VendedorPropostas() {
               <div className="space-y-1.5">
                 <Label>Plano de Saúde *</Label>
                 <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
-                  {planosNaTabela.length === 0 && (
+                  {loadingPlanos ? (
                     <div className="col-span-2 flex items-center justify-center h-16 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando...
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando planos...
                     </div>
-                  )}
-                  {planosNaTabela.map(p => (
+                  ) : planosNaTabela.length === 0 ? (
+                    <div className="col-span-2 text-center py-4 text-sm text-muted-foreground">
+                      Nenhum plano disponível. Contate o administrador.
+                    </div>
+                  ) : planosNaTabela.map(p => (
                     <button key={p.id} onClick={() => handleSelecionarPlano(p)} data-testid={`btn-proposta-plano-${p.codigo}`}
                       className={`p-3 rounded-lg border text-left transition-all ${form.planoId === p.id ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/40"}`}>
                       <div className="font-mono font-bold text-sm">{p.codigo ?? "—"}</div>

@@ -261,6 +261,7 @@ export default function AdminPropostas() {
   // ─── NOVA PROPOSTA (admin) ────────────────────────────────────
   const [novaAberta, setNovaAberta] = useState(false);
   const [novaStep, setNovaStep] = useState<1 | 2 | 3>(1);
+  const [loadingNovaForm, setLoadingNovaForm] = useState(true);
   const [vendedoresList, setVendedoresList] = useState<VendedorSelect[]>([]);
   const [planosList, setPlanosList] = useState<PlanoSelect[]>([]);
   const [contratosList, setContratosList] = useState<ContratoSelect[]>([]);
@@ -287,7 +288,7 @@ export default function AdminPropostas() {
       setPlanosList((p.planos ?? []).filter(pl => pl.ativo));
       setContratosList((c.contratos ?? []).filter(ct => ct.ativo));
       setResponsaveisList(r.responsaveis ?? []);
-    }).catch(console.error);
+    }).catch(console.error).finally(() => setLoadingNovaForm(false));
   }, []);
 
   const handleAnalisarIA = async () => {
@@ -782,7 +783,15 @@ export default function AdminPropostas() {
               <div className="space-y-1.5">
                 <Label>Plano de Saúde *</Label>
                 <div className="grid grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
-                  {planosList.map(p => (
+                  {loadingNovaForm ? (
+                    <div className="col-span-2 flex items-center justify-center h-16 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando planos...
+                    </div>
+                  ) : planosList.length === 0 ? (
+                    <div className="col-span-2 text-center py-4 text-sm text-muted-foreground">
+                      Nenhum plano ativo cadastrado.
+                    </div>
+                  ) : planosList.map(p => (
                     <button key={p.id} onClick={() => setNovaForm(f => ({ ...f, planoId: p.id }))}
                       data-testid={`btn-nova-plano-${p.codigo}`}
                       className={`p-3 rounded-lg border text-left transition-all ${novaForm.planoId === p.id ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/40"}`}>
