@@ -168,18 +168,19 @@ router.post("/vendedor/propostas", async (req, res) => {
     const vendedorId = req.user!.vendedorId;
     if (!vendedorId) return res.status(403).json({ error: "Somente vendedores" });
 
-    const { dadosTitular, dadosDependentes, planoId, valorTotal, contratoId, responsavelFinanceiroId } = req.body as {
+    const { dadosTitular, dadosDependentes, planoId, valorTotal, contratoId, responsavelFinanceiroId, titularEhResponsavel } = req.body as {
       dadosTitular: Record<string, unknown>;
       dadosDependentes?: Record<string, unknown>[];
       planoId?: string;
       valorTotal?: string;
       contratoId?: string;
       responsavelFinanceiroId?: string;
+      titularEhResponsavel?: boolean;
     };
 
     if (!dadosTitular) return res.status(400).json({ error: "dadosTitular é obrigatório" });
     if (!contratoId) return res.status(400).json({ error: "contratoId é obrigatório" });
-    if (!responsavelFinanceiroId) return res.status(400).json({ error: "responsavelFinanceiroId é obrigatório" });
+    if (!titularEhResponsavel && !responsavelFinanceiroId) return res.status(400).json({ error: "responsavelFinanceiroId é obrigatório" });
     const erroValidacao = validarDadosTitular(dadosTitular);
     if (erroValidacao) return res.status(400).json({ error: erroValidacao });
 

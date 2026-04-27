@@ -311,18 +311,19 @@ router.patch("/admin/users/:userId/reset-password", async (req, res) => {
 // POST /admin/propostas — admin cria proposta para qualquer vendedor
 router.post("/admin/propostas", async (req, res) => {
   try {
-    const { vendedorId, dadosTitular, dadosDependentes, valorTotal, contratoId, responsavelFinanceiroId } = req.body as {
+    const { vendedorId, dadosTitular, dadosDependentes, valorTotal, contratoId, responsavelFinanceiroId, titularEhResponsavel } = req.body as {
       vendedorId: string;
       dadosTitular: Record<string, unknown>;
       dadosDependentes?: Record<string, unknown>[];
       valorTotal?: string;
       contratoId?: string;
       responsavelFinanceiroId?: string;
+      titularEhResponsavel?: boolean;
     };
     if (!vendedorId) return res.status(400).json({ error: "vendedorId é obrigatório" });
     if (!dadosTitular) return res.status(400).json({ error: "dadosTitular é obrigatório" });
     if (!contratoId) return res.status(400).json({ error: "contratoId é obrigatório" });
-    if (!responsavelFinanceiroId) return res.status(400).json({ error: "responsavelFinanceiroId é obrigatório" });
+    if (!titularEhResponsavel && !responsavelFinanceiroId) return res.status(400).json({ error: "responsavelFinanceiroId é obrigatório" });
     const erroValidacao = validarDadosTitular(dadosTitular);
     if (erroValidacao) return res.status(400).json({ error: erroValidacao });
 
