@@ -189,13 +189,13 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/acesso" component={AcessoPage} />
       <Route path="/admin" component={AdminRoutes} />
-      <Route path="/admin/:rest*" component={AdminRoutes} />
+      <Route path="/admin/*" component={AdminRoutes} />
       <Route path="/vendedor" component={VendedorRoutes} />
-      <Route path="/vendedor/:rest*" component={VendedorRoutes} />
+      <Route path="/vendedor/*" component={VendedorRoutes} />
       <Route path="/gerente" component={GerenteRoutes} />
-      <Route path="/gerente/:rest*" component={GerenteRoutes} />
+      <Route path="/gerente/*" component={GerenteRoutes} />
       <Route path="/cliente" component={ClienteRoutes} />
-      <Route path="/cliente/:rest*" component={ClienteRoutes} />
+      <Route path="/cliente/*" component={ClienteRoutes} />
       <Route component={NotFound} />
     </Switch>
   );
