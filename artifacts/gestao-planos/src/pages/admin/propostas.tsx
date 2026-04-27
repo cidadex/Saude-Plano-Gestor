@@ -735,48 +735,41 @@ export default function AdminPropostas() {
                   <Input placeholder="CE" maxLength={2} value={novaForm.estado}
                     onChange={e => setNovaForm(f => ({ ...f, estado: e.target.value.toUpperCase() }))} />
                 </div>
-              </div>
-
-              {/* Dados pessoais adicionais (Hapvida) */}
-              <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3 space-y-3">
-                <p className="text-xs font-semibold text-amber-800">Dados Pessoais Adicionais (Hapvida)</p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Estado Civil</Label>
-                    <Select value={novaForm.estadoCivil} onValueChange={v => setNovaForm(f => ({ ...f, estadoCivil: v }))}>
-                      <SelectTrigger data-testid="select-nova-estado-civil"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="SOLTEIRO">Solteiro(a)</SelectItem>
-                        <SelectItem value="CASADO">Casado(a)</SelectItem>
-                        <SelectItem value="DIVORCIADO">Divorciado(a)</SelectItem>
-                        <SelectItem value="VIUVO">Viúvo(a)</SelectItem>
-                        <SelectItem value="UNIAO_ESTAVEL">União Estável</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1 sm:col-span-1">
-                    <Label className="text-xs text-muted-foreground">Nome da Mãe</Label>
-                    <Input placeholder="Nome completo da mãe" value={novaForm.nomeMae}
-                      onChange={e => setNovaForm(f => ({ ...f, nomeMae: e.target.value }))} data-testid="input-nova-nome-mae" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">RG</Label>
-                    <Input value={novaForm.rg} onChange={e => setNovaForm(f => ({ ...f, rg: e.target.value }))} data-testid="input-nova-rg" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Órgão Emissor</Label>
-                    <Input placeholder="SSP" value={novaForm.rgOrgaoEmissor}
-                      onChange={e => setNovaForm(f => ({ ...f, rgOrgaoEmissor: e.target.value }))} data-testid="input-nova-rg-orgao" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">UF do RG</Label>
-                    <Select value={novaForm.rgUf} onValueChange={v => setNovaForm(f => ({ ...f, rgUf: v }))}>
-                      <SelectTrigger data-testid="select-nova-rg-uf"><SelectValue /></SelectTrigger>
-                      <SelectContent className="max-h-60">
-                        {UFS_BR.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Estado Civil</Label>
+                  <Select value={novaForm.estadoCivil} onValueChange={v => setNovaForm(f => ({ ...f, estadoCivil: v }))}>
+                    <SelectTrigger data-testid="select-nova-estado-civil"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="SOLTEIRO">Solteiro(a)</SelectItem>
+                      <SelectItem value="CASADO">Casado(a)</SelectItem>
+                      <SelectItem value="DIVORCIADO">Divorciado(a)</SelectItem>
+                      <SelectItem value="VIUVO">Viúvo(a)</SelectItem>
+                      <SelectItem value="UNIAO_ESTAVEL">União Estável</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs text-muted-foreground">Nome da Mãe</Label>
+                  <Input placeholder="Nome completo da mãe" value={novaForm.nomeMae}
+                    onChange={e => setNovaForm(f => ({ ...f, nomeMae: e.target.value }))} data-testid="input-nova-nome-mae" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">RG</Label>
+                  <Input value={novaForm.rg} onChange={e => setNovaForm(f => ({ ...f, rg: e.target.value }))} data-testid="input-nova-rg" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Órgão Emissor</Label>
+                  <Input placeholder="SSP" value={novaForm.rgOrgaoEmissor}
+                    onChange={e => setNovaForm(f => ({ ...f, rgOrgaoEmissor: e.target.value }))} data-testid="input-nova-rg-orgao" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">UF do RG</Label>
+                  <Select value={novaForm.rgUf} onValueChange={v => setNovaForm(f => ({ ...f, rgUf: v }))}>
+                    <SelectTrigger data-testid="select-nova-rg-uf"><SelectValue /></SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {UFS_BR.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
