@@ -65,7 +65,7 @@ Nunca invente dados. Use exatamente o formato abaixo:
   "estadoCivil": "SOLTEIRO, CASADO, DIVORCIADO, VIUVO ou UNIAO_ESTAVEL — sempre maiúsculo, sem acentos — ou null",
   "diaVencimento": "número inteiro de 1 a 31 (somente o dia, sem mês) ou null",
   "valorMensal": "valor mensal do plano em formato decimal com ponto (ex.: 275.86) ou null",
-  "formaPagamento": "BOLETO, CORA, C6, BTG, PIX ou DÉBITO EM FOLHA — sempre maiúsculo — ou null",
+  "formaPagamento": "BOLETO, PIX ou CARTAO — sempre maiúsculo — ou null",
   "plano": "nome do plano de saúde (ex.: HAPVIDA NACIONAL APARTAMENTO) ou null",
   "codigoPlano": "código do plano (ex.: 5254, 0DMQW) ou null"
 }`,

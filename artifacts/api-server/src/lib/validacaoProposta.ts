@@ -1,5 +1,5 @@
 const ESTADOS_CIVIS = new Set(["SOLTEIRO", "CASADO", "DIVORCIADO", "VIUVO", "UNIAO_ESTAVEL"]);
-const FORMAS_PAGAMENTO = new Set(["BOLETO", "CORA", "C6", "BTG", "PIX", "DÉBITO EM FOLHA", "DEBITO EM FOLHA"]);
+const FORMAS_PAGAMENTO = new Set(["BOLETO", "PIX", "CARTAO", "CARTÃO"]);
 
 export function validarDadosTitular(
   dadosTitular: Record<string, unknown> | undefined,
@@ -24,7 +24,7 @@ export function validarDadosTitular(
   const fp = dadosTitular.formaPagamento;
   if (fp !== undefined && fp !== null && fp !== "") {
     if (typeof fp !== "string" || !FORMAS_PAGAMENTO.has(fp.toUpperCase())) {
-      return "formaPagamento inválido (use BOLETO|CORA|C6|BTG|PIX|DÉBITO EM FOLHA)";
+      return "formaPagamento inválido (use BOLETO|PIX|CARTAO)";
     }
   }
 

@@ -60,7 +60,7 @@ type ContratoOpt = { id: string; nome: string; ativo: boolean; asaasModo: "SANDB
 type ResponsavelOpt = { id: string; nome: string; tipo: "PF" | "PJ"; cpfCnpj: string };
 type VendedorOpt = { id: string; nome: string };
 
-const formasPagamento = ["BOLETO", "CORA", "C6", "BTG", "PIX", "DÉBITO EM FOLHA"];
+const formasPagamento = ["BOLETO", "PIX", "CARTAO"];
 const ufs = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
 
 function extrairValor(texto: string, chaves: string[]): string {

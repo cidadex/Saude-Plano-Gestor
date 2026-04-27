@@ -45,7 +45,7 @@ const STATUS_COLORS: Record<string, string> = {
   RECUSADA: "border-red-300 bg-red-50 text-red-700",
 };
 
-const formasPagamento = ["BOLETO", "CORA", "C6", "BTG", "PIX", "DÉBITO EM FOLHA"];
+const formasPagamento = ["BOLETO", "PIX", "CARTAO"];
 const UFS_BR = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
 
 function getNome(p: PropostaAPI) { return String((p.dadosTitular as Record<string, unknown>).nome ?? "—"); }

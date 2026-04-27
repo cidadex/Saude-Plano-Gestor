@@ -20,7 +20,7 @@ type ResponsavelSelect = { id: string; nome: string; tipo: "PF" | "PJ"; cpfCnpj:
 type DepAdmin = { _id: string; nome: string; cpf: string; dataNascimento: string; grauParentesco: string };
 
 const GRAUS_PARENTESCO = ["CÔNJUGE", "FILHO(A)", "PAI/MÃE", "OUTRO", "AGREGADO"];
-const FORMAS_PAGAMENTO = ["BOLETO", "CORA", "C6", "BTG", "PIX", "DÉBITO EM FOLHA"];
+const FORMAS_PAGAMENTO = ["BOLETO", "PIX", "CARTAO"];
 
 const UFS_BR = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
 

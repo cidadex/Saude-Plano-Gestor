@@ -523,7 +523,7 @@ export default function AdminClientes() {
                     <Select value={editForm.formaPagamento} onValueChange={v => setEditForm(f => ({ ...f, formaPagamento: v }))}>
                       <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                       <SelectContent>
-                        {["BOLETO", "CORA", "C6", "BTG", "PIX", "DÉBITO EM FOLHA"].map(fp => (
+                        {["BOLETO", "PIX", "CARTAO"].map(fp => (
                           <SelectItem key={fp} value={fp}>{fp}</SelectItem>
                         ))}
                       </SelectContent>
