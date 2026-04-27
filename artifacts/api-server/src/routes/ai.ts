@@ -58,7 +58,16 @@ Nunca invente dados. Use exatamente o formato abaixo:
   "cidade": "cidade ou null",
   "estado": "UF ou null",
   "nomeMae": "nome da mãe ou null",
-  "cns": "número CNS ou null"
+  "cns": "número CNS ou null",
+  "rg": "número do RG (apenas dígitos e/ou letras, sem pontuação) ou null",
+  "rgOrgaoEmissor": "órgão emissor (ex.: SSP, SDS, DETRAN) ou null",
+  "rgUf": "UF do RG (sigla 2 letras) ou null",
+  "estadoCivil": "SOLTEIRO, CASADO, DIVORCIADO, VIUVO ou UNIAO_ESTAVEL — sempre maiúsculo, sem acentos — ou null",
+  "diaVencimento": "número inteiro de 1 a 31 (somente o dia, sem mês) ou null",
+  "valorMensal": "valor mensal do plano em formato decimal com ponto (ex.: 275.86) ou null",
+  "formaPagamento": "BOLETO, CORA, C6, BTG, PIX ou DÉBITO EM FOLHA — sempre maiúsculo — ou null",
+  "plano": "nome do plano de saúde (ex.: HAPVIDA NACIONAL APARTAMENTO) ou null",
+  "codigoPlano": "código do plano (ex.: 5254, 0DMQW) ou null"
 }`,
         },
         {

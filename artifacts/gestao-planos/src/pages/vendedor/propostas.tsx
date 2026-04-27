@@ -46,6 +46,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const formasPagamento = ["BOLETO", "CORA", "C6", "BTG", "PIX", "DÉBITO EM FOLHA"];
+const UFS_BR = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
 
 function getNome(p: PropostaAPI) { return String((p.dadosTitular as Record<string, unknown>).nome ?? "—"); }
 function getCpf(p: PropostaAPI) { return String((p.dadosTitular as Record<string, unknown>).cpf ?? "—"); }
@@ -64,7 +65,7 @@ export default function VendedorPropostas() {
 
   // Edit proposta
   const [editandoProposta, setEditandoProposta] = useState<PropostaAPI | null>(null);
-  const [editForm2, setEditForm2] = useState({ nome: "", cpf: "", telefone: "", planoNome: "", codigoPlano: "", formaPagamento: "", observacao: "", valorTotal: "" });
+  const [editForm2, setEditForm2] = useState({ nome: "", cpf: "", telefone: "", planoNome: "", codigoPlano: "", formaPagamento: "", observacao: "", valorTotal: "", nomeMae: "", rg: "", rgOrgaoEmissor: "", rgUf: "CE", estadoCivil: "", diaVencimento: "", valorMensal: "" });
   const [editSalvando, setEditSalvando] = useState(false);
   const [editErro, setEditErro] = useState("");
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -96,9 +97,10 @@ export default function VendedorPropostas() {
 
   const FORM_INIT = {
     clienteNome: "", clienteCpf: "", dataNascimento: "", sexo: "", telefone: "",
+    nomeMae: "", rg: "", rgOrgaoEmissor: "", rgUf: "CE", estadoCivil: "",
     codigoPlano: "", planoNome: "", planoId: "", tabelaId: "",
     faixaIdTitular: "", valorTitular: 0,
-    formaPagamento: "", observacao: "",
+    formaPagamento: "", diaVencimento: "", observacao: "",
     contratoId: "", responsavelFinanceiroId: "",
     dependentes: [] as DepVendedor[],
   };
@@ -153,14 +155,27 @@ export default function VendedorPropostas() {
         body: JSON.stringify({ texto: iaTexto }),
       }) as { dados: Record<string, string | null> };
       const dados = res.dados ?? {};
-      setForm(prev => ({
-        ...prev,
-        clienteNome: dados.nome ?? prev.clienteNome,
-        clienteCpf: dados.cpf ?? prev.clienteCpf,
-        dataNascimento: dados.dataNascimento ?? prev.dataNascimento,
-        sexo: dados.sexo ?? prev.sexo,
-        telefone: dados.telefone ?? prev.telefone,
-      }));
+      setForm(prev => {
+        const valorIA = dados.valorMensal != null ? parseFloat(String(dados.valorMensal).replace(",", ".")) : NaN;
+        return {
+          ...prev,
+          clienteNome: dados.nome ?? prev.clienteNome,
+          clienteCpf: dados.cpf ?? prev.clienteCpf,
+          dataNascimento: dados.dataNascimento ?? prev.dataNascimento,
+          sexo: dados.sexo ?? prev.sexo,
+          telefone: dados.telefone ?? prev.telefone,
+          nomeMae: dados.nomeMae ?? prev.nomeMae,
+          rg: dados.rg ?? prev.rg,
+          rgOrgaoEmissor: dados.rgOrgaoEmissor ?? prev.rgOrgaoEmissor,
+          rgUf: dados.rgUf ?? prev.rgUf,
+          estadoCivil: dados.estadoCivil ?? prev.estadoCivil,
+          formaPagamento: dados.formaPagamento ?? prev.formaPagamento,
+          diaVencimento: dados.diaVencimento != null ? String(dados.diaVencimento) : prev.diaVencimento,
+          // valorMensal vindo da IA: aplica como valorTitular só se vendedor ainda não escolheu faixa etária.
+          // Quando uma faixa for selecionada, valorTitular é recalculado pela tabela e prevalece.
+          valorTitular: !prev.faixaIdTitular && Number.isFinite(valorIA) && valorIA > 0 ? valorIA : prev.valorTitular,
+        };
+      });
       setIaPreenchido(true);
       setTimeout(() => setIaAberta(false), 1200);
     } catch (err: unknown) {
@@ -214,10 +229,17 @@ export default function VendedorPropostas() {
             dataNascimento: form.dataNascimento,
             sexo: form.sexo,
             telefone: form.telefone,
+            nomeMae: form.nomeMae,
+            rg: form.rg,
+            rgOrgaoEmissor: form.rgOrgaoEmissor,
+            rgUf: form.rgUf,
+            estadoCivil: form.estadoCivil,
             tipo: "TITULAR",
             plano: form.planoNome,
             codigoPlano: form.codigoPlano,
             formaPagamento: form.formaPagamento,
+            diaVencimento: form.diaVencimento ? Number(form.diaVencimento) : null,
+            valorMensal: form.valorTitular > 0 ? form.valorTitular.toFixed(2) : null,
             observacao: form.observacao,
             faixaEtaria: faixasDoPlanosTabela.find(f => f.id === form.faixaIdTitular)?.faixaEtaria ?? "",
             valor: form.valorTitular,
@@ -262,6 +284,13 @@ export default function VendedorPropostas() {
       formaPagamento: String(dt.formaPagamento ?? ""),
       observacao: String(dt.observacao ?? ""),
       valorTotal: p.valorTotal ?? "",
+      nomeMae: String(dt.nomeMae ?? ""),
+      rg: String(dt.rg ?? ""),
+      rgOrgaoEmissor: String(dt.rgOrgaoEmissor ?? ""),
+      rgUf: String(dt.rgUf ?? "CE"),
+      estadoCivil: String(dt.estadoCivil ?? ""),
+      diaVencimento: dt.diaVencimento != null ? String(dt.diaVencimento) : "",
+      valorMensal: String(dt.valorMensal ?? ""),
     });
   };
 
@@ -281,6 +310,13 @@ export default function VendedorPropostas() {
             codigoPlano: editForm2.codigoPlano,
             formaPagamento: editForm2.formaPagamento,
             observacao: editForm2.observacao,
+            nomeMae: editForm2.nomeMae,
+            rg: editForm2.rg,
+            rgOrgaoEmissor: editForm2.rgOrgaoEmissor,
+            rgUf: editForm2.rgUf,
+            estadoCivil: editForm2.estadoCivil,
+            diaVencimento: editForm2.diaVencimento ? Number(editForm2.diaVencimento) : null,
+            valorMensal: editForm2.valorMensal ? editForm2.valorMensal.replace(",", ".") : null,
           },
           valorTotal: editForm2.valorTotal || undefined,
         }),
@@ -492,6 +528,42 @@ export default function VendedorPropostas() {
                   <Input placeholder="(85) 99999-9999" value={form.telefone}
                     onChange={e => setForm(f => ({ ...f, telefone: e.target.value }))} data-testid="input-proposta-telefone" />
                 </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Estado Civil</Label>
+                  <Select value={form.estadoCivil} onValueChange={v => setForm(f => ({ ...f, estadoCivil: v }))}>
+                    <SelectTrigger data-testid="select-proposta-estado-civil"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="SOLTEIRO">Solteiro(a)</SelectItem>
+                      <SelectItem value="CASADO">Casado(a)</SelectItem>
+                      <SelectItem value="DIVORCIADO">Divorciado(a)</SelectItem>
+                      <SelectItem value="VIUVO">Viúvo(a)</SelectItem>
+                      <SelectItem value="UNIAO_ESTAVEL">União Estável</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs text-muted-foreground">Nome da Mãe</Label>
+                  <Input placeholder="Nome completo da mãe" value={form.nomeMae}
+                    onChange={e => setForm(f => ({ ...f, nomeMae: e.target.value }))} data-testid="input-proposta-nome-mae" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">RG</Label>
+                  <Input value={form.rg} onChange={e => setForm(f => ({ ...f, rg: e.target.value }))} data-testid="input-proposta-rg" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Órgão Emissor</Label>
+                  <Input placeholder="SSP" value={form.rgOrgaoEmissor}
+                    onChange={e => setForm(f => ({ ...f, rgOrgaoEmissor: e.target.value }))} data-testid="input-proposta-rg-orgao" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">UF do RG</Label>
+                  <Select value={form.rgUf} onValueChange={v => setForm(f => ({ ...f, rgUf: v }))}>
+                    <SelectTrigger data-testid="select-proposta-rg-uf"><SelectValue /></SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {UFS_BR.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* Contrato + Responsável Financeiro */}
@@ -580,7 +652,7 @@ export default function VendedorPropostas() {
                 </div>
               )}
 
-              {/* Forma pagamento + obs */}
+              {/* Forma pagamento + dia vencimento + obs */}
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">Forma de Pagamento</Label>
@@ -590,6 +662,12 @@ export default function VendedorPropostas() {
                       {formasPagamento.map(fp => <SelectItem key={fp} value={fp}>{fp}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Dia de Vencimento (1–31)</Label>
+                  <Input type="number" min={1} max={31} placeholder="10" value={form.diaVencimento}
+                    onChange={e => setForm(f => ({ ...f, diaVencimento: e.target.value }))}
+                    data-testid="input-proposta-dia-vencimento" />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label className="text-xs text-muted-foreground">Observações</Label>

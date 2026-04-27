@@ -22,12 +22,16 @@ type DepAdmin = { _id: string; nome: string; cpf: string; dataNascimento: string
 const GRAUS_PARENTESCO = ["CÔNJUGE", "FILHO(A)", "PAI/MÃE", "OUTRO", "AGREGADO"];
 const FORMAS_PAGAMENTO = ["BOLETO", "CORA", "C6", "BTG", "PIX", "DÉBITO EM FOLHA"];
 
+const UFS_BR = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
+
 const NOVA_FORM_INIT = {
   vendedorId: "", contratoId: "", responsavelFinanceiroId: "",
   clienteNome: "", clienteCpf: "", dataNascimento: "", sexo: "",
   telefone: "", email: "", cep: "", logradouro: "", numero: "", bairro: "",
   cidade: "", estado: "", planoId: "", formaPagamento: "", valorManual: "",
   observacao: "", dependentes: [] as DepAdmin[],
+  nomeMae: "", rg: "", rgOrgaoEmissor: "", rgUf: "CE", estadoCivil: "",
+  diaVencimento: "",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -89,7 +93,7 @@ export default function AdminPropostas() {
 
   // Edit dados
   const [dadosEditando, setDadosEditando] = useState<PropostaAdmin | null>(null);
-  const [dadosForm, setDadosForm] = useState({ nome: "", cpf: "", telefone: "", plano: "", codigoPlano: "", observacao: "", formaPagamento: "", valorTotal: "" });
+  const [dadosForm, setDadosForm] = useState({ nome: "", cpf: "", telefone: "", plano: "", codigoPlano: "", observacao: "", formaPagamento: "", valorTotal: "", nomeMae: "", rg: "", rgOrgaoEmissor: "", rgUf: "CE", estadoCivil: "", diaVencimento: "", valorMensal: "" });
   const [dadosSalvando, setDadosSalvando] = useState(false);
   const [dadosErro, setDadosErro] = useState("");
 
@@ -180,6 +184,13 @@ export default function AdminPropostas() {
       observacao: String(dt.observacao ?? ""),
       formaPagamento: String(dt.formaPagamento ?? ""),
       valorTotal: p.valorTotal ?? "",
+      nomeMae: String(dt.nomeMae ?? ""),
+      rg: String(dt.rg ?? ""),
+      rgOrgaoEmissor: String(dt.rgOrgaoEmissor ?? ""),
+      rgUf: String(dt.rgUf ?? "CE"),
+      estadoCivil: String(dt.estadoCivil ?? ""),
+      diaVencimento: dt.diaVencimento != null ? String(dt.diaVencimento) : "",
+      valorMensal: String(dt.valorMensal ?? ""),
     });
   };
 
@@ -199,6 +210,13 @@ export default function AdminPropostas() {
             codigoPlano: dadosForm.codigoPlano,
             observacao: dadosForm.observacao,
             formaPagamento: dadosForm.formaPagamento,
+            nomeMae: dadosForm.nomeMae,
+            rg: dadosForm.rg,
+            rgOrgaoEmissor: dadosForm.rgOrgaoEmissor,
+            rgUf: dadosForm.rgUf,
+            estadoCivil: dadosForm.estadoCivil,
+            diaVencimento: dadosForm.diaVencimento ? Number(dadosForm.diaVencimento) : null,
+            valorMensal: dadosForm.valorMensal || null,
           },
           valorTotal: dadosForm.valorTotal || undefined,
         }),
@@ -295,6 +313,14 @@ export default function AdminPropostas() {
         bairro: d.bairro ?? f.bairro,
         cidade: d.cidade ?? f.cidade,
         estado: d.estado ?? f.estado,
+        nomeMae: d.nomeMae ?? f.nomeMae,
+        rg: d.rg ?? f.rg,
+        rgOrgaoEmissor: d.rgOrgaoEmissor ?? f.rgOrgaoEmissor,
+        rgUf: d.rgUf ?? f.rgUf,
+        estadoCivil: d.estadoCivil ?? f.estadoCivil,
+        formaPagamento: d.formaPagamento ?? f.formaPagamento,
+        diaVencimento: d.diaVencimento != null ? String(d.diaVencimento) : f.diaVencimento,
+        valorManual: d.valorMensal != null ? String(d.valorMensal) : f.valorManual,
       }));
       setNIaPreenchido(true);
       setTimeout(() => setNIaAberta(false), 1200);
@@ -337,10 +363,17 @@ export default function AdminPropostas() {
             bairro: novaForm.bairro,
             cidade: novaForm.cidade,
             estado: novaForm.estado,
+            nomeMae: novaForm.nomeMae,
+            rg: novaForm.rg,
+            rgOrgaoEmissor: novaForm.rgOrgaoEmissor,
+            rgUf: novaForm.rgUf,
+            estadoCivil: novaForm.estadoCivil,
             tipo: "TITULAR",
             plano: plano?.nome ?? "",
             codigoPlano: plano?.codigo ?? "",
             formaPagamento: novaForm.formaPagamento,
+            diaVencimento: novaForm.diaVencimento ? Number(novaForm.diaVencimento) : null,
+            valorMensal: novaForm.valorManual ? novaForm.valorManual.replace(",", ".") : null,
             observacao: novaForm.observacao,
           },
           dadosDependentes: novaForm.dependentes.map(d => ({
@@ -703,6 +736,49 @@ export default function AdminPropostas() {
                     onChange={e => setNovaForm(f => ({ ...f, estado: e.target.value.toUpperCase() }))} />
                 </div>
               </div>
+
+              {/* Dados pessoais adicionais (Hapvida) */}
+              <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3 space-y-3">
+                <p className="text-xs font-semibold text-amber-800">Dados Pessoais Adicionais (Hapvida)</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Estado Civil</Label>
+                    <Select value={novaForm.estadoCivil} onValueChange={v => setNovaForm(f => ({ ...f, estadoCivil: v }))}>
+                      <SelectTrigger data-testid="select-nova-estado-civil"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="SOLTEIRO">Solteiro(a)</SelectItem>
+                        <SelectItem value="CASADO">Casado(a)</SelectItem>
+                        <SelectItem value="DIVORCIADO">Divorciado(a)</SelectItem>
+                        <SelectItem value="VIUVO">Viúvo(a)</SelectItem>
+                        <SelectItem value="UNIAO_ESTAVEL">União Estável</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1 sm:col-span-1">
+                    <Label className="text-xs text-muted-foreground">Nome da Mãe</Label>
+                    <Input placeholder="Nome completo da mãe" value={novaForm.nomeMae}
+                      onChange={e => setNovaForm(f => ({ ...f, nomeMae: e.target.value }))} data-testid="input-nova-nome-mae" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">RG</Label>
+                    <Input value={novaForm.rg} onChange={e => setNovaForm(f => ({ ...f, rg: e.target.value }))} data-testid="input-nova-rg" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Órgão Emissor</Label>
+                    <Input placeholder="SSP" value={novaForm.rgOrgaoEmissor}
+                      onChange={e => setNovaForm(f => ({ ...f, rgOrgaoEmissor: e.target.value }))} data-testid="input-nova-rg-orgao" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">UF do RG</Label>
+                    <Select value={novaForm.rgUf} onValueChange={v => setNovaForm(f => ({ ...f, rgUf: v }))}>
+                      <SelectTrigger data-testid="select-nova-rg-uf"><SelectValue /></SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        {UFS_BR.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -727,7 +803,7 @@ export default function AdminPropostas() {
                 </div>
               </div>
 
-              {/* Forma pagamento + valor */}
+              {/* Forma pagamento + dia vencimento + valor */}
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Forma de Pagamento</Label>
@@ -739,7 +815,13 @@ export default function AdminPropostas() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Valor Total (R$)</Label>
+                  <Label>Dia de Vencimento (1–31)</Label>
+                  <Input type="number" min={1} max={31} placeholder="10" value={novaForm.diaVencimento}
+                    onChange={e => setNovaForm(f => ({ ...f, diaVencimento: e.target.value }))}
+                    data-testid="input-nova-dia-vencimento" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Valor do Plano / Mensalidade (R$)</Label>
                   <Input placeholder="0,00" value={novaForm.valorManual}
                     onChange={e => setNovaForm(f => ({ ...f, valorManual: e.target.value }))}
                     data-testid="input-nova-valor" />
@@ -1061,6 +1143,52 @@ export default function AdminPropostas() {
                   <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                   <SelectContent>
                     {FORMAS_PAGAMENTO.map(fp => <SelectItem key={fp} value={fp}>{fp}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Dia de Vencimento (1–31)</Label>
+                <Input type="number" min={1} max={31} placeholder="10" value={dadosForm.diaVencimento}
+                  onChange={e => setDadosForm(f => ({ ...f, diaVencimento: e.target.value }))}
+                  data-testid="input-dados-dia-vencimento" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Valor do Plano / Mensalidade (R$)</Label>
+                <Input type="number" step="0.01" placeholder="0,00" value={dadosForm.valorMensal}
+                  onChange={e => setDadosForm(f => ({ ...f, valorMensal: e.target.value }))}
+                  data-testid="input-dados-valor-mensal" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Estado Civil</Label>
+                <Select value={dadosForm.estadoCivil} onValueChange={v => setDadosForm(f => ({ ...f, estadoCivil: v }))}>
+                  <SelectTrigger data-testid="select-dados-estado-civil"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SOLTEIRO">Solteiro(a)</SelectItem>
+                    <SelectItem value="CASADO">Casado(a)</SelectItem>
+                    <SelectItem value="DIVORCIADO">Divorciado(a)</SelectItem>
+                    <SelectItem value="VIUVO">Viúvo(a)</SelectItem>
+                    <SelectItem value="UNIAO_ESTAVEL">União Estável</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <Label className="text-xs text-muted-foreground">Nome da Mãe</Label>
+                <Input value={dadosForm.nomeMae} onChange={e => setDadosForm(f => ({ ...f, nomeMae: e.target.value }))} data-testid="input-dados-nome-mae" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">RG</Label>
+                <Input value={dadosForm.rg} onChange={e => setDadosForm(f => ({ ...f, rg: e.target.value }))} data-testid="input-dados-rg" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Órgão Emissor</Label>
+                <Input placeholder="SSP" value={dadosForm.rgOrgaoEmissor} onChange={e => setDadosForm(f => ({ ...f, rgOrgaoEmissor: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">UF do RG</Label>
+                <Select value={dadosForm.rgUf} onValueChange={v => setDadosForm(f => ({ ...f, rgUf: v }))}>
+                  <SelectTrigger data-testid="select-dados-rg-uf"><SelectValue /></SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {UFS_BR.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
