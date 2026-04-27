@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiFetch, ApiError } from "@/lib/api";
-import { FileText, Plus, Pencil, Trash2, KeyRound, Users, ShieldCheck, ShieldAlert } from "lucide-react";
+import { FileText, Plus, Pencil, Trash2, KeyRound, Users, ShieldCheck, ShieldAlert, ChevronRight } from "lucide-react";
 
 type Contrato = {
   id: string;
@@ -35,6 +36,7 @@ const empty: FormState = { nome: "", descricao: "", asaasApiKey: "", asaasModo: 
 
 export default function AdminContratos() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -161,9 +163,16 @@ export default function AdminContratos() {
                 </thead>
                 <tbody>
                   {contratos.map(c => (
-                    <tr key={c.id} className="border-b hover:bg-muted/30">
+                    <tr
+                      key={c.id}
+                      className="border-b hover:bg-muted/30 cursor-pointer"
+                      onClick={() => navigate(`/admin/contratos/${c.id}`)}
+                    >
                       <td className="py-3 pr-4 align-top">
-                        <div className="font-medium">{c.nome}</div>
+                        <div className="font-medium flex items-center gap-1">
+                          {c.nome}
+                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-60" />
+                        </div>
                         {c.descricao && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2 max-w-md">{c.descricao}</div>}
                       </td>
                       <td className="py-3 pr-4 align-top">
@@ -194,7 +203,7 @@ export default function AdminContratos() {
                           <Badge variant="secondary">Inativo</Badge>
                         )}
                       </td>
-                      <td className="py-3 pr-2 text-right align-top">
+                      <td className="py-3 pr-2 text-right align-top" onClick={e => e.stopPropagation()}>
                         <Button size="sm" variant="ghost" onClick={() => abrirEdicao(c)} data-testid={`btn-editar-${c.id}`}>
                           <Pencil className="h-4 w-4" />
                         </Button>

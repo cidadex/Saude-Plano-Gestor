@@ -10,8 +10,10 @@ import {
   propostasTable,
   boletosTable,
   contratosTable,
+  planosTable,
   responsaveisFinanceirosTable,
 } from "@workspace/db";
+import { count as drizzleCount, sum as drizzleSum } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
 import { validarDadosTitular } from "../lib/validacaoProposta.js";
 
@@ -802,6 +804,110 @@ router.patch("/admin/clientes/:id", async (req, res) => {
     await db.update(clientesTable).set(updates as never).where(eq(clientesTable.id, id));
     const [updated] = await db.select().from(clientesTable).where(eq(clientesTable.id, id)).limit(1);
     res.json({ cliente: updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── CONTRATO DETALHE ─────────────────────────────────────────
+
+// GET /admin/contratos/:id/detalhe — visão detalhada de um contrato
+router.get("/admin/contratos/:id/detalhe", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Dados básicos do contrato
+    const [contrato] = await db.select().from(contratosTable).where(eq(contratosTable.id, id)).limit(1);
+    if (!contrato) return res.status(404).json({ error: "Contrato não encontrado" });
+
+    // 2. Stats de clientes por status
+    const clientesStats = await db
+      .select({ status: clientesTable.status, total: sql<number>`count(*)::int` })
+      .from(clientesTable)
+      .where(eq(clientesTable.contratoId, id))
+      .groupBy(clientesTable.status);
+
+    // 3. Stats de propostas por status
+    const propostasStats = await db
+      .select({ status: propostasTable.status, total: sql<number>`count(*)::int` })
+      .from(propostasTable)
+      .where(eq(propostasTable.contratoId, id))
+      .groupBy(propostasTable.status);
+
+    // 4. Receita mensal estimada (valorMensal dos clientes ATIVOS)
+    const receitaRow = await db
+      .select({ total: sql<string>`coalesce(sum(${clientesTable.valorMensal}::numeric), 0)::text` })
+      .from(clientesTable)
+      .where(and(eq(clientesTable.contratoId, id), eq(clientesTable.status, "ATIVO")));
+    const receitaMensal = receitaRow[0]?.total ?? "0";
+
+    // 5. Planos usados pelos clientes desse contrato
+    const planosUsados = await db
+      .select({
+        planoId: planosTable.id,
+        planoNome: planosTable.nome,
+        planoCodigo: planosTable.codigo,
+        planoTipo: planosTable.tipo,
+        valorTitular: planosTable.valorTitular,
+        totalClientes: sql<number>`count(${clientesTable.id})::int`,
+      })
+      .from(clientesTable)
+      .innerJoin(planosTable, eq(planosTable.id, clientesTable.planoId))
+      .where(eq(clientesTable.contratoId, id))
+      .groupBy(planosTable.id, planosTable.nome, planosTable.codigo, planosTable.tipo, planosTable.valorTitular)
+      .orderBy(desc(sql`count(${clientesTable.id})`));
+
+    // 6. Vendedores com suas métricas nesse contrato
+    const vendedoresData = await db
+      .select({
+        vendedorId: vendedoresTable.id,
+        vendedorNome: vendedoresTable.nome,
+        vendedorEmail: vendedoresTable.email,
+        totalPropostas: sql<number>`count(distinct ${propostasTable.id})::int`,
+        totalClientes: sql<number>`count(distinct ${clientesTable.id})::int`,
+      })
+      .from(vendedoresTable)
+      .leftJoin(propostasTable, and(eq(propostasTable.vendedorId, vendedoresTable.id), eq(propostasTable.contratoId, id)))
+      .leftJoin(clientesTable, and(eq(clientesTable.vendedorId, vendedoresTable.id), eq(clientesTable.contratoId, id)))
+      .where(or(eq(propostasTable.contratoId, id), eq(clientesTable.contratoId, id)))
+      .groupBy(vendedoresTable.id, vendedoresTable.nome, vendedoresTable.email)
+      .orderBy(desc(sql`count(distinct ${clientesTable.id})`));
+
+    // 7. Pendências: propostas em aberto (AGUARDANDO_ENVIO / EM_ANALISE)
+    const pendencias = await db
+      .select({
+        id: propostasTable.id,
+        status: propostasTable.status,
+        dadosTitular: propostasTable.dadosTitular,
+        valorTotal: propostasTable.valorTotal,
+        createdAt: propostasTable.createdAt,
+        vendedorNome: vendedoresTable.nome,
+      })
+      .from(propostasTable)
+      .leftJoin(vendedoresTable, eq(vendedoresTable.id, propostasTable.vendedorId))
+      .where(and(
+        eq(propostasTable.contratoId, id),
+        inArray(propostasTable.status, ["AGUARDANDO_ENVIO", "ENVIADA_OPERADORA"]),
+      ))
+      .orderBy(desc(propostasTable.createdAt));
+
+    res.json({
+      contrato: {
+        id: contrato.id,
+        nome: contrato.nome,
+        descricao: contrato.descricao,
+        asaasModo: contrato.asaasModo,
+        ativo: contrato.ativo,
+        asaasApiKeyConfigured: !!contrato.asaasApiKey,
+      },
+      clientesStats,
+      propostasStats,
+      receitaMensal,
+      planosUsados,
+      vendedores: vendedoresData,
+      pendencias,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: String(err) });

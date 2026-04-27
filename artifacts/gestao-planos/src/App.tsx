@@ -33,6 +33,7 @@ import AdminFinanceiro from "@/pages/admin/financeiro";
 import AdminComissoes from "@/pages/admin/comissoes";
 import AdminGerentes from "@/pages/admin/gerentes";
 import AdminContratos from "@/pages/admin/contratos";
+import AdminContratoDetalhe from "@/pages/admin/contrato-detalhe";
 import AdminResponsaveis from "@/pages/admin/responsaveis";
 
 import { ClienteLayout } from "@/components/layout/cliente-layout";
@@ -80,6 +81,7 @@ function AdminRoutes() {
         <Route path="/admin/financeiro" component={AdminFinanceiro} />
         <Route path="/admin/comissoes" component={AdminComissoes} />
         <Route path="/admin/gerentes" component={AdminGerentes} />
+        <Route path="/admin/contratos/:id" component={AdminContratoDetalhe} />
         <Route path="/admin/contratos" component={AdminContratos} />
         <Route path="/admin/responsaveis" component={AdminResponsaveis} />
         <Route component={NotFound} />
