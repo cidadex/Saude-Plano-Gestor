@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireAuth } from "../middlewares/auth.js";
+import { validarDadosTitular } from "../lib/validacaoProposta.js";
 import {
   db, clientesTable, propostasTable, boletosTable,
   comissoesTable, planosTable, vendedoresTable,
@@ -179,6 +180,8 @@ router.post("/vendedor/propostas", async (req, res) => {
     if (!dadosTitular) return res.status(400).json({ error: "dadosTitular é obrigatório" });
     if (!contratoId) return res.status(400).json({ error: "contratoId é obrigatório" });
     if (!responsavelFinanceiroId) return res.status(400).json({ error: "responsavelFinanceiroId é obrigatório" });
+    const erroValidacao = validarDadosTitular(dadosTitular);
+    if (erroValidacao) return res.status(400).json({ error: erroValidacao });
 
     const id = `prop-${Date.now()}`;
     const [proposta] = await db.insert(propostasTable).values({
@@ -223,6 +226,9 @@ router.patch("/vendedor/propostas/:id", async (req, res) => {
       contratoId?: string | null;
       responsavelFinanceiroId?: string | null;
     };
+
+    const erroValidacao = validarDadosTitular(dadosTitular);
+    if (erroValidacao) return res.status(400).json({ error: erroValidacao });
 
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (dadosTitular !== undefined) {

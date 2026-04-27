@@ -216,7 +216,7 @@ export default function AdminPropostas() {
             rgUf: dadosForm.rgUf,
             estadoCivil: dadosForm.estadoCivil,
             diaVencimento: dadosForm.diaVencimento ? Number(dadosForm.diaVencimento) : null,
-            valorMensal: dadosForm.valorMensal || null,
+            valorMensal: dadosForm.valorMensal ? dadosForm.valorMensal.replace(",", ".") : null,
           },
           valorTotal: dadosForm.valorTotal || undefined,
         }),

@@ -13,6 +13,7 @@ import {
   responsaveisFinanceirosTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth.js";
+import { validarDadosTitular } from "../lib/validacaoProposta.js";
 
 const router = Router();
 
@@ -320,6 +321,8 @@ router.post("/admin/propostas", async (req, res) => {
     if (!dadosTitular) return res.status(400).json({ error: "dadosTitular é obrigatório" });
     if (!contratoId) return res.status(400).json({ error: "contratoId é obrigatório" });
     if (!responsavelFinanceiroId) return res.status(400).json({ error: "responsavelFinanceiroId é obrigatório" });
+    const erroValidacao = validarDadosTitular(dadosTitular);
+    if (erroValidacao) return res.status(400).json({ error: erroValidacao });
 
     const id = `prop-${Date.now()}`;
     const [proposta] = await db.insert(propostasTable).values({
@@ -392,6 +395,9 @@ router.patch("/admin/propostas/:id", async (req, res) => {
 
     const [proposta] = await db.select().from(propostasTable).where(eq(propostasTable.id, id)).limit(1);
     if (!proposta) return res.status(404).json({ error: "Proposta não encontrada" });
+
+    const erroValidacao = validarDadosTitular(dadosTitular);
+    if (erroValidacao) return res.status(400).json({ error: erroValidacao });
 
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (dadosTitular !== undefined) {
