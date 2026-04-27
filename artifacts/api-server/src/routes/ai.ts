@@ -1,26 +1,39 @@
 import { Router } from "express";
-import OpenAI from "openai";
 import { requireAuth } from "../middlewares/auth.js";
 
 const router = Router();
 router.use(requireAuth);
 
-const openai = new OpenAI({
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-});
+function getOpenAI() {
+  const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+  const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
+  if (!apiKey) return null;
+  const { default: OpenAI } = require("openai");
+  return new OpenAI({ baseURL, apiKey });
+}
 
 // POST /api/ai/parse-cliente
 // Recebe texto livre com dados do cliente e retorna estrutura JSON para preencher o formulário
 router.post("/ai/parse-cliente", async (req, res) => {
   try {
+    const openaiModule = await import("openai");
+    const OpenAI = openaiModule.default;
+    const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+    const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(503).json({ error: "Funcionalidade de IA não configurada" });
+    }
+
+    const openai = new OpenAI({ baseURL, apiKey });
+
     const { texto } = req.body as { texto: string };
     if (!texto || texto.trim().length < 5) {
       return res.status(400).json({ error: "Texto muito curto para análise" });
     }
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-5-mini",
+      model: "gpt-4o-mini",
       max_completion_tokens: 512,
       messages: [
         {
