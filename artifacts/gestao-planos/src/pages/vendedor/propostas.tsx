@@ -56,6 +56,8 @@ export default function VendedorPropostas() {
   const { propostas, loading, reload } = usePropostas();
   const [planosAPI, setPlanosAPI] = useState<PlanoAPI[]>([]);
   const [tabelas, setTabelas] = useState<TabelaVendedor[]>([]);
+  const [contratosList, setContratosList] = useState<Array<{ id: string; nome: string; asaasModo?: string }>>([]);
+  const [responsaveisList, setResponsaveisList] = useState<Array<{ id: string; nome: string; tipo: string }>>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("TODOS");
   const [novaPropostaAberta, setNovaPropostaAberta] = useState(false);
@@ -77,6 +79,12 @@ export default function VendedorPropostas() {
     (apiFetch("/vendedor/tabela-preco") as Promise<{ tabelas: TabelaVendedor[] }>)
       .then(d => setTabelas(d.tabelas ?? []))
       .catch(console.error);
+    (apiFetch("/contratos") as Promise<{ contratos: Array<{ id: string; nome: string; asaasModo?: string }> }>)
+      .then(d => setContratosList(d.contratos ?? []))
+      .catch(console.error);
+    (apiFetch("/responsaveis-financeiros") as Promise<{ responsaveis: Array<{ id: string; nome: string; tipo: string }> }>)
+      .then(d => setResponsaveisList(d.responsaveis ?? []))
+      .catch(console.error);
   }, []);
 
   // IA — colar dados
@@ -91,6 +99,7 @@ export default function VendedorPropostas() {
     codigoPlano: "", planoNome: "", planoId: "", tabelaId: "",
     faixaIdTitular: "", valorTitular: 0,
     formaPagamento: "", observacao: "",
+    contratoId: "", responsavelFinanceiroId: "",
     dependentes: [] as DepVendedor[],
   };
   const [form, setForm] = useState({ ...FORM_INIT });
@@ -197,6 +206,8 @@ export default function VendedorPropostas() {
       await apiFetch("/vendedor/propostas", {
         method: "POST",
         body: JSON.stringify({
+          contratoId: form.contratoId,
+          responsavelFinanceiroId: form.responsavelFinanceiroId,
           dadosTitular: {
             nome: form.clienteNome.toUpperCase(),
             cpf: form.clienteCpf,
@@ -336,6 +347,7 @@ export default function VendedorPropostas() {
             <TableRow className="bg-muted/50 hover:bg-muted/50 border-b-2">
               <TableHead className="font-semibold text-foreground">Cliente / CPF</TableHead>
               <TableHead className="font-semibold text-foreground">Plano</TableHead>
+              <TableHead className="font-semibold text-foreground">Contrato / Resp.</TableHead>
               <TableHead className="font-semibold text-foreground">Envio</TableHead>
               <TableHead className="font-semibold text-foreground text-right">Valor</TableHead>
               <TableHead className="font-semibold text-foreground text-center">Status</TableHead>
@@ -344,7 +356,7 @@ export default function VendedorPropostas() {
           <TableBody>
             {filteredPropostas.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <Search className="h-8 w-8 text-muted-foreground/30" />
                     <p>Nenhuma proposta encontrada com estes filtros.</p>
@@ -363,6 +375,18 @@ export default function VendedorPropostas() {
                   <div className="flex flex-col gap-0.5">
                     <span className="text-sm">{getPlanoNome(prop)}</span>
                     <span className="text-xs text-muted-foreground font-mono bg-muted px-1 py-0.5 rounded w-fit">{getCodigoPlano(prop)}</span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col gap-1">
+                    {prop.contratoNome ? (
+                      <span className="text-xs px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-slate-700 w-fit">{prop.contratoNome}</span>
+                    ) : <span className="text-xs text-muted-foreground">— sem contrato</span>}
+                    {prop.responsavelNome ? (
+                      <span className={`text-xs px-1.5 py-0.5 rounded border w-fit ${prop.responsavelTipo === "PJ" ? "border-indigo-300 bg-indigo-50 text-indigo-700" : "border-teal-300 bg-teal-50 text-teal-700"}`}>
+                        {prop.responsavelNome} <span className="opacity-60">({prop.responsavelTipo})</span>
+                      </span>
+                    ) : <span className="text-xs text-muted-foreground">— sem resp.</span>}
                   </div>
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
@@ -467,6 +491,39 @@ export default function VendedorPropostas() {
                   <Label className="text-xs text-muted-foreground">Telefone / WhatsApp</Label>
                   <Input placeholder="(85) 99999-9999" value={form.telefone}
                     onChange={e => setForm(f => ({ ...f, telefone: e.target.value }))} data-testid="input-proposta-telefone" />
+                </div>
+              </div>
+
+              {/* Contrato + Responsável Financeiro */}
+              <div className="rounded-lg border border-blue-200 bg-blue-50/40 p-3 space-y-3">
+                <p className="text-xs font-semibold text-blue-800">Contrato e Responsável Financeiro *</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Contrato *</Label>
+                    <Select value={form.contratoId} onValueChange={v => setForm(f => ({ ...f, contratoId: v }))}>
+                      <SelectTrigger data-testid="select-vend-contrato"><SelectValue placeholder="Selecione o contrato..." /></SelectTrigger>
+                      <SelectContent>
+                        {contratosList.map(c => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.nome} {c.asaasModo === "SANDBOX" && "(sandbox)"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Responsável Financeiro *</Label>
+                    <Select value={form.responsavelFinanceiroId} onValueChange={v => setForm(f => ({ ...f, responsavelFinanceiroId: v }))}>
+                      <SelectTrigger data-testid="select-vend-responsavel"><SelectValue placeholder="Quem paga?" /></SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        {responsaveisList.map(r => (
+                          <SelectItem key={r.id} value={r.id}>
+                            {r.nome} <span className="text-xs text-muted-foreground">({r.tipo})</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
             </div>
@@ -676,10 +733,10 @@ export default function VendedorPropostas() {
               <Button variant="ghost" onClick={handleFechar}>Cancelar</Button>
               {step < 3 ? (
                 <Button onClick={() => setStep(s => (s + 1) as 1 | 2 | 3)}
-                  disabled={step === 1 && (!form.clienteNome || !form.clienteCpf)}
+                  disabled={step === 1 && (!form.clienteNome || !form.clienteCpf || !form.contratoId || !form.responsavelFinanceiroId)}
                   data-testid="btn-proximo-proposta">Próximo</Button>
               ) : (
-                <Button className="bg-primary" onClick={handleSalvar} disabled={salvando || salvo || !form.clienteNome || !form.clienteCpf || !form.planoId} data-testid="btn-salvar-proposta">
+                <Button className="bg-primary" onClick={handleSalvar} disabled={salvando || salvo || !form.clienteNome || !form.clienteCpf || !form.planoId || !form.contratoId || !form.responsavelFinanceiroId} data-testid="btn-salvar-proposta">
                   {salvando ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Salvando...</> : salvo ? "Salvo!" : "Registrar Proposta"}
                 </Button>
               )}

@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { apiFetch } from "@/lib/api";
 import {
   HeartPulse, Database, CheckCircle2, Loader2, Copy, Check,
-  ShieldCheck, Users, UserCog, Building2, User,
+  ShieldCheck, Users, UserCog, Building2, User, Wallet,
 } from "lucide-react";
 
 type Credencial = {
@@ -51,6 +51,13 @@ const credenciais: Credencial[] = [
     nascimento: "02/05/1967",
     cor: "from-rose-600/20 to-pink-600/10 border-rose-500/30",
     icon: User,
+  },
+  {
+    label: "Responsável Financeiro (PJ — Acme)",
+    email: "financeiro@acme.com.br",
+    senha: "123456",
+    cor: "from-violet-600/20 to-purple-600/10 border-violet-500/30",
+    icon: Wallet,
   },
 ];
 

@@ -15,13 +15,16 @@ import { Search, SlidersHorizontal, Loader2, RefreshCw, AlertCircle, Receipt, Pl
 
 type VendedorSelect = { id: string; nome: string; email: string };
 type PlanoSelect = { id: string; codigo: string | null; nome: string; valorTitular: string | null; ativo: boolean };
+type ContratoSelect = { id: string; nome: string; ativo: boolean; asaasModo: "SANDBOX" | "PRODUCAO" };
+type ResponsavelSelect = { id: string; nome: string; tipo: "PF" | "PJ"; cpfCnpj: string };
 type DepAdmin = { _id: string; nome: string; cpf: string; dataNascimento: string; grauParentesco: string };
 
 const GRAUS_PARENTESCO = ["CÔNJUGE", "FILHO(A)", "PAI/MÃE", "OUTRO", "AGREGADO"];
 const FORMAS_PAGAMENTO = ["BOLETO", "CORA", "C6", "BTG", "PIX", "DÉBITO EM FOLHA"];
 
 const NOVA_FORM_INIT = {
-  vendedorId: "", clienteNome: "", clienteCpf: "", dataNascimento: "", sexo: "",
+  vendedorId: "", contratoId: "", responsavelFinanceiroId: "",
+  clienteNome: "", clienteCpf: "", dataNascimento: "", sexo: "",
   telefone: "", email: "", cep: "", logradouro: "", numero: "", bairro: "",
   cidade: "", estado: "", planoId: "", formaPagamento: "", valorManual: "",
   observacao: "", dependentes: [] as DepAdmin[],
@@ -64,6 +67,11 @@ type PropostaAdmin = {
   dataEnvioOperadora: string | null;
   dataAtivacao: string | null;
   motivoRecusa: string | null;
+  contratoId: string | null;
+  contratoNome: string | null;
+  responsavelFinanceiroId: string | null;
+  responsavelNome: string | null;
+  responsavelTipo: "PF" | "PJ" | null;
 };
 
 export default function AdminPropostas() {
@@ -237,6 +245,8 @@ export default function AdminPropostas() {
   const [novaStep, setNovaStep] = useState<1 | 2 | 3>(1);
   const [vendedoresList, setVendedoresList] = useState<VendedorSelect[]>([]);
   const [planosList, setPlanosList] = useState<PlanoSelect[]>([]);
+  const [contratosList, setContratosList] = useState<ContratoSelect[]>([]);
+  const [responsaveisList, setResponsaveisList] = useState<ResponsavelSelect[]>([]);
   const [novaSalvando, setNovaSalvando] = useState(false);
   const [novaSalvo, setNovaSalvo] = useState(false);
   const [novaErro, setNovaErro] = useState("");
@@ -252,9 +262,13 @@ export default function AdminPropostas() {
     Promise.all([
       apiFetch("/admin/vendedores") as Promise<{ vendedores: VendedorSelect[] }>,
       apiFetch("/planos") as Promise<{ planos: PlanoSelect[] }>,
-    ]).then(([v, p]) => {
+      apiFetch("/admin/contratos") as Promise<{ contratos: ContratoSelect[] }>,
+      apiFetch("/admin/responsaveis") as Promise<{ responsaveis: ResponsavelSelect[] }>,
+    ]).then(([v, p, c, r]) => {
       setVendedoresList(v.vendedores ?? []);
       setPlanosList((p.planos ?? []).filter(pl => pl.ativo));
+      setContratosList((c.contratos ?? []).filter(ct => ct.ativo));
+      setResponsaveisList(r.responsaveis ?? []);
     }).catch(console.error);
   }, []);
 
@@ -308,6 +322,8 @@ export default function AdminPropostas() {
         method: "POST",
         body: JSON.stringify({
           vendedorId: novaForm.vendedorId,
+          contratoId: novaForm.contratoId,
+          responsavelFinanceiroId: novaForm.responsavelFinanceiroId,
           dadosTitular: {
             nome: novaForm.clienteNome.toUpperCase(),
             cpf: novaForm.clienteCpf,
@@ -355,7 +371,7 @@ export default function AdminPropostas() {
   };
 
   const novaPlanoAtual = planosList.find(p => p.id === novaForm.planoId);
-  const novaPodeAvancar1 = !!novaForm.vendedorId && !!novaForm.clienteNome && !!novaForm.clienteCpf;
+  const novaPodeAvancar1 = !!novaForm.vendedorId && !!novaForm.contratoId && !!novaForm.responsavelFinanceiroId && !!novaForm.clienteNome && !!novaForm.clienteCpf;
   const novaPodeSalvar = novaPodeAvancar1 && !!novaForm.planoId;
 
   return (
@@ -432,6 +448,7 @@ export default function AdminPropostas() {
               <TableRow className="bg-muted/50 hover:bg-muted/50 border-b-2">
                 <TableHead className="font-semibold text-foreground">Cliente / CPF</TableHead>
                 <TableHead className="font-semibold text-foreground">Plano</TableHead>
+                <TableHead className="font-semibold text-foreground">Contrato / Resp.</TableHead>
                 <TableHead className="font-semibold text-foreground">Vendedor</TableHead>
                 <TableHead className="font-semibold text-foreground">Data</TableHead>
                 <TableHead className="font-semibold text-foreground text-right">Valor</TableHead>
@@ -442,7 +459,7 @@ export default function AdminPropostas() {
             <TableBody>
               {filteredPropostas.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Search className="h-8 w-8 text-muted-foreground/30" />
                       <p>Nenhuma proposta encontrada.</p>
@@ -463,6 +480,18 @@ export default function AdminPropostas() {
                       <span className="text-xs text-muted-foreground font-mono bg-muted px-1 py-0.5 rounded w-fit">
                         {String(prop.dadosTitular?.codigoPlano ?? prop.dadosTitular?.planoCode ?? "—")}
                       </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      {prop.contratoNome ? (
+                        <span className="text-xs px-1.5 py-0.5 rounded border border-slate-300 bg-slate-50 text-slate-700 w-fit">{prop.contratoNome}</span>
+                      ) : <span className="text-xs text-muted-foreground">— sem contrato</span>}
+                      {prop.responsavelNome ? (
+                        <span className={`text-xs px-1.5 py-0.5 rounded border w-fit ${prop.responsavelTipo === "PJ" ? "border-indigo-300 bg-indigo-50 text-indigo-700" : "border-teal-300 bg-teal-50 text-teal-700"}`}>
+                          {prop.responsavelNome} <span className="opacity-60">({prop.responsavelTipo})</span>
+                        </span>
+                      ) : <span className="text-xs text-muted-foreground">— sem responsável</span>}
                     </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{prop.vendedorNome ?? "—"}</TableCell>
@@ -540,14 +569,42 @@ export default function AdminPropostas() {
           {novaStep === 1 && (
             <div className="space-y-4 py-1">
               {/* Vendedor */}
-              <div className="space-y-1.5">
-                <Label>Vendedor Responsável *</Label>
-                <Select value={novaForm.vendedorId} onValueChange={v => setNovaForm(f => ({ ...f, vendedorId: v }))}>
-                  <SelectTrigger data-testid="select-nova-vendedor"><SelectValue placeholder="Selecione o vendedor..." /></SelectTrigger>
-                  <SelectContent>
-                    {vendedoresList.map(v => <SelectItem key={v.id} value={v.id}>{v.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Vendedor *</Label>
+                  <Select value={novaForm.vendedorId} onValueChange={v => setNovaForm(f => ({ ...f, vendedorId: v }))}>
+                    <SelectTrigger data-testid="select-nova-vendedor"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      {vendedoresList.map(v => <SelectItem key={v.id} value={v.id}>{v.nome}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Contrato *</Label>
+                  <Select value={novaForm.contratoId} onValueChange={v => setNovaForm(f => ({ ...f, contratoId: v }))}>
+                    <SelectTrigger data-testid="select-nova-contrato"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      {contratosList.map(c => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.nome} {c.asaasModo === "SANDBOX" && "(sandbox)"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Resp. Financeiro *</Label>
+                  <Select value={novaForm.responsavelFinanceiroId} onValueChange={v => setNovaForm(f => ({ ...f, responsavelFinanceiroId: v }))}>
+                    <SelectTrigger data-testid="select-nova-responsavel"><SelectValue placeholder="Quem paga?" /></SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      {responsaveisList.map(r => (
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.nome} <span className="text-xs text-muted-foreground">({r.tipo})</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* Cola IA */}

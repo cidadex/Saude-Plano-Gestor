@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, Users, UserMinus, ClipboardList, FileText,
   Briefcase, LogOut, BellRing, ChevronRight, Home, HeartPulse,
-  Menu, BarChart3, Banknote, ChevronDown, Sun, Moon,
+  Menu, BarChart3, Banknote, ChevronDown, Sun, Moon, Users2, FileSignature,
 } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "@/hooks/useTheme";
@@ -20,6 +20,8 @@ const rotulos: Record<string, string> = {
   '/admin/relatorios': 'Relatórios',
   '/admin/financeiro': 'Financeiro',
   '/admin/comissoes': 'Comissões',
+  '/admin/contratos': 'Contratos',
+  '/admin/responsaveis': 'Responsáveis Financeiros',
 };
 
 type NavItem = { href: string; label: string; icon: React.ElementType; sub?: { href: string; label: string }[] };
@@ -37,6 +39,8 @@ const navItems: NavItem[] = [
   { href: "/admin/comissoes", label: "Comissões", icon: BellRing },
   { href: "/admin/propostas", label: "Propostas", icon: FileText },
   { href: "/admin/planos", label: "Planos", icon: ClipboardList },
+  { href: "/admin/contratos", label: "Contratos", icon: FileSignature },
+  { href: "/admin/responsaveis", label: "Responsáveis", icon: Users2 },
   {
     href: "/admin/vendedores", label: "Equipe", icon: Briefcase,
     sub: [

@@ -36,11 +36,16 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 ### Papéis / Rotas
 - `admin` → `/admin/*`
 - `vendedor` → `/vendedor/*`
+- `responsavel` (PJ ou PF financeiro) — login via `POST /api/auth/login` (mesmos campos), portal próprio em planejamento
+- `cliente` (beneficiário) → `POST /api/auth/cliente/login` (CPF + nascimento)
 - Seed via `POST /api/seed`
 
 ### Credenciais de teste
-- `wladson@seacec.com.br` / `123456` (vendedor v1 — 3 clientes)
-- `carol@seacec.com.br` / `123456` (vendedor v2 — 2 clientes)
+- `admin@teste.com` / `123456` (admin)
+- `wladson@teste.com` / `123456` (vendedor v1 — 3 clientes)
+- `carol@teste.com` / `123456` (vendedor v2 — 2 clientes)
+- `financeiro@acme.com.br` / `123456` (responsável financeiro PJ — Acme)
+- CPF `483.665.870-53` / nasc. `02/05/1967` (beneficiário)
 
 ### Features implementadas
 - Auth JWT (cookie + middleware `requireAuth`)
@@ -49,6 +54,15 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 - WhatsApp via wa.me com 3 templates (BOLETO, ATRASO, SUSPENSAO)
 - Registro de comunicações no banco (`comunicacoes` table) ao abrir WhatsApp
 - Página `/vendedor/historico` com histórico completo de mensagens enviadas + filtros
+- **Contratos** (`contratos`): cada contrato guarda chave Asaas (sandbox/produção). CRUD admin em `/admin/contratos`. Seed cria `ctr-padrao` (PF individual) e `ctr-corp-acme` (PJ corporativo).
+- **Responsáveis Financeiros** (`responsaveis_financeiros`): PF ou PJ pré-cadastrados pelo admin. Podem ter login próprio (vinculado a `users` com role `responsavel`). CRUD admin em `/admin/responsaveis`.
+- Cadastro de cliente exige Contrato + Responsável Financeiro + dia vencimento (1–31, validado server-side) + valor mensal + forma pagamento. Patches em `/admin/clientes/:id` impedem nullification dos vínculos obrigatórios.
+- Tabelas listagem (admin/clientes, admin/propostas, vendedor/propostas) exibem chips Contrato + Responsável (PF teal, PJ indigo).
+
+### Rotas públicas (autenticadas) novas
+- `GET /api/contratos` — lista contratos ativos (todos os papéis autenticados)
+- `GET /api/responsaveis-financeiros` — lista responsáveis (admin/vendedor/gerente)
+- Importante: em `routes/index.ts`, esses routers vêm ANTES do `adminRouter`, pois o admin guard responde 403 unconditionally para qualquer requisição não-admin.
 
 ### Mapeamento de tipos WhatsApp → DB
 - `BOLETO` → `BOLETO_EMITIDO`

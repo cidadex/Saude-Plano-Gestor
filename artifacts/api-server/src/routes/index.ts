@@ -9,6 +9,8 @@ import adminRouter from "./admin.js";
 import aiRouter from "./ai.js";
 import planosRouter from "./planos.js";
 import clienteRouter from "./cliente.js";
+import contratosRouter, { contratosPublicRouter } from "./contratos.js";
+import responsaveisRouter from "./responsaveis.js";
 
 const router: IRouter = Router();
 
@@ -19,7 +21,11 @@ router.use(clienteRouter);
 router.use(vendedorRouter);
 router.use(gerenteRouter);
 router.use(comunicacoesRouter);
+// Public-among-authenticated routers come BEFORE admin-only routers so the admin guard doesn't block them
+router.use(contratosPublicRouter);
+router.use(responsaveisRouter);
 router.use(adminRouter);
+router.use(contratosRouter);
 router.use(aiRouter);
 router.use(planosRouter);
 

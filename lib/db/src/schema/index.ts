@@ -2,6 +2,8 @@ export * from "./users";
 export * from "./vendedores";
 export * from "./gerentes";
 export * from "./planos";
+export * from "./contratos";
+export * from "./responsaveis";
 export * from "./clientes";
 export * from "./propostas";
 export * from "./boletos";

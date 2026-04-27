@@ -9,6 +9,8 @@ import {
   clientesTable,
   propostasTable,
   boletosTable,
+  contratosTable,
+  responsaveisFinanceirosTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth.js";
 
@@ -306,23 +308,30 @@ router.patch("/admin/users/:userId/reset-password", async (req, res) => {
 // POST /admin/propostas — admin cria proposta para qualquer vendedor
 router.post("/admin/propostas", async (req, res) => {
   try {
-    const { vendedorId, dadosTitular, dadosDependentes, valorTotal } = req.body as {
+    const { vendedorId, dadosTitular, dadosDependentes, valorTotal, contratoId, responsavelFinanceiroId } = req.body as {
       vendedorId: string;
       dadosTitular: Record<string, unknown>;
       dadosDependentes?: Record<string, unknown>[];
       valorTotal?: string;
+      contratoId?: string;
+      responsavelFinanceiroId?: string;
     };
     if (!vendedorId) return res.status(400).json({ error: "vendedorId é obrigatório" });
     if (!dadosTitular) return res.status(400).json({ error: "dadosTitular é obrigatório" });
+    if (!contratoId) return res.status(400).json({ error: "contratoId é obrigatório" });
+    if (!responsavelFinanceiroId) return res.status(400).json({ error: "responsavelFinanceiroId é obrigatório" });
 
     const id = `prop-${Date.now()}`;
     const [proposta] = await db.insert(propostasTable).values({
       id,
       vendedorId,
+      adminId: req.user?.userId ?? null,
       status: "AGUARDANDO_ENVIO",
       dadosTitular,
       dadosDependentes: dadosDependentes ?? [],
       valorTotal: valorTotal ?? null,
+      contratoId,
+      responsavelFinanceiroId,
     }).returning();
 
     res.status(201).json({ proposta });
@@ -332,7 +341,7 @@ router.post("/admin/propostas", async (req, res) => {
   }
 });
 
-// Listar todas as propostas com dados do vendedor
+// Listar todas as propostas com dados do vendedor / contrato / responsável
 router.get("/admin/propostas", async (_req, res) => {
   try {
     const rows = await db
@@ -351,9 +360,16 @@ router.get("/admin/propostas", async (_req, res) => {
         vendedorId: propostasTable.vendedorId,
         vendedorNome: vendedoresTable.nome,
         vendedorEmail: vendedoresTable.email,
+        contratoId: propostasTable.contratoId,
+        contratoNome: contratosTable.nome,
+        responsavelFinanceiroId: propostasTable.responsavelFinanceiroId,
+        responsavelNome: responsaveisFinanceirosTable.nome,
+        responsavelTipo: responsaveisFinanceirosTable.tipo,
       })
       .from(propostasTable)
       .leftJoin(vendedoresTable, eq(vendedoresTable.id, propostasTable.vendedorId))
+      .leftJoin(contratosTable, eq(contratosTable.id, propostasTable.contratoId))
+      .leftJoin(responsaveisFinanceirosTable, eq(responsaveisFinanceirosTable.id, propostasTable.responsavelFinanceiroId))
       .orderBy(desc(propostasTable.createdAt));
 
     res.json({ propostas: rows });
@@ -363,13 +379,15 @@ router.get("/admin/propostas", async (_req, res) => {
   }
 });
 
-// PATCH /admin/propostas/:id — editar dados da proposta (dadosTitular + valorTotal)
+// PATCH /admin/propostas/:id — editar dados da proposta (dadosTitular + valorTotal + vínculos)
 router.patch("/admin/propostas/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { dadosTitular, valorTotal } = req.body as {
+    const { dadosTitular, valorTotal, contratoId, responsavelFinanceiroId } = req.body as {
       dadosTitular?: Record<string, unknown>;
       valorTotal?: string;
+      contratoId?: string | null;
+      responsavelFinanceiroId?: string | null;
     };
 
     const [proposta] = await db.select().from(propostasTable).where(eq(propostasTable.id, id)).limit(1);
@@ -380,6 +398,13 @@ router.patch("/admin/propostas/:id", async (req, res) => {
       updates.dadosTitular = { ...(proposta.dadosTitular as Record<string, unknown>), ...dadosTitular };
     }
     if (valorTotal !== undefined) updates.valorTotal = valorTotal;
+    // contratoId / responsavelFinanceiroId só atualizam se vier valor não-vazio (impede nullification)
+    if (contratoId !== undefined && contratoId !== null && String(contratoId).trim() !== "") {
+      updates.contratoId = String(contratoId).trim();
+    }
+    if (responsavelFinanceiroId !== undefined && responsavelFinanceiroId !== null && String(responsavelFinanceiroId).trim() !== "") {
+      updates.responsavelFinanceiroId = String(responsavelFinanceiroId).trim();
+    }
 
     await db.update(propostasTable).set(updates as never).where(eq(propostasTable.id, id));
     const [updated] = await db.select().from(propostasTable).where(eq(propostasTable.id, id)).limit(1);
@@ -561,7 +586,7 @@ router.post("/admin/propostas/:id/gerar-boleto", async (req, res) => {
 
 // ─── CLIENTES ──────────────────────────────────────────────────
 
-// GET /admin/clientes — listar todos os clientes com nome do vendedor
+// GET /admin/clientes — listar todos os clientes com nome do vendedor / contrato / responsável
 router.get("/admin/clientes", async (_req, res) => {
   try {
     const rows = await db
@@ -595,14 +620,114 @@ router.get("/admin/clientes", async (_req, res) => {
         codigoPlano: clientesTable.codigoPlano,
         status: clientesTable.status,
         observacao: clientesTable.observacao,
+        nomeMae: clientesTable.nomeMae,
+        rg: clientesTable.rg,
+        rgOrgaoEmissor: clientesTable.rgOrgaoEmissor,
+        rgUf: clientesTable.rgUf,
+        estadoCivil: clientesTable.estadoCivil,
+        docRgUrl: clientesTable.docRgUrl,
+        docComprovanteUrl: clientesTable.docComprovanteUrl,
         vendedorId: clientesTable.vendedorId,
         vendedorNome: vendedoresTable.nome,
+        contratoId: clientesTable.contratoId,
+        contratoNome: contratosTable.nome,
+        responsavelFinanceiroId: clientesTable.responsavelFinanceiroId,
+        responsavelNome: responsaveisFinanceirosTable.nome,
+        responsavelTipo: responsaveisFinanceirosTable.tipo,
+        responsavelCpfCnpj: responsaveisFinanceirosTable.cpfCnpj,
       })
       .from(clientesTable)
       .leftJoin(vendedoresTable, eq(vendedoresTable.id, clientesTable.vendedorId))
+      .leftJoin(contratosTable, eq(contratosTable.id, clientesTable.contratoId))
+      .leftJoin(responsaveisFinanceirosTable, eq(responsaveisFinanceirosTable.id, clientesTable.responsavelFinanceiroId))
       .orderBy(clientesTable.nome);
 
     res.json({ clientes: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// POST /admin/clientes — admin cadastra cliente diretamente (sem fluxo de proposta)
+router.post("/admin/clientes", async (req, res) => {
+  try {
+    const body = req.body as Record<string, string | number | boolean | undefined | null>;
+    const cpfDigits = String(body.cpf ?? "").replace(/\D/g, "");
+    if (!body.nome || !cpfDigits) {
+      return res.status(400).json({ error: "Nome e CPF são obrigatórios" });
+    }
+    if (!body.vendedorId) return res.status(400).json({ error: "vendedorId é obrigatório" });
+    if (!body.contratoId) return res.status(400).json({ error: "contratoId é obrigatório" });
+    if (!body.responsavelFinanceiroId) return res.status(400).json({ error: "responsavelFinanceiroId é obrigatório" });
+
+    // Validação dia de vencimento (1–31, quando informado)
+    if (body.diaVencimento !== undefined && body.diaVencimento !== null && body.diaVencimento !== "") {
+      const dia = Number(body.diaVencimento);
+      if (!Number.isInteger(dia) || dia < 1 || dia > 31) {
+        return res.status(400).json({ error: "diaVencimento deve ser um inteiro entre 1 e 31" });
+      }
+    }
+
+    // Verifica duplicidade
+    const [dup] = await db.select({ id: clientesTable.id })
+      .from(clientesTable).where(eq(clientesTable.cpf, cpfDigits)).limit(1);
+    if (dup) return res.status(409).json({ error: "Já existe um cliente com este CPF" });
+
+    const id = `cli-${Date.now()}`;
+    const dataNasc = body.dataNascimento ? String(body.dataNascimento) : null;
+    // Converte DD/MM/YYYY → YYYY-MM-DD se necessário
+    let dataNascIso: string | null = null;
+    if (dataNasc) {
+      const m = dataNasc.match(/^(\d{2})\/(\d{2})\/(\d{2,4})$/);
+      if (m) {
+        const ano = m[3].length === 2 ? `20${m[3]}` : m[3];
+        dataNascIso = `${ano}-${m[2]}-${m[1]}`;
+      } else if (/^\d{4}-\d{2}-\d{2}$/.test(dataNasc)) {
+        dataNascIso = dataNasc;
+      }
+    }
+
+    const valuesToInsert = {
+      id,
+      vendedorId: String(body.vendedorId),
+      contratoId: String(body.contratoId),
+      responsavelFinanceiroId: String(body.responsavelFinanceiroId),
+      nome: String(body.nome).trim(),
+      cpf: cpfDigits,
+      dataNascimento: dataNascIso,
+      sexo: body.sexo === "M" || body.sexo === "F" ? body.sexo : null,
+      telefone: body.telefone ? String(body.telefone).trim() : null,
+      email: body.email ? String(body.email).toLowerCase().trim() : null,
+      cep: body.cep ? String(body.cep).trim() : null,
+      logradouro: body.logradouro ? String(body.logradouro).trim() : null,
+      numero: body.numero ? String(body.numero).trim() : null,
+      complemento: body.complemento ? String(body.complemento).trim() : null,
+      bairro: body.bairro ? String(body.bairro).trim() : null,
+      cidade: body.cidade ? String(body.cidade).trim() : null,
+      estado: body.estado ? String(body.estado).trim() : null,
+      nomeMae: body.nomeMae ? String(body.nomeMae).trim() : null,
+      rg: body.rg ? String(body.rg).trim() : null,
+      rgOrgaoEmissor: body.rgOrgaoEmissor ? String(body.rgOrgaoEmissor).trim() : null,
+      rgUf: body.rgUf ? String(body.rgUf).trim() : null,
+      estadoCivil: body.estadoCivil ? String(body.estadoCivil).trim() : null,
+      docRgUrl: body.docRgUrl ? String(body.docRgUrl).trim() : null,
+      docComprovanteUrl: body.docComprovanteUrl ? String(body.docComprovanteUrl).trim() : null,
+      tipo: body.tipo ? String(body.tipo) : "TITULAR",
+      formaPagamento: body.formaPagamento ? String(body.formaPagamento) : null,
+      diaVencimento:
+        body.diaVencimento !== undefined && body.diaVencimento !== null && body.diaVencimento !== ""
+          ? Number(body.diaVencimento)
+          : null,
+      valorMensal: body.valorMensal != null ? String(body.valorMensal) : null,
+      planoCode: body.planoCode ? String(body.planoCode) : null,
+      codigoPlano: body.codigoPlano ? String(body.codigoPlano) : null,
+      observacao: body.observacao ? String(body.observacao) : null,
+      representante: body.representante ? String(body.representante) : null,
+    } as typeof clientesTable.$inferInsert;
+
+    const [cliente] = await db.insert(clientesTable).values(valuesToInsert).returning();
+    res.status(201).json({ cliente });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: String(err) });
@@ -631,17 +756,38 @@ router.patch("/admin/clientes/:id", async (req, res) => {
     const { id } = req.params;
     const body = req.body as Record<string, string | number | undefined | null>;
 
+    // Validação dia de vencimento (1–31, quando informado)
+    if (body.diaVencimento !== undefined && body.diaVencimento !== null && body.diaVencimento !== "") {
+      const dia = Number(body.diaVencimento);
+      if (!Number.isInteger(dia) || dia < 1 || dia > 31) {
+        return res.status(400).json({ error: "diaVencimento deve ser um inteiro entre 1 e 31" });
+      }
+    }
+
     const updates: Record<string, unknown> = {};
     const str = (k: string) => { if (body[k] !== undefined) updates[k] = body[k] ?? null; };
     const num = (k: string) => { if (body[k] !== undefined) updates[k] = body[k] != null ? Number(body[k]) : null; };
+    // Campos obrigatórios — só atualizam se vier valor não-vazio (impede nullification)
+    const reqStr = (k: string) => {
+      if (body[k] !== undefined && body[k] !== null && String(body[k]).trim() !== "") {
+        updates[k] = String(body[k]).trim();
+      }
+    };
 
     str("nome"); str("telefone"); str("email"); str("dataNascimento");
-    str("cep"); str("logradouro"); str("numero"); str("bairro"); str("cidade"); str("estado");
-    str("observacao"); str("formaPagamento"); num("diaVencimento");
+    str("cep"); str("logradouro"); str("numero"); str("complemento"); str("bairro"); str("cidade"); str("estado");
+    str("observacao"); str("formaPagamento");
+    if (body.diaVencimento !== undefined) {
+      updates.diaVencimento =
+        body.diaVencimento === null || body.diaVencimento === "" ? null : Number(body.diaVencimento);
+    }
     str("sexo"); str("representante"); str("tipo");
     str("matricula"); str("planoCode"); str("codigoPlano");
     str("valorMensal"); str("dataAtivacao");
     str("vrPl"); str("saldo"); str("valor2026"); str("comissao");
+    str("nomeMae"); str("rg"); str("rgOrgaoEmissor"); str("rgUf"); str("estadoCivil");
+    str("docRgUrl"); str("docComprovanteUrl");
+    reqStr("contratoId"); reqStr("responsavelFinanceiroId");
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: "Nenhum campo para atualizar" });

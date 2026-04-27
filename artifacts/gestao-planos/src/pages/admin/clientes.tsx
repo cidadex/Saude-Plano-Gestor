@@ -13,9 +13,11 @@ import { formatMoney } from "@/lib/format";
 import {
   Search, SlidersHorizontal, ChevronDown, ChevronUp,
   PlayCircle, PauseCircle, MessageCircle, Pencil, Loader2, RefreshCw,
+  UserPlus, FileSignature, Users2, Building2, User as UserIcon,
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { WhatsappModal } from "@/components/whatsapp-modal";
+import CadastroCliente from "@/pages/admin/cadastro-cliente";
 
 type ClienteAdminAPI = {
   id: string;
@@ -49,6 +51,11 @@ type ClienteAdminAPI = {
   observacao?: string | null;
   vendedorId: string;
   vendedorNome?: string | null;
+  contratoId?: string | null;
+  contratoNome?: string | null;
+  responsavelFinanceiroId?: string | null;
+  responsavelNome?: string | null;
+  responsavelTipo?: "PF" | "PJ" | null;
 };
 
 function statusBadge(status: string) {
@@ -68,6 +75,7 @@ export default function AdminClientes() {
   const [whatsappAberto, setWhatsappAberto] = useState(false);
   const [clienteWhatsapp, setClienteWhatsapp] = useState<ClienteAdminAPI | null>(null);
 
+  const [novoAberto, setNovoAberto] = useState(false);
   const [editandoCliente, setEditandoCliente] = useState<ClienteAdminAPI | null>(null);
   const [editSalvando, setEditSalvando] = useState(false);
   const [editErro, setEditErro] = useState("");
@@ -187,10 +195,17 @@ export default function AdminClientes() {
           <h2 className="text-3xl font-bold tracking-tight text-foreground">Clientes Ativos</h2>
           <p className="text-muted-foreground">Gerencie a carteira de clientes ativos da corretora.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={carregar} className="gap-2">
-          <RefreshCw className="h-4 w-4" /> Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={carregar} className="gap-2">
+            <RefreshCw className="h-4 w-4" /> Atualizar
+          </Button>
+          <Button size="sm" onClick={() => setNovoAberto(true)} className="gap-2" data-testid="btn-novo-cliente">
+            <UserPlus className="h-4 w-4" /> Novo Cliente
+          </Button>
+        </div>
       </div>
+
+      <CadastroCliente open={novoAberto} onClose={() => setNovoAberto(false)} onCreated={carregar} />
 
       <Card className="p-4">
         <div className="flex items-center gap-2 mb-3">
@@ -270,6 +285,8 @@ export default function AdminClientes() {
                 <TableHead>Nome / CPF</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Vendedor</TableHead>
+                <TableHead>Contrato</TableHead>
+                <TableHead>Responsável</TableHead>
                 <TableHead>Plano</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
                 <TableHead className="text-center">Venc.</TableHead>
@@ -279,7 +296,7 @@ export default function AdminClientes() {
             <TableBody>
               {filteredClientes.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
                     Nenhum cliente encontrado.
                   </TableCell>
                 </TableRow>
@@ -312,6 +329,21 @@ export default function AdminClientes() {
                       </TableCell>
                       <TableCell className="text-sm">{c.vendedorNome ?? c.representante ?? "—"}</TableCell>
                       <TableCell>
+                        {c.contratoNome ? (
+                          <Badge variant="outline" className="text-xs gap-1 border-slate-300 bg-slate-50 text-slate-700">
+                            <FileSignature className="h-3 w-3" /> {c.contratoNome}
+                          </Badge>
+                        ) : <span className="text-xs text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell>
+                        {c.responsavelNome ? (
+                          <Badge variant="outline" className={`text-xs gap-1 ${c.responsavelTipo === "PJ" ? "border-indigo-300 bg-indigo-50 text-indigo-700" : "border-teal-300 bg-teal-50 text-teal-700"}`}>
+                            {c.responsavelTipo === "PJ" ? <Building2 className="h-3 w-3" /> : <UserIcon className="h-3 w-3" />}
+                            {c.responsavelNome}
+                          </Badge>
+                        ) : <span className="text-xs text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell>
                         <Badge variant="outline" className="font-mono text-xs bg-muted/50">{c.planoCode ?? "—"}</Badge>
                       </TableCell>
                       <TableCell className="text-right font-semibold text-sm">{formatMoney(parseFloat(c.valorMensal ?? "0"))}</TableCell>
@@ -323,7 +355,7 @@ export default function AdminClientes() {
 
                     <CollapsibleContent asChild>
                       <TableRow className="bg-muted/20 hover:bg-muted/20">
-                        <TableCell colSpan={8} className="p-0">
+                        <TableCell colSpan={10} className="p-0">
                           <div className="px-6 py-4 border-b">
                             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 text-sm mb-4">
                               <div className="space-y-1.5">
@@ -344,6 +376,8 @@ export default function AdminClientes() {
                               </div>
                               <div className="space-y-1.5">
                                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 pb-1 border-b">Plano & Contrato</p>
+                                {c.contratoNome && <p><span className="text-muted-foreground">Contrato:</span> <span className="font-medium">{c.contratoNome}</span></p>}
+                                {c.responsavelNome && <p><span className="text-muted-foreground">Resp. Financeiro:</span> <span className="font-medium">{c.responsavelNome}</span> <span className="text-xs text-muted-foreground">({c.responsavelTipo})</span></p>}
                                 {c.planoCode && <p><span className="text-muted-foreground">Código Plano:</span> <span className="font-mono text-xs">{c.planoCode}</span></p>}
                                 {c.codigoPlano && <p><span className="text-muted-foreground">Cód. Completo:</span> <span className="font-mono text-xs">{c.codigoPlano}</span></p>}
                                 {c.matricula && <p><span className="text-muted-foreground">Carteirinha:</span> <span className="font-mono text-xs">{c.matricula}</span></p>}

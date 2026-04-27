@@ -4,6 +4,8 @@ import { z } from "zod/v4";
 import { vendedoresTable } from "./vendedores";
 import { planosTable, tabelasPrecoFaixasTable } from "./planos";
 import { usersTable } from "./users";
+import { contratosTable } from "./contratos";
+import { responsaveisFinanceirosTable } from "./responsaveis";
 
 export const statusClienteEnum = pgEnum("status_cliente", [
   "ATIVO",
@@ -45,6 +47,14 @@ export const clientesTable = pgTable("clientes", {
   estado: text("estado"),
   cns: text("cns"),
   nomeMae: text("nome_mae"),
+  rg: text("rg"),
+  rgOrgaoEmissor: text("rg_orgao_emissor"),
+  rgUf: text("rg_uf"),
+  estadoCivil: text("estado_civil"),
+  docRgUrl: text("doc_rg_url"),
+  docComprovanteUrl: text("doc_comprovante_url"),
+  contratoId: text("contrato_id").references(() => contratosTable.id),
+  responsavelFinanceiroId: text("responsavel_financeiro_id").references(() => responsaveisFinanceirosTable.id),
   matricula: text("matricula"),
   valorMensal: numeric("valor_mensal", { precision: 10, scale: 2 }),
   dataVigencia: date("data_vigencia"),

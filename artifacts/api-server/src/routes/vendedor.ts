@@ -3,6 +3,7 @@ import { requireAuth } from "../middlewares/auth.js";
 import {
   db, clientesTable, propostasTable, boletosTable,
   comissoesTable, planosTable, vendedoresTable,
+  contratosTable, responsaveisFinanceirosTable,
 } from "@workspace/db";
 import { eq, and, or } from "drizzle-orm";
 
@@ -35,12 +36,32 @@ router.get("/vendedor/propostas", async (req, res) => {
     const vendedorId = req.user!.vendedorId;
     if (!vendedorId) return res.status(403).json({ error: "Somente vendedores" });
 
-    const propostas = await db
-      .select()
+    const rows = await db
+      .select({
+        id: propostasTable.id,
+        vendedorId: propostasTable.vendedorId,
+        contratoId: propostasTable.contratoId,
+        responsavelFinanceiroId: propostasTable.responsavelFinanceiroId,
+        dadosTitular: propostasTable.dadosTitular,
+        dadosDependentes: propostasTable.dadosDependentes,
+        valorTotal: propostasTable.valorTotal,
+        status: propostasTable.status,
+        motivoRecusa: propostasTable.motivoRecusa,
+        dataEnvioOperadora: propostasTable.dataEnvioOperadora,
+        dataAtivacao: propostasTable.dataAtivacao,
+        clienteId: propostasTable.clienteId,
+        createdAt: propostasTable.createdAt,
+        updatedAt: propostasTable.updatedAt,
+        contratoNome: contratosTable.nome,
+        responsavelNome: responsaveisFinanceirosTable.nome,
+        responsavelTipo: responsaveisFinanceirosTable.tipo,
+      })
       .from(propostasTable)
+      .leftJoin(contratosTable, eq(propostasTable.contratoId, contratosTable.id))
+      .leftJoin(responsaveisFinanceirosTable, eq(propostasTable.responsavelFinanceiroId, responsaveisFinanceirosTable.id))
       .where(eq(propostasTable.vendedorId, vendedorId));
 
-    res.json({ propostas });
+    res.json({ propostas: rows });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: String(err) });
@@ -146,14 +167,18 @@ router.post("/vendedor/propostas", async (req, res) => {
     const vendedorId = req.user!.vendedorId;
     if (!vendedorId) return res.status(403).json({ error: "Somente vendedores" });
 
-    const { dadosTitular, dadosDependentes, planoId, valorTotal } = req.body as {
+    const { dadosTitular, dadosDependentes, planoId, valorTotal, contratoId, responsavelFinanceiroId } = req.body as {
       dadosTitular: Record<string, unknown>;
       dadosDependentes?: Record<string, unknown>[];
       planoId?: string;
       valorTotal?: string;
+      contratoId?: string;
+      responsavelFinanceiroId?: string;
     };
 
     if (!dadosTitular) return res.status(400).json({ error: "dadosTitular é obrigatório" });
+    if (!contratoId) return res.status(400).json({ error: "contratoId é obrigatório" });
+    if (!responsavelFinanceiroId) return res.status(400).json({ error: "responsavelFinanceiroId é obrigatório" });
 
     const id = `prop-${Date.now()}`;
     const [proposta] = await db.insert(propostasTable).values({
@@ -164,6 +189,8 @@ router.post("/vendedor/propostas", async (req, res) => {
       dadosDependentes: dadosDependentes ?? [],
       planoId: planoId ?? null,
       valorTotal: valorTotal ?? null,
+      contratoId,
+      responsavelFinanceiroId,
     }).returning();
 
     res.status(201).json({ proposta });
@@ -189,10 +216,12 @@ router.patch("/vendedor/propostas/:id", async (req, res) => {
       return res.status(400).json({ error: "Só é possível editar propostas com status AGUARDANDO_ENVIO" });
     }
 
-    const { dadosTitular, dadosDependentes, valorTotal } = req.body as {
+    const { dadosTitular, dadosDependentes, valorTotal, contratoId, responsavelFinanceiroId } = req.body as {
       dadosTitular?: Record<string, unknown>;
       dadosDependentes?: Record<string, unknown>[];
       valorTotal?: string;
+      contratoId?: string | null;
+      responsavelFinanceiroId?: string | null;
     };
 
     const updates: Record<string, unknown> = { updatedAt: new Date() };
@@ -201,6 +230,13 @@ router.patch("/vendedor/propostas/:id", async (req, res) => {
     }
     if (dadosDependentes !== undefined) updates.dadosDependentes = dadosDependentes;
     if (valorTotal !== undefined) updates.valorTotal = valorTotal;
+    // contratoId / responsavelFinanceiroId só atualizam se vier valor não-vazio (impede nullification)
+    if (contratoId !== undefined && contratoId !== null && String(contratoId).trim() !== "") {
+      updates.contratoId = String(contratoId).trim();
+    }
+    if (responsavelFinanceiroId !== undefined && responsavelFinanceiroId !== null && String(responsavelFinanceiroId).trim() !== "") {
+      updates.responsavelFinanceiroId = String(responsavelFinanceiroId).trim();
+    }
 
     await db.update(propostasTable).set(updates as never).where(eq(propostasTable.id, id));
     const [updated] = await db.select().from(propostasTable).where(eq(propostasTable.id, id)).limit(1);

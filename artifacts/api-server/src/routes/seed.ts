@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { db, usersTable, vendedoresTable, gerentesTable, planosTable, tabelasPrecoTable, tabelasPrecoFaixasTable, clientesTable, propostasTable, boletosTable, comissoesTable } from "@workspace/db";
+import { db, usersTable, vendedoresTable, gerentesTable, planosTable, tabelasPrecoTable, tabelasPrecoFaixasTable, clientesTable, propostasTable, boletosTable, comissoesTable, contratosTable, responsaveisFinanceirosTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 
 const router = Router();
@@ -26,6 +26,8 @@ router.post("/seed", async (_req, res) => {
       await tx.execute(sql`DELETE FROM propostas`);
       await tx.execute(sql`DELETE FROM dependentes`);
       await tx.execute(sql`DELETE FROM clientes`);
+      await tx.execute(sql`DELETE FROM responsaveis_financeiros`);
+      await tx.execute(sql`DELETE FROM contratos`);
       await tx.execute(sql`DELETE FROM tabelas_preco_faixas`);
       await tx.execute(sql`DELETE FROM tabelas_preco`);
       await tx.execute(sql`DELETE FROM gerentes`);
@@ -140,6 +142,53 @@ router.post("/seed", async (_req, res) => {
         await tx.insert(tabelasPrecoFaixasTable).values(f);
       }
 
+      // Contratos — agrupam beneficiários e cada um carrega sua chave Asaas
+      await tx.insert(contratosTable).values([
+        {
+          id: "ctr-padrao",
+          nome: "Contrato Padrão",
+          descricao: "Contrato geral para beneficiários individuais (PF). Pré-cadastre a chave Asaas para emitir boletos.",
+          asaasApiKey: null,
+          asaasModo: "SANDBOX",
+          ativo: true,
+        },
+        {
+          id: "ctr-corp-acme",
+          nome: "Contrato Corporativo — ACME LTDA",
+          descricao: "Contrato pessoa jurídica de exemplo. ACME paga pelos beneficiários atrelados.",
+          asaasApiKey: null,
+          asaasModo: "SANDBOX",
+          ativo: true,
+        },
+      ]);
+
+      // Responsável Financeiro PJ de exemplo (com login)
+      const respPjUserId = "user-resp-acme";
+      await tx.insert(usersTable).values({
+        id: respPjUserId,
+        email: "financeiro@acme.com.br",
+        passwordHash: hash,
+        role: "responsavel",
+        nome: "ACME LTDA",
+        active: true,
+      });
+      await tx.insert(responsaveisFinanceirosTable).values({
+        id: "resp-acme",
+        userId: respPjUserId,
+        tipo: "PJ",
+        nome: "ACME LTDA",
+        cpfCnpj: "12345678000199",
+        email: "financeiro@acme.com.br",
+        telefone: "(85) 3000-0000",
+        cep: "60000-000",
+        logradouro: "Av. Empresarial",
+        numero: "1000",
+        bairro: "Centro",
+        cidade: "Fortaleza",
+        estado: "CE",
+        observacao: "Responsável financeiro de exemplo (PJ) — paga por funcionários cadastrados sob este responsável.",
+      });
+
       // Clientes
       const clientesData = [
         { id: "c1", vendedorId: "v2", nome: "ABNER SOUSA LIMA", cpf: "722.987.331-2", sexo: "M" as const, dataNascimento: "1997-06-30", telefone: "(85) 98679-6239", email: "abner.lima@gmail.com", cep: "60822-140", logradouro: "RUA DAS ACÁCIAS", numero: "45", bairro: "CAMBEBA", cidade: "FORTALEZA", estado: "CE", matricula: "00218900619010", valorMensal: "275.86", dataAtivacao: "2025-03-26", codigo: "0DMQW", tipo: "TITULAR", representante: "CAROL", formaPagamento: "BOLETO", diaVencimento: 10, vrPl: "143.12", saldo: "132.74", valor2026: "275.86", comissao: "0", planoCode: "5254", codigoPlano: "0DMQW000189006", status: "ATIVO" as const, observacao: "" },
@@ -156,7 +205,59 @@ router.post("/seed", async (_req, res) => {
         { id: "c12", vendedorId: "v7", nome: "ALDEIZA BARBOZA BARROS", cpf: "547.463.613-04", sexo: "F" as const, dataNascimento: "1968-04-28", telefone: "(85) 98754-6607", cep: "60540-540", logradouro: "RUA DOUTOR GILBERTO STUDART", numero: "880", bairro: "CONJUNTO CEARA I", cidade: "FORTALEZA", estado: "CE", matricula: "00387200219010", valorMensal: "404.48", dataAtivacao: "2025-11-18", codigo: "0H4C9", tipo: "TITULAR", representante: "", formaPagamento: "BOLETO", diaVencimento: 20, vrPl: "143.12", saldo: "261.36", valor2026: "404.48", comissao: "0", planoCode: "5254", codigoPlano: "0H4C9000387002", status: "ATIVO" as const, observacao: "PARCELADO 12/2025 em 5 vezes" },
         { id: "c13", vendedorId: "v4", nome: "ALDENISA MACIEL DE LIMA ALBUQUERQUE", cpf: "473.247.083-15", sexo: "F" as const, dataNascimento: "1973-03-23", telefone: "(85) 99601-6320", email: "aldenisa.maciel@gmail.com", cep: "60870-480", logradouro: "RUA PEDRAS", numero: "55", bairro: "PEDRAS", cidade: "FORTALEZA", estado: "CE", matricula: "00484000819010", valorMensal: "404.48", dataAtivacao: "2026-02-16", codigo: "0H4C9", tipo: "TITULAR", representante: "", formaPagamento: "C6", diaVencimento: 10, vrPl: "153.92", saldo: "240.56", valor2026: "404.48", comissao: "10", planoCode: "5252", codigoPlano: "0H4C9000484008", status: "ATIVO" as const, observacao: "" },
       ];
-      for (const c of clientesData) await tx.insert(clientesTable).values(c);
+      // Beneficiários atrelados ao Contrato Corporativo + Responsável PJ ACME
+      const corporativosClienteIds = new Set(["c4", "c8"]);
+
+      // Pré-cria 1 responsável (PF, próprio beneficiário) para cada cliente — exceto os que vão pro responsável PJ
+      const responsaveisInsert: Array<typeof responsaveisFinanceirosTable.$inferInsert> = [];
+      const clienteResp: Record<string, string> = {};
+      for (const c of clientesData) {
+        if (corporativosClienteIds.has(c.id)) {
+          clienteResp[c.id] = "resp-acme";
+          continue;
+        }
+        const docDigits = c.cpf.replace(/\D/g, "");
+        const respId = `resp-${c.id}`;
+        clienteResp[c.id] = respId;
+        responsaveisInsert.push({
+          id: respId,
+          userId: null,
+          tipo: "PF",
+          nome: c.nome,
+          cpfCnpj: docDigits || `${c.id}-doc`,
+          email: c.email ?? null,
+          telefone: c.telefone ?? null,
+          cep: c.cep ?? null,
+          logradouro: c.logradouro ?? null,
+          numero: c.numero ?? null,
+          bairro: c.bairro ?? null,
+          cidade: c.cidade ?? null,
+          estado: c.estado ?? null,
+          observacao: "Responsável criado automaticamente — beneficiário paga o próprio plano.",
+        });
+      }
+      // Deduplica por cpfCnpj para evitar conflito de unicidade
+      const seen = new Set<string>();
+      const respDedup = responsaveisInsert.filter(r => {
+        if (seen.has(r.cpfCnpj!)) return false;
+        seen.add(r.cpfCnpj!);
+        return true;
+      });
+      for (const r of respDedup) await tx.insert(responsaveisFinanceirosTable).values(r);
+      // Re-aponta clientes cujo responsável foi removido por duplicidade
+      const respIdsExistentes = new Set([...respDedup.map(r => r.id), "resp-acme"]);
+      for (const cid of Object.keys(clienteResp)) {
+        if (!respIdsExistentes.has(clienteResp[cid])) clienteResp[cid] = "resp-acme";
+      }
+
+      for (const c of clientesData) {
+        const isCorporativo = corporativosClienteIds.has(c.id);
+        await tx.insert(clientesTable).values({
+          ...c,
+          contratoId: isCorporativo ? "ctr-corp-acme" : "ctr-padrao",
+          responsavelFinanceiroId: clienteResp[c.id],
+        });
+      }
 
       // Propostas
       const propostasData = [
@@ -172,7 +273,17 @@ router.post("/seed", async (_req, res) => {
         { id: "prop11", vendedorId: "v2", status: "ATIVA" as const, dadosTitular: { nome: "ADRIELLE RODRIGUES LOPES", cpf: "295.649.437-6", telefone: "(85) 98212-0646", plano: "AMBUL+HOSP. S/PARTO ENFERMARIA", codigoPlano: "5254", tipo: "TITULAR", valor: 341.28 }, dadosDependentes: [], valorTotal: "341.28", dataAtivacao: new Date("2025-08-05"), clienteId: "c11" },
         { id: "prop12", vendedorId: "v4", status: "ATIVA" as const, dadosTitular: { nome: "ADRIELLY KETLEN BARBOSA PEREIRA", cpf: "631.007.453-96", telefone: "(85) 99609-4618", plano: "AMBUL+HOSP. C/PARTO ENFERMARIA", codigoPlano: "5252", tipo: "TITULAR", valor: 268.75 }, dadosDependentes: [], valorTotal: "268.75", dataAtivacao: new Date("2026-02-26"), clienteId: "c8" },
       ];
-      for (const p of propostasData) await tx.insert(propostasTable).values(p);
+      for (const p of propostasData) {
+        // Se a proposta tem clienteId, herda contrato/responsável dele; caso contrário usa padrão + ACME
+        const clienteId = (p as { clienteId?: string }).clienteId;
+        const ctr = clienteId && corporativosClienteIds.has(clienteId) ? "ctr-corp-acme" : "ctr-padrao";
+        const rsp = clienteId && clienteResp[clienteId] ? clienteResp[clienteId] : "resp-acme";
+        await tx.insert(propostasTable).values({
+          ...p,
+          contratoId: ctr,
+          responsavelFinanceiroId: rsp,
+        });
+      }
 
       // Boletos
       const boletosData = [

@@ -47,6 +47,11 @@ export interface PropostaAPI {
   dataAtivacao?: string;
   clienteId?: string;
   createdAt: string;
+  contratoId?: string | null;
+  responsavelFinanceiroId?: string | null;
+  contratoNome?: string | null;
+  responsavelNome?: string | null;
+  responsavelTipo?: string | null;
 }
 
 export interface BoletoAPI {

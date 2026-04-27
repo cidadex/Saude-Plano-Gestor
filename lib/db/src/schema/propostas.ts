@@ -3,6 +3,8 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { vendedoresTable } from "./vendedores";
 import { usersTable } from "./users";
+import { contratosTable } from "./contratos";
+import { responsaveisFinanceirosTable } from "./responsaveis";
 
 export const statusPropostaEnum = pgEnum("status_proposta", [
   "AGUARDANDO_ENVIO",
@@ -21,6 +23,8 @@ export const propostasTable = pgTable("propostas", {
   dadosDependentes: jsonb("dados_dependentes").$type<Record<string, unknown>[]>().notNull().default([]),
   planoId: text("plano_id"),
   faixaId: text("faixa_id"),
+  contratoId: text("contrato_id").references(() => contratosTable.id),
+  responsavelFinanceiroId: text("responsavel_financeiro_id").references(() => responsaveisFinanceirosTable.id),
   valorTotal: text("valor_total"),
   motivoRecusa: text("motivo_recusa"),
   dataEnvioOperadora: timestamp("data_envio_operadora"),
