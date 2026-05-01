@@ -11,9 +11,11 @@ import planosRouter from "./planos.js";
 import clienteRouter from "./cliente.js";
 import contratosRouter, { contratosPublicRouter } from "./contratos.js";
 import responsaveisRouter from "./responsaveis.js";
+import storageRouter from "./storage.js";
 
 const router: IRouter = Router();
 
+router.use(storageRouter);
 router.use(healthRouter);
 router.use(authRouter);
 router.use(seedRouter);

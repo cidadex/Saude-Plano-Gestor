@@ -11,12 +11,13 @@ import { apiFetch } from "@/lib/api";
 import { formatMoney } from "@/lib/format";
 import { Textarea } from "@/components/ui/textarea";
 import { Search, SlidersHorizontal, Loader2, RefreshCw, AlertCircle, Receipt, Plus, Sparkles, ChevronDown, Check, X, UserPlus, Trash2, User } from "lucide-react";
+import { DocUploader, type DocFile } from "@/components/DocUploader";
 
 type VendedorSelect = { id: string; nome: string; email: string };
 type PlanoSelect = { id: string; codigo: string | null; nome: string; valorTitular: string | null; valorDependente: string | null; ativo: boolean };
 type ContratoSelect = { id: string; nome: string; ativo: boolean; asaasModo: "SANDBOX" | "PRODUCAO" };
 type ResponsavelSelect = { id: string; nome: string; tipo: "PF" | "PJ"; cpfCnpj: string };
-type DepAdmin = { _id: string; nome: string; cpf: string; dataNascimento: string; grauParentesco: string; nomeMae: string; estadoCivil: string; sexo: string; planoId: string; codigoPlano: string; planoNome: string; valor: string };
+type DepAdmin = { _id: string; nome: string; cpf: string; dataNascimento: string; grauParentesco: string; nomeMae: string; estadoCivil: string; sexo: string; planoId: string; codigoPlano: string; planoNome: string; valor: string; documentos: DocFile[] };
 
 const GRAUS_PARENTESCO = ["CÔNJUGE", "FILHO(A)", "PAI/MÃE", "OUTRO", "AGREGADO"];
 const FORMAS_PAGAMENTO = ["BOLETO", "PIX", "CARTAO"];
@@ -29,6 +30,7 @@ const NOVA_FORM_INIT = {
   telefone: "", email: "", cep: "", logradouro: "", numero: "", bairro: "",
   cidade: "", estado: "", estadoCivil: "", nomeMae: "", rg: "", rgOrgaoEmissor: "", rgUf: "CE",
   planoId: "", codigoPlano: "", planoNome: "", valorManual: "",
+  documentosTitular: [] as DocFile[],
   dependentes: [] as DepAdmin[],
   contratoId: "", responsavelFinanceiroId: "", titularEhResponsavel: false,
   formaPagamento: "", diaVencimento: "", observacao: "",
@@ -334,7 +336,7 @@ export default function AdminPropostas() {
 
   const addDep = () => setNovaForm(f => ({
     ...f,
-    dependentes: [...f.dependentes, { _id: `d${Date.now()}`, nome: "", cpf: "", dataNascimento: "", grauParentesco: "FILHO(A)", nomeMae: "", estadoCivil: "", sexo: "", planoId: "", codigoPlano: "", planoNome: "", valor: "" }],
+    dependentes: [...f.dependentes, { _id: `d${Date.now()}`, nome: "", cpf: "", dataNascimento: "", grauParentesco: "FILHO(A)", nomeMae: "", estadoCivil: "", sexo: "", planoId: "", codigoPlano: "", planoNome: "", valor: "", documentos: [] as DocFile[] }],
   }));
   const removeDep = (id: string) => setNovaForm(f => ({ ...f, dependentes: f.dependentes.filter(d => d._id !== id) }));
   const updateDep = (id: string, field: string, val: string) => setNovaForm(f => ({
@@ -391,6 +393,7 @@ export default function AdminPropostas() {
             valorMensal: novaForm.valorManual ? novaForm.valorManual.replace(",", ".") : null,
             observacao: novaForm.observacao,
             titularEhResponsavel: novaForm.titularEhResponsavel,
+            documentos: novaForm.documentosTitular,
           },
           dadosDependentes: novaForm.dependentes.map(d => ({
             nome: d.nome.toUpperCase(), cpf: d.cpf,
@@ -398,6 +401,7 @@ export default function AdminPropostas() {
             nomeMae: d.nomeMae, estadoCivil: d.estadoCivil, sexo: d.sexo,
             tipo: "DEPENDENTE", plano: d.planoNome, codigoPlano: d.codigoPlano, planoId: d.planoId,
             valor: d.valor ? parseFloat(d.valor.replace(",", ".")) : 0,
+            documentos: d.documentos,
           })),
           valorTotal: totalGeralAdmin > 0 ? totalGeralAdmin.toFixed(2) : (novaForm.valorManual.replace(",", ".") || null),
         }),
@@ -801,6 +805,15 @@ export default function AdminPropostas() {
                   </div>
                 )}
               </div>
+
+              {/* Documentos do Titular */}
+              <div className="pt-2 border-t">
+                <DocUploader
+                  label="Documentos do Titular"
+                  files={novaForm.documentosTitular}
+                  onChange={docs => setNovaForm(f => ({ ...f, documentosTitular: docs }))}
+                />
+              </div>
             </div>
           )}
 
@@ -910,6 +923,18 @@ export default function AdminPropostas() {
                             <span className="text-sm font-bold text-primary">R$ {parseFloat(dep.valor.replace(",", ".")).toFixed(2).replace(".", ",")}</span>
                           </div>
                         )}
+                      </div>
+
+                      {/* Documentos do dependente */}
+                      <div className="pt-2 border-t">
+                        <DocUploader
+                          label={`Documentos — ${dep.nome || `Dependente ${i + 1}`}`}
+                          files={dep.documentos}
+                          onChange={docs => setNovaForm(f => ({
+                            ...f,
+                            dependentes: f.dependentes.map(d => d._id === dep._id ? { ...d, documentos: docs } : d),
+                          }))}
+                        />
                       </div>
                     </div>
                   ))}
@@ -1141,8 +1166,8 @@ export default function AdminPropostas() {
                           <SelectValue placeholder="Selecione o plano..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {planos.map(p => (
-                            <SelectItem key={p.codigo} value={p.codigo}>
+                          {planosList.map(p => (
+                            <SelectItem key={p.codigo ?? ""} value={p.codigo ?? ""}>
                               <span className="font-mono font-bold">{p.codigo}</span>
                               <span className="ml-2 text-muted-foreground text-xs">{p.nome}</span>
                             </SelectItem>

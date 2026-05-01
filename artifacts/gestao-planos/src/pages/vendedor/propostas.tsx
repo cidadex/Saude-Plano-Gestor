@@ -12,6 +12,7 @@ import { usePropostas, type PropostaAPI } from "@/hooks/useVendedorData";
 import { formatMoney } from "@/lib/format";
 import { apiFetch } from "@/lib/api";
 import { Search, SlidersHorizontal, Plus, Check, Loader2, Sparkles, X, ChevronDown, UserPlus, Trash2, AlertCircle, User } from "lucide-react";
+import { DocUploader, type DocFile } from "@/components/DocUploader";
 
 type PlanoAPI = { id: string; codigo: string | null; nome: string; categoria: string | null; valorTitular: string | null; valorDependente: string | null; ativo: boolean };
 type TabelaFaixa = { id: string; tabelaId: string; planoId: string; faixaEtaria: string; valor: string; valorApartamento?: string | null };
@@ -31,6 +32,7 @@ type DepVendedor = {
   planoNome: string;
   faixaId: string;
   valor: number;
+  documentos: DocFile[];
 };
 
 const GRAUS = ["CÔNJUGE", "FILHO(A)", "PAI/MÃE", "OUTRO", "AGREGADO"];
@@ -44,7 +46,7 @@ function getCpf(p: PropostaAPI) { return String((p.dadosTitular as Record<string
 function getPlanoNome(p: PropostaAPI) { return String((p.dadosTitular as Record<string, unknown>).plano ?? "—"); }
 function getCodigoPlano(p: PropostaAPI) { return String((p.dadosTitular as Record<string, unknown>).codigoPlano ?? "—"); }
 
-const DEP_INIT: Omit<DepVendedor, "_id"> = { nome: "", cpf: "", dataNascimento: "", grauParentesco: "FILHO(A)", nomeMae: "", estadoCivil: "", sexo: "", planoId: "", codigoPlano: "", planoNome: "", faixaId: "", valor: 0 };
+const DEP_INIT: Omit<DepVendedor, "_id"> = { nome: "", cpf: "", dataNascimento: "", grauParentesco: "FILHO(A)", nomeMae: "", estadoCivil: "", sexo: "", planoId: "", codigoPlano: "", planoNome: "", faixaId: "", valor: 0, documentos: [] as DocFile[] };
 
 const FORM_INIT = {
   clienteNome: "", clienteCpf: "", dataNascimento: "", sexo: "", telefone: "",
@@ -54,6 +56,7 @@ const FORM_INIT = {
   faixaIdTitular: "", valorTitular: 0,
   contratoId: "", responsavelFinanceiroId: "", titularEhResponsavel: false,
   formaPagamento: "", diaVencimento: "", observacao: "",
+  documentosTitular: [] as DocFile[],
   dependentes: [] as DepVendedor[],
 };
 
@@ -237,6 +240,7 @@ export default function VendedorPropostas() {
             faixaEtaria: faixasTitular.find(f => f.id === form.faixaIdTitular)?.faixaEtaria ?? "",
             valor: form.valorTitular,
             titularEhResponsavel: form.titularEhResponsavel,
+            documentos: form.documentosTitular,
           },
           dadosDependentes: form.dependentes.map(d => {
             const faixas = tabelaAtual?.faixas.filter(fx => fx.planoId === d.planoId) ?? [];
@@ -246,6 +250,7 @@ export default function VendedorPropostas() {
               tipo: "DEPENDENTE", plano: d.planoNome, codigoPlano: d.codigoPlano, planoId: d.planoId,
               faixaEtaria: faixas.find(f => f.id === d.faixaId)?.faixaEtaria ?? "",
               valor: d.valor,
+              documentos: d.documentos,
             };
           }),
           valorTotal: totalGeral > 0 ? totalGeral.toFixed(2) : null,
@@ -634,6 +639,15 @@ export default function VendedorPropostas() {
                   </div>
                 )}
               </div>
+
+              {/* Documentos do Titular */}
+              <div className="pt-2 border-t">
+                <DocUploader
+                  label="Documentos do Titular"
+                  files={form.documentosTitular}
+                  onChange={docs => setForm(f => ({ ...f, documentosTitular: docs }))}
+                />
+              </div>
             </div>
           )}
 
@@ -753,6 +767,18 @@ export default function VendedorPropostas() {
                               <span className="text-sm font-bold text-primary">R$ {dep.valor.toFixed(2).replace(".", ",")}</span>
                             </div>
                           )}
+                        </div>
+
+                        {/* Documentos do dependente */}
+                        <div className="pt-2 border-t">
+                          <DocUploader
+                            label={`Documentos — ${dep.nome || `Dependente ${i + 1}`}`}
+                            files={dep.documentos}
+                            onChange={docs => setForm(f => ({
+                              ...f,
+                              dependentes: f.dependentes.map(d => d._id === dep._id ? { ...d, documentos: docs } : d),
+                            }))}
+                          />
                         </div>
                       </div>
                     );
