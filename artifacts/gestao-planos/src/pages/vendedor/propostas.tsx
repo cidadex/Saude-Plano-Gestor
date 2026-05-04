@@ -71,7 +71,10 @@ export default function VendedorPropostas() {
   const [statusFilter, setStatusFilter] = useState("TODOS");
   const [novaPropostaAberta, setNovaPropostaAberta] = useState(false);
   const [editandoProposta, setEditandoProposta] = useState<PropostaAPI | null>(null);
-  const [editForm2, setEditForm2] = useState({ nome: "", cpf: "", telefone: "", planoNome: "", codigoPlano: "", formaPagamento: "", observacao: "", valorTotal: "", nomeMae: "", rg: "", rgOrgaoEmissor: "", rgUf: "CE", estadoCivil: "", diaVencimento: "", valorMensal: "" });
+  const [editStep, setEditStep] = useState<1|2|3>(1);
+  const [editForm2, setEditForm2] = useState({ nome: "", cpf: "", dataNascimento: "", sexo: "", telefone: "", email: "", cep: "", logradouro: "", numero: "", bairro: "", cidade: "", estado: "", estadoCivil: "", nomeMae: "", rg: "", rgOrgaoEmissor: "", rgUf: "CE", planoNome: "", codigoPlano: "", formaPagamento: "", observacao: "", valorTotal: "", diaVencimento: "", valorMensal: "" });
+  const [editDocsTitular, setEditDocsTitular] = useState<DocFile[]>([]);
+  const [editDeps, setEditDeps] = useState<DepVendedor[]>([]);
   const [editSalvando, setEditSalvando] = useState(false);
   const [editErro, setEditErro] = useState("");
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -277,16 +280,41 @@ export default function VendedorPropostas() {
   const handleAbrirEdit = (p: PropostaAPI) => {
     const dt = p.dadosTitular as Record<string, unknown>;
     setEditandoProposta(p);
+    setEditStep(1);
     setEditErro("");
     setEditForm2({
-      nome: String(dt.nome ?? ""), cpf: String(dt.cpf ?? ""), telefone: String(dt.telefone ?? ""),
+      nome: String(dt.nome ?? ""), cpf: String(dt.cpf ?? ""),
+      dataNascimento: String(dt.dataNascimento ?? ""), sexo: String(dt.sexo ?? ""),
+      telefone: String(dt.telefone ?? ""), email: String(dt.email ?? ""),
+      cep: String(dt.cep ?? ""), logradouro: String(dt.logradouro ?? ""),
+      numero: String(dt.numero ?? ""), bairro: String(dt.bairro ?? ""),
+      cidade: String(dt.cidade ?? ""), estado: String(dt.estado ?? ""),
+      estadoCivil: String(dt.estadoCivil ?? ""), nomeMae: String(dt.nomeMae ?? ""),
+      rg: String(dt.rg ?? ""), rgOrgaoEmissor: String(dt.rgOrgaoEmissor ?? ""),
+      rgUf: String(dt.rgUf ?? "CE"),
       planoNome: String(dt.plano ?? ""), codigoPlano: String(dt.codigoPlano ?? ""),
       formaPagamento: String(dt.formaPagamento ?? ""), observacao: String(dt.observacao ?? ""),
-      valorTotal: p.valorTotal ?? "", nomeMae: String(dt.nomeMae ?? ""), rg: String(dt.rg ?? ""),
-      rgOrgaoEmissor: String(dt.rgOrgaoEmissor ?? ""), rgUf: String(dt.rgUf ?? "CE"),
-      estadoCivil: String(dt.estadoCivil ?? ""), diaVencimento: dt.diaVencimento != null ? String(dt.diaVencimento) : "",
+      valorTotal: p.valorTotal ?? "",
+      diaVencimento: dt.diaVencimento != null ? String(dt.diaVencimento) : "",
       valorMensal: String(dt.valorMensal ?? ""),
     });
+    setEditDocsTitular((dt.documentos as DocFile[] | undefined) ?? []);
+    setEditDeps((p.dadosDependentes as Record<string, unknown>[]).map((d, i) => ({
+      _id: `ed${i}_${Date.now()}`,
+      nome: String(d.nome ?? ""),
+      cpf: String(d.cpf ?? ""),
+      dataNascimento: String(d.dataNascimento ?? ""),
+      grauParentesco: String(d.grauParentesco ?? "FILHO(A)"),
+      nomeMae: String(d.nomeMae ?? ""),
+      estadoCivil: String(d.estadoCivil ?? ""),
+      sexo: String(d.sexo ?? ""),
+      planoId: String(d.planoId ?? ""),
+      codigoPlano: String(d.codigoPlano ?? ""),
+      planoNome: String((d.plano ?? d.planoNome) ?? ""),
+      faixaId: String(d.faixaId ?? ""),
+      valor: typeof d.valor === "number" ? d.valor : parseFloat(String(d.valor ?? "0")) || 0,
+      documentos: (d.documentos as DocFile[] | undefined) ?? [],
+    })));
   };
 
   const handleSalvarEdit = async () => {
@@ -297,14 +325,29 @@ export default function VendedorPropostas() {
         method: "PATCH",
         body: JSON.stringify({
           dadosTitular: {
-            nome: editForm2.nome, cpf: editForm2.cpf, telefone: editForm2.telefone,
+            nome: editForm2.nome, cpf: editForm2.cpf,
+            dataNascimento: editForm2.dataNascimento, sexo: editForm2.sexo,
+            telefone: editForm2.telefone, email: editForm2.email,
+            cep: editForm2.cep, logradouro: editForm2.logradouro,
+            numero: editForm2.numero, bairro: editForm2.bairro,
+            cidade: editForm2.cidade, estado: editForm2.estado,
+            estadoCivil: editForm2.estadoCivil, nomeMae: editForm2.nomeMae,
+            rg: editForm2.rg, rgOrgaoEmissor: editForm2.rgOrgaoEmissor, rgUf: editForm2.rgUf,
             plano: editForm2.planoNome, codigoPlano: editForm2.codigoPlano,
             formaPagamento: editForm2.formaPagamento, observacao: editForm2.observacao,
-            nomeMae: editForm2.nomeMae, rg: editForm2.rg, rgOrgaoEmissor: editForm2.rgOrgaoEmissor,
-            rgUf: editForm2.rgUf, estadoCivil: editForm2.estadoCivil,
             diaVencimento: editForm2.diaVencimento ? Number(editForm2.diaVencimento) : null,
             valorMensal: editForm2.valorMensal ? editForm2.valorMensal.replace(",", ".") : null,
+            documentos: editDocsTitular,
           },
+          dadosDependentes: editDeps.map(d => ({
+            nome: d.nome, cpf: d.cpf, dataNascimento: d.dataNascimento,
+            grauParentesco: d.grauParentesco, nomeMae: d.nomeMae,
+            estadoCivil: d.estadoCivil, sexo: d.sexo,
+            tipo: "DEPENDENTE",
+            plano: d.planoNome, codigoPlano: d.codigoPlano, planoId: d.planoId,
+            valor: d.valor,
+            documentos: d.documentos,
+          })),
           valorTotal: editForm2.valorTotal || undefined,
         }),
       });
@@ -315,6 +358,11 @@ export default function VendedorPropostas() {
       setEditSalvando(false);
     }
   };
+
+  const updateEditDep = (id: string, field: string, val: string | number) =>
+    setEditDeps(prev => prev.map(d => d._id === id ? { ...d, [field]: val } : d));
+  const updateEditDepDocs = (id: string, docs: DocFile[]) =>
+    setEditDeps(prev => prev.map(d => d._id === id ? { ...d, documentos: docs } : d));
 
   const podeSair1 = !!form.clienteNome && !!form.clienteCpf && !!form.planoId && (faixasTitular.length === 0 || !!form.faixaIdTitular);
 
@@ -936,104 +984,305 @@ export default function VendedorPropostas() {
       </Dialog>
 
       {/* Modal Editar Proposta */}
-      {editandoProposta && (
-        <Dialog open={!!editandoProposta} onOpenChange={() => setEditandoProposta(null)}>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Editar Proposta</DialogTitle>
-              <DialogDescription>Edite os dados da proposta (apenas AGUARDANDO_ENVIO).</DialogDescription>
-            </DialogHeader>
-            {editandoProposta.status !== "AGUARDANDO_ENVIO" && (
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm">
-                <AlertCircle className="h-4 w-4 shrink-0" /> Esta proposta não pode ser editada no status atual.
+      {editandoProposta && (() => {
+        const canEdit = editandoProposta.status === "AGUARDANDO_ENVIO";
+        return (
+          <Dialog open={!!editandoProposta} onOpenChange={() => { setEditandoProposta(null); setEditStep(1); }}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{String((editandoProposta.dadosTitular as Record<string,unknown>).nome ?? "Proposta")}</DialogTitle>
+                <DialogDescription className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className={STATUS_COLORS[editandoProposta.status] ?? ""}>{STATUS_LABEL[editandoProposta.status] ?? editandoProposta.status}</Badge>
+                  {!canEdit && <span className="text-xs text-amber-600 flex items-center gap-1"><AlertCircle className="h-3 w-3" />Somente visualização — status não permite edição</span>}
+                </DialogDescription>
+              </DialogHeader>
+
+              {/* Stepper */}
+              <div className="flex items-center gap-2 py-2">
+                {([1,2,3] as const).map(s => (
+                  <div key={s} className="flex items-center gap-2">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${editStep >= s ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/30 text-muted-foreground"}`}>
+                      {editStep > s ? <Check className="h-3.5 w-3.5" /> : s}
+                    </div>
+                    <span className={`text-xs font-medium ${editStep >= s ? "text-foreground" : "text-muted-foreground"}`}>
+                      {s === 1 ? "Titular" : s === 2 ? "Dependentes" : "Financeiro"}
+                    </span>
+                    {s < 3 && <div className="h-px w-8 bg-muted-foreground/30" />}
+                  </div>
+                ))}
               </div>
-            )}
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1 sm:col-span-2">
-                <Label className="text-xs text-muted-foreground">Nome</Label>
-                <Input value={editForm2.nome} onChange={e => setEditForm2(f => ({ ...f, nome: e.target.value }))} disabled={editandoProposta.status !== "AGUARDANDO_ENVIO"} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">CPF</Label>
-                <Input value={editForm2.cpf} onChange={e => setEditForm2(f => ({ ...f, cpf: e.target.value }))} disabled={editandoProposta.status !== "AGUARDANDO_ENVIO"} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Telefone</Label>
-                <Input value={editForm2.telefone} onChange={e => setEditForm2(f => ({ ...f, telefone: e.target.value }))} disabled={editandoProposta.status !== "AGUARDANDO_ENVIO"} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Estado Civil</Label>
-                <Select value={editForm2.estadoCivil} onValueChange={v => setEditForm2(f => ({ ...f, estadoCivil: v }))} disabled={editandoProposta.status !== "AGUARDANDO_ENVIO"}>
-                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="SOLTEIRO">Solteiro(a)</SelectItem>
-                    <SelectItem value="CASADO">Casado(a)</SelectItem>
-                    <SelectItem value="DIVORCIADO">Divorciado(a)</SelectItem>
-                    <SelectItem value="VIUVO">Viúvo(a)</SelectItem>
-                    <SelectItem value="UNIAO_ESTAVEL">União Estável</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Nome da Mãe</Label>
-                <Input value={editForm2.nomeMae} onChange={e => setEditForm2(f => ({ ...f, nomeMae: e.target.value }))} disabled={editandoProposta.status !== "AGUARDANDO_ENVIO"} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">RG</Label>
-                <Input value={editForm2.rg} onChange={e => setEditForm2(f => ({ ...f, rg: e.target.value }))} disabled={editandoProposta.status !== "AGUARDANDO_ENVIO"} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Órgão Emissor</Label>
-                <Input value={editForm2.rgOrgaoEmissor} onChange={e => setEditForm2(f => ({ ...f, rgOrgaoEmissor: e.target.value }))} disabled={editandoProposta.status !== "AGUARDANDO_ENVIO"} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Código do Plano</Label>
-                <Input value={editForm2.codigoPlano} onChange={e => setEditForm2(f => ({ ...f, codigoPlano: e.target.value }))} disabled={editandoProposta.status !== "AGUARDANDO_ENVIO"} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Plano</Label>
-                <Input value={editForm2.planoNome} onChange={e => setEditForm2(f => ({ ...f, planoNome: e.target.value }))} disabled={editandoProposta.status !== "AGUARDANDO_ENVIO"} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Forma de Pagamento</Label>
-                <Select value={editForm2.formaPagamento} onValueChange={v => setEditForm2(f => ({ ...f, formaPagamento: v }))} disabled={editandoProposta.status !== "AGUARDANDO_ENVIO"}>
-                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                  <SelectContent>{formasPagamento.map(fp => <SelectItem key={fp} value={fp}>{fp}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Dia de Vencimento</Label>
-                <Input type="number" min={1} max={31} value={editForm2.diaVencimento} onChange={e => setEditForm2(f => ({ ...f, diaVencimento: e.target.value }))} disabled={editandoProposta.status !== "AGUARDANDO_ENVIO"} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Valor Mensal (R$)</Label>
-                <Input value={editForm2.valorMensal} onChange={e => setEditForm2(f => ({ ...f, valorMensal: e.target.value }))} disabled={editandoProposta.status !== "AGUARDANDO_ENVIO"} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Valor Total (R$)</Label>
-                <Input value={editForm2.valorTotal} onChange={e => setEditForm2(f => ({ ...f, valorTotal: e.target.value }))} disabled={editandoProposta.status !== "AGUARDANDO_ENVIO"} />
-              </div>
-              <div className="space-y-1 sm:col-span-2">
-                <Label className="text-xs text-muted-foreground">Observações</Label>
-                <Textarea value={editForm2.observacao} onChange={e => setEditForm2(f => ({ ...f, observacao: e.target.value }))} className="resize-none" rows={2} disabled={editandoProposta.status !== "AGUARDANDO_ENVIO"} />
-              </div>
-            </div>
-            {editErro && (
-              <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />{editErro}
-              </div>
-            )}
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setEditandoProposta(null)}>Fechar</Button>
-              {editandoProposta.status === "AGUARDANDO_ENVIO" && (
-                <Button onClick={handleSalvarEdit} disabled={editSalvando}>
-                  {editSalvando ? <><Loader2 className="h-4 w-4 animate-spin mr-1" />Salvando...</> : "Salvar"}
-                </Button>
+
+              {/* ── STEP 1 — Titular ── */}
+              {editStep === 1 && (
+                <div className="space-y-4 py-1">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Dados do Titular</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1 sm:col-span-2">
+                      <Label className="text-xs text-muted-foreground">Nome Completo</Label>
+                      <Input value={editForm2.nome} onChange={e => setEditForm2(f => ({ ...f, nome: e.target.value }))} disabled={!canEdit} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">CPF</Label>
+                      <Input value={editForm2.cpf} onChange={e => setEditForm2(f => ({ ...f, cpf: e.target.value }))} disabled={!canEdit} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Data de Nascimento</Label>
+                      <Input type="date" value={editForm2.dataNascimento} onChange={e => setEditForm2(f => ({ ...f, dataNascimento: e.target.value }))} disabled={!canEdit} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Sexo</Label>
+                      <Select value={editForm2.sexo} onValueChange={v => setEditForm2(f => ({ ...f, sexo: v }))} disabled={!canEdit}>
+                        <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="M">Masculino</SelectItem>
+                          <SelectItem value="F">Feminino</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Estado Civil</Label>
+                      <Select value={editForm2.estadoCivil} onValueChange={v => setEditForm2(f => ({ ...f, estadoCivil: v }))} disabled={!canEdit}>
+                        <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SOLTEIRO">Solteiro(a)</SelectItem>
+                          <SelectItem value="CASADO">Casado(a)</SelectItem>
+                          <SelectItem value="DIVORCIADO">Divorciado(a)</SelectItem>
+                          <SelectItem value="VIUVO">Viúvo(a)</SelectItem>
+                          <SelectItem value="UNIAO_ESTAVEL">União Estável</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Telefone</Label>
+                      <Input value={editForm2.telefone} onChange={e => setEditForm2(f => ({ ...f, telefone: e.target.value }))} disabled={!canEdit} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">E-mail</Label>
+                      <Input type="email" value={editForm2.email} onChange={e => setEditForm2(f => ({ ...f, email: e.target.value }))} disabled={!canEdit} />
+                    </div>
+                    <div className="space-y-1 sm:col-span-2">
+                      <Label className="text-xs text-muted-foreground">Nome da Mãe</Label>
+                      <Input value={editForm2.nomeMae} onChange={e => setEditForm2(f => ({ ...f, nomeMae: e.target.value }))} disabled={!canEdit} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">RG</Label>
+                      <Input value={editForm2.rg} onChange={e => setEditForm2(f => ({ ...f, rg: e.target.value }))} disabled={!canEdit} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Órgão Emissor</Label>
+                      <Input placeholder="SSP" value={editForm2.rgOrgaoEmissor} onChange={e => setEditForm2(f => ({ ...f, rgOrgaoEmissor: e.target.value }))} disabled={!canEdit} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">UF do RG</Label>
+                      <Select value={editForm2.rgUf} onValueChange={v => setEditForm2(f => ({ ...f, rgUf: v }))} disabled={!canEdit}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent className="max-h-60">{UFS_BR.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">CEP</Label>
+                      <Input value={editForm2.cep} onChange={e => setEditForm2(f => ({ ...f, cep: e.target.value }))} disabled={!canEdit} />
+                    </div>
+                    <div className="space-y-1 sm:col-span-2">
+                      <Label className="text-xs text-muted-foreground">Logradouro</Label>
+                      <Input value={editForm2.logradouro} onChange={e => setEditForm2(f => ({ ...f, logradouro: e.target.value }))} disabled={!canEdit} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Número</Label>
+                      <Input value={editForm2.numero} onChange={e => setEditForm2(f => ({ ...f, numero: e.target.value }))} disabled={!canEdit} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Bairro</Label>
+                      <Input value={editForm2.bairro} onChange={e => setEditForm2(f => ({ ...f, bairro: e.target.value }))} disabled={!canEdit} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Cidade</Label>
+                      <Input value={editForm2.cidade} onChange={e => setEditForm2(f => ({ ...f, cidade: e.target.value }))} disabled={!canEdit} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Estado (UF)</Label>
+                      <Select value={editForm2.estado} onValueChange={v => setEditForm2(f => ({ ...f, estado: v }))} disabled={!canEdit}>
+                        <SelectTrigger><SelectValue placeholder="UF..." /></SelectTrigger>
+                        <SelectContent className="max-h-60">{UFS_BR.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="pt-2 space-y-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Plano do Titular</p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Plano (nome)</Label>
+                        <Input value={editForm2.planoNome} onChange={e => setEditForm2(f => ({ ...f, planoNome: e.target.value }))} disabled={!canEdit} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Código do Plano</Label>
+                        <Input className="font-mono" value={editForm2.codigoPlano} onChange={e => setEditForm2(f => ({ ...f, codigoPlano: e.target.value }))} disabled={!canEdit} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t">
+                    <DocUploader label="Documentos do Titular" files={editDocsTitular} onChange={setEditDocsTitular} />
+                  </div>
+                </div>
               )}
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+
+              {/* ── STEP 2 — Dependentes ── */}
+              {editStep === 2 && (
+                <div className="space-y-4 py-1">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold">Dependentes</p>
+                      <p className="text-xs text-muted-foreground">{editDeps.length} dependente(s) registrado(s).</p>
+                    </div>
+                    {canEdit && (
+                      <Button size="sm" variant="outline" className="gap-1.5 text-xs"
+                        onClick={() => setEditDeps(prev => [...prev, { _id: `ed${Date.now()}`, ...DEP_INIT }])}>
+                        <UserPlus className="h-3.5 w-3.5" /> Adicionar
+                      </Button>
+                    )}
+                  </div>
+                  {editDeps.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 gap-2 text-muted-foreground border-2 border-dashed rounded-lg">
+                      <UserPlus className="h-8 w-8 opacity-30" />
+                      <p className="text-sm">Nenhum dependente cadastrado.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {editDeps.map((dep, i) => (
+                        <div key={dep._id} className="rounded-lg border p-3 space-y-3 bg-muted/10">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-primary">Dependente {i + 1}</span>
+                            {canEdit && (
+                              <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-red-500 hover:bg-red-50"
+                                onClick={() => setEditDeps(prev => prev.filter(d => d._id !== dep._id))}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <div className="space-y-1 sm:col-span-2">
+                              <Label className="text-xs text-muted-foreground">Nome Completo</Label>
+                              <Input value={dep.nome} onChange={e => updateEditDep(dep._id, "nome", e.target.value)} className="h-8 text-sm" disabled={!canEdit} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">CPF</Label>
+                              <Input value={dep.cpf} onChange={e => updateEditDep(dep._id, "cpf", e.target.value)} className="h-8 text-sm font-mono" disabled={!canEdit} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Nascimento</Label>
+                              <Input type="date" value={dep.dataNascimento} onChange={e => updateEditDep(dep._id, "dataNascimento", e.target.value)} className="h-8 text-sm" disabled={!canEdit} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Parentesco</Label>
+                              <Select value={dep.grauParentesco} onValueChange={v => updateEditDep(dep._id, "grauParentesco", v)} disabled={!canEdit}>
+                                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                                <SelectContent>{GRAUS.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Sexo</Label>
+                              <Select value={dep.sexo} onValueChange={v => updateEditDep(dep._id, "sexo", v)} disabled={!canEdit}>
+                                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="..." /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="M">Masculino</SelectItem>
+                                  <SelectItem value="F">Feminino</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Estado Civil</Label>
+                              <Select value={dep.estadoCivil} onValueChange={v => updateEditDep(dep._id, "estadoCivil", v)} disabled={!canEdit}>
+                                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="..." /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="SOLTEIRO">Solteiro(a)</SelectItem>
+                                  <SelectItem value="CASADO">Casado(a)</SelectItem>
+                                  <SelectItem value="DIVORCIADO">Divorciado(a)</SelectItem>
+                                  <SelectItem value="VIUVO">Viúvo(a)</SelectItem>
+                                  <SelectItem value="UNIAO_ESTAVEL">União Estável</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1 sm:col-span-2">
+                              <Label className="text-xs text-muted-foreground">Nome da Mãe</Label>
+                              <Input value={dep.nomeMae} onChange={e => updateEditDep(dep._id, "nomeMae", e.target.value)} className="h-8 text-sm" disabled={!canEdit} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Plano (nome)</Label>
+                              <Input value={dep.planoNome} onChange={e => updateEditDep(dep._id, "planoNome", e.target.value)} className="h-8 text-sm" disabled={!canEdit} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Código do Plano</Label>
+                              <Input value={dep.codigoPlano} onChange={e => updateEditDep(dep._id, "codigoPlano", e.target.value)} className="h-8 text-sm font-mono" disabled={!canEdit} />
+                            </div>
+                          </div>
+                          <div className="pt-2 border-t">
+                            <DocUploader
+                              label={`Documentos — ${dep.nome || `Dependente ${i + 1}`}`}
+                              files={dep.documentos}
+                              onChange={docs => updateEditDepDocs(dep._id, docs)}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── STEP 3 — Financeiro ── */}
+              {editStep === 3 && (
+                <div className="space-y-4 py-1">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Dados Financeiros</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Forma de Pagamento</Label>
+                      <Select value={editForm2.formaPagamento} onValueChange={v => setEditForm2(f => ({ ...f, formaPagamento: v }))} disabled={!canEdit}>
+                        <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                        <SelectContent>{formasPagamento.map(fp => <SelectItem key={fp} value={fp}>{fp}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Dia de Vencimento (1–31)</Label>
+                      <Input type="number" min={1} max={31} value={editForm2.diaVencimento} onChange={e => setEditForm2(f => ({ ...f, diaVencimento: e.target.value }))} disabled={!canEdit} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Valor Mensal (R$)</Label>
+                      <Input value={editForm2.valorMensal} onChange={e => setEditForm2(f => ({ ...f, valorMensal: e.target.value }))} disabled={!canEdit} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Valor Total (R$)</Label>
+                      <Input value={editForm2.valorTotal} onChange={e => setEditForm2(f => ({ ...f, valorTotal: e.target.value }))} disabled={!canEdit} />
+                    </div>
+                    <div className="space-y-1 sm:col-span-2">
+                      <Label className="text-xs text-muted-foreground">Observações</Label>
+                      <Textarea value={editForm2.observacao} onChange={e => setEditForm2(f => ({ ...f, observacao: e.target.value }))} className="resize-none" rows={3} disabled={!canEdit} />
+                    </div>
+                  </div>
+                  {editErro && (
+                    <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                      <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />{editErro}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <DialogFooter className="flex-row gap-2 sm:justify-between">
+                <div>{editStep > 1 && <Button variant="outline" onClick={() => setEditStep(s => (s - 1) as 1|2|3)}>Voltar</Button>}</div>
+                <div className="flex gap-2">
+                  <Button variant="ghost" onClick={() => { setEditandoProposta(null); setEditStep(1); }}>Fechar</Button>
+                  {editStep < 3 ? (
+                    <Button onClick={() => setEditStep(s => (s + 1) as 1|2|3)}>Próximo</Button>
+                  ) : canEdit ? (
+                    <Button onClick={handleSalvarEdit} disabled={editSalvando}>
+                      {editSalvando ? <><Loader2 className="h-4 w-4 animate-spin mr-1" />Salvando...</> : "Salvar"}
+                    </Button>
+                  ) : null}
+                </div>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }

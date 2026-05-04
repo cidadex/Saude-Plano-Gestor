@@ -95,9 +95,12 @@ export default function AdminPropostas() {
 
   // Edit dados
   const [dadosEditando, setDadosEditando] = useState<PropostaAdmin | null>(null);
-  const [dadosForm, setDadosForm] = useState({ nome: "", cpf: "", telefone: "", plano: "", codigoPlano: "", observacao: "", formaPagamento: "", valorTotal: "", nomeMae: "", rg: "", rgOrgaoEmissor: "", rgUf: "CE", estadoCivil: "", diaVencimento: "", valorMensal: "" });
+  const [dadosForm, setDadosForm] = useState({ nome: "", cpf: "", dataNascimento: "", sexo: "", telefone: "", email: "", cep: "", logradouro: "", numero: "", bairro: "", cidade: "", estado: "", estadoCivil: "", nomeMae: "", rg: "", rgOrgaoEmissor: "", rgUf: "CE", plano: "", codigoPlano: "", observacao: "", formaPagamento: "", valorTotal: "", diaVencimento: "", valorMensal: "" });
   const [dadosSalvando, setDadosSalvando] = useState(false);
   const [dadosErro, setDadosErro] = useState("");
+  const [dadosEditStep, setDadosEditStep] = useState<1|2|3>(1);
+  const [dadosEditDocsTitular, setDadosEditDocsTitular] = useState<DocFile[]>([]);
+  const [dadosEditDeps, setDadosEditDeps] = useState<DepAdmin[]>([]);
 
   // Campos de ativação
   const [matricula, setMatricula] = useState("");
@@ -176,24 +179,38 @@ export default function AdminPropostas() {
   const handleAbrirDadosEdicao = (p: PropostaAdmin) => {
     const dt = p.dadosTitular as Record<string, unknown>;
     setDadosEditando(p);
+    setDadosEditStep(1);
     setDadosErro("");
     setDadosForm({
-      nome: String(dt.nome ?? ""),
-      cpf: String(dt.cpf ?? ""),
-      telefone: String(dt.telefone ?? ""),
-      plano: String(dt.plano ?? ""),
-      codigoPlano: String(dt.codigoPlano ?? ""),
-      observacao: String(dt.observacao ?? ""),
-      formaPagamento: String(dt.formaPagamento ?? ""),
-      valorTotal: p.valorTotal ?? "",
-      nomeMae: String(dt.nomeMae ?? ""),
-      rg: String(dt.rg ?? ""),
-      rgOrgaoEmissor: String(dt.rgOrgaoEmissor ?? ""),
+      nome: String(dt.nome ?? ""), cpf: String(dt.cpf ?? ""),
+      dataNascimento: String(dt.dataNascimento ?? ""), sexo: String(dt.sexo ?? ""),
+      telefone: String(dt.telefone ?? ""), email: String(dt.email ?? ""),
+      cep: String(dt.cep ?? ""), logradouro: String(dt.logradouro ?? ""),
+      numero: String(dt.numero ?? ""), bairro: String(dt.bairro ?? ""),
+      cidade: String(dt.cidade ?? ""), estado: String(dt.estado ?? ""),
+      estadoCivil: String(dt.estadoCivil ?? ""), nomeMae: String(dt.nomeMae ?? ""),
+      rg: String(dt.rg ?? ""), rgOrgaoEmissor: String(dt.rgOrgaoEmissor ?? ""),
       rgUf: String(dt.rgUf ?? "CE"),
-      estadoCivil: String(dt.estadoCivil ?? ""),
+      plano: String(dt.plano ?? ""), codigoPlano: String(dt.codigoPlano ?? ""),
+      observacao: String(dt.observacao ?? ""), formaPagamento: String(dt.formaPagamento ?? ""),
+      valorTotal: p.valorTotal ?? "",
       diaVencimento: dt.diaVencimento != null ? String(dt.diaVencimento) : "",
       valorMensal: String(dt.valorMensal ?? ""),
     });
+    setDadosEditDocsTitular((dt.documentos as DocFile[] | undefined) ?? []);
+    const rawDeps = (p as unknown as { dadosDependentes?: Record<string, unknown>[] }).dadosDependentes ?? [];
+    setDadosEditDeps(rawDeps.map((d, i) => ({
+      _id: `de${i}_${Date.now()}`,
+      nome: String(d.nome ?? ""), cpf: String(d.cpf ?? ""),
+      dataNascimento: String(d.dataNascimento ?? ""),
+      grauParentesco: String(d.grauParentesco ?? "FILHO(A)"),
+      nomeMae: String(d.nomeMae ?? ""), estadoCivil: String(d.estadoCivil ?? ""),
+      sexo: String(d.sexo ?? ""),
+      planoId: String(d.planoId ?? ""), codigoPlano: String(d.codigoPlano ?? ""),
+      planoNome: String((d.plano ?? d.planoNome) ?? ""),
+      valor: String(d.valor ?? ""),
+      documentos: (d.documentos as DocFile[] | undefined) ?? [],
+    })));
   };
 
   const handleSalvarDados = async () => {
@@ -205,21 +222,29 @@ export default function AdminPropostas() {
         method: "PATCH",
         body: JSON.stringify({
           dadosTitular: {
-            nome: dadosForm.nome,
-            cpf: dadosForm.cpf,
-            telefone: dadosForm.telefone,
-            plano: dadosForm.plano,
-            codigoPlano: dadosForm.codigoPlano,
-            observacao: dadosForm.observacao,
-            formaPagamento: dadosForm.formaPagamento,
-            nomeMae: dadosForm.nomeMae,
-            rg: dadosForm.rg,
-            rgOrgaoEmissor: dadosForm.rgOrgaoEmissor,
-            rgUf: dadosForm.rgUf,
-            estadoCivil: dadosForm.estadoCivil,
+            nome: dadosForm.nome, cpf: dadosForm.cpf,
+            dataNascimento: dadosForm.dataNascimento, sexo: dadosForm.sexo,
+            telefone: dadosForm.telefone, email: dadosForm.email,
+            cep: dadosForm.cep, logradouro: dadosForm.logradouro,
+            numero: dadosForm.numero, bairro: dadosForm.bairro,
+            cidade: dadosForm.cidade, estado: dadosForm.estado,
+            estadoCivil: dadosForm.estadoCivil, nomeMae: dadosForm.nomeMae,
+            rg: dadosForm.rg, rgOrgaoEmissor: dadosForm.rgOrgaoEmissor, rgUf: dadosForm.rgUf,
+            plano: dadosForm.plano, codigoPlano: dadosForm.codigoPlano,
+            observacao: dadosForm.observacao, formaPagamento: dadosForm.formaPagamento,
             diaVencimento: dadosForm.diaVencimento ? Number(dadosForm.diaVencimento) : null,
             valorMensal: dadosForm.valorMensal ? dadosForm.valorMensal.replace(",", ".") : null,
+            documentos: dadosEditDocsTitular,
           },
+          dadosDependentes: dadosEditDeps.map(d => ({
+            nome: d.nome, cpf: d.cpf, dataNascimento: d.dataNascimento,
+            grauParentesco: d.grauParentesco, nomeMae: d.nomeMae,
+            estadoCivil: d.estadoCivil, sexo: d.sexo,
+            tipo: "DEPENDENTE",
+            plano: d.planoNome, codigoPlano: d.codigoPlano, planoId: d.planoId,
+            valor: d.valor,
+            documentos: d.documentos,
+          })),
           valorTotal: dadosForm.valorTotal || undefined,
         }),
       });
@@ -231,6 +256,11 @@ export default function AdminPropostas() {
       setDadosSalvando(false);
     }
   };
+
+  const updateDadosEditDep = (id: string, field: string, val: string) =>
+    setDadosEditDeps(prev => prev.map(d => d._id === id ? { ...d, [field]: val } : d));
+  const updateDadosEditDepDocs = (id: string, docs: DocFile[]) =>
+    setDadosEditDeps(prev => prev.map(d => d._id === id ? { ...d, documentos: docs } : d));
 
   const proximosStatus = propostaEditando ? (PROXIMOS_STATUS[propostaEditando.status] ?? []) : [];
   const planoCodeFinal = usarManual ? planoCodeManual : planoCodeSelecionado;
@@ -1228,105 +1258,296 @@ export default function AdminPropostas() {
       </Dialog>
 
       {/* Modal Editar Dados da Proposta */}
-      <Dialog open={!!dadosEditando} onOpenChange={() => setDadosEditando(null)}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <Dialog open={!!dadosEditando} onOpenChange={() => { setDadosEditando(null); setDadosEditStep(1); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Editar Dados da Proposta</DialogTitle>
-            <DialogDescription className="font-mono text-xs">{dadosEditando?.dadosTitular && String((dadosEditando.dadosTitular as Record<string, unknown>).cpf ?? "")} — {dadosEditando?.dadosTitular && String((dadosEditando.dadosTitular as Record<string, unknown>).nome ?? "")}</DialogDescription>
+            <DialogTitle>{dadosEditando ? String((dadosEditando.dadosTitular as Record<string, unknown>).nome ?? "Editar Proposta") : "Editar Proposta"}</DialogTitle>
+            <DialogDescription className="font-mono text-xs">
+              {dadosEditando ? String((dadosEditando.dadosTitular as Record<string, unknown>).cpf ?? "") : ""}
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 py-2 text-sm">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1 sm:col-span-2">
-                <Label className="text-xs text-muted-foreground">Nome</Label>
-                <Input value={dadosForm.nome} onChange={e => setDadosForm(f => ({ ...f, nome: e.target.value }))} data-testid="input-dados-nome" />
+
+          {/* Stepper */}
+          <div className="flex items-center gap-2 py-2">
+            {([1,2,3] as const).map(s => (
+              <div key={s} className="flex items-center gap-2">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${dadosEditStep >= s ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/30 text-muted-foreground"}`}>
+                  {dadosEditStep > s ? <Check className="h-3.5 w-3.5" /> : s}
+                </div>
+                <span className={`text-xs font-medium ${dadosEditStep >= s ? "text-foreground" : "text-muted-foreground"}`}>
+                  {s === 1 ? "Titular" : s === 2 ? "Dependentes" : "Financeiro"}
+                </span>
+                {s < 3 && <div className="h-px w-8 bg-muted-foreground/30" />}
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">CPF</Label>
-                <Input value={dadosForm.cpf} onChange={e => setDadosForm(f => ({ ...f, cpf: e.target.value }))} />
+            ))}
+          </div>
+
+          {/* ── STEP 1 — Titular ── */}
+          {dadosEditStep === 1 && (
+            <div className="space-y-4 py-1">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Dados do Titular</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs text-muted-foreground">Nome Completo</Label>
+                  <Input value={dadosForm.nome} onChange={e => setDadosForm(f => ({ ...f, nome: e.target.value }))} data-testid="input-dados-nome" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">CPF</Label>
+                  <Input value={dadosForm.cpf} onChange={e => setDadosForm(f => ({ ...f, cpf: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Data de Nascimento</Label>
+                  <Input type="date" value={dadosForm.dataNascimento} onChange={e => setDadosForm(f => ({ ...f, dataNascimento: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Sexo</Label>
+                  <Select value={dadosForm.sexo} onValueChange={v => setDadosForm(f => ({ ...f, sexo: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="M">Masculino</SelectItem>
+                      <SelectItem value="F">Feminino</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Estado Civil</Label>
+                  <Select value={dadosForm.estadoCivil} onValueChange={v => setDadosForm(f => ({ ...f, estadoCivil: v }))}>
+                    <SelectTrigger data-testid="select-dados-estado-civil"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="SOLTEIRO">Solteiro(a)</SelectItem>
+                      <SelectItem value="CASADO">Casado(a)</SelectItem>
+                      <SelectItem value="DIVORCIADO">Divorciado(a)</SelectItem>
+                      <SelectItem value="VIUVO">Viúvo(a)</SelectItem>
+                      <SelectItem value="UNIAO_ESTAVEL">União Estável</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Telefone</Label>
+                  <Input value={dadosForm.telefone} onChange={e => setDadosForm(f => ({ ...f, telefone: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">E-mail</Label>
+                  <Input type="email" value={dadosForm.email} onChange={e => setDadosForm(f => ({ ...f, email: e.target.value }))} />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs text-muted-foreground">Nome da Mãe</Label>
+                  <Input value={dadosForm.nomeMae} onChange={e => setDadosForm(f => ({ ...f, nomeMae: e.target.value }))} data-testid="input-dados-nome-mae" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">RG</Label>
+                  <Input value={dadosForm.rg} onChange={e => setDadosForm(f => ({ ...f, rg: e.target.value }))} data-testid="input-dados-rg" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Órgão Emissor</Label>
+                  <Input placeholder="SSP" value={dadosForm.rgOrgaoEmissor} onChange={e => setDadosForm(f => ({ ...f, rgOrgaoEmissor: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">UF do RG</Label>
+                  <Select value={dadosForm.rgUf} onValueChange={v => setDadosForm(f => ({ ...f, rgUf: v }))}>
+                    <SelectTrigger data-testid="select-dados-rg-uf"><SelectValue /></SelectTrigger>
+                    <SelectContent className="max-h-60">{UFS_BR.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">CEP</Label>
+                  <Input value={dadosForm.cep} onChange={e => setDadosForm(f => ({ ...f, cep: e.target.value }))} />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs text-muted-foreground">Logradouro</Label>
+                  <Input value={dadosForm.logradouro} onChange={e => setDadosForm(f => ({ ...f, logradouro: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Número</Label>
+                  <Input value={dadosForm.numero} onChange={e => setDadosForm(f => ({ ...f, numero: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Bairro</Label>
+                  <Input value={dadosForm.bairro} onChange={e => setDadosForm(f => ({ ...f, bairro: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Cidade</Label>
+                  <Input value={dadosForm.cidade} onChange={e => setDadosForm(f => ({ ...f, cidade: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Estado (UF)</Label>
+                  <Select value={dadosForm.estado} onValueChange={v => setDadosForm(f => ({ ...f, estado: v }))}>
+                    <SelectTrigger><SelectValue placeholder="UF..." /></SelectTrigger>
+                    <SelectContent className="max-h-60">{UFS_BR.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Telefone</Label>
-                <Input value={dadosForm.telefone} onChange={e => setDadosForm(f => ({ ...f, telefone: e.target.value }))} />
+              <div className="pt-2 space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Plano do Titular</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Plano (nome)</Label>
+                    <Input value={dadosForm.plano} onChange={e => setDadosForm(f => ({ ...f, plano: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Código do Plano</Label>
+                    <Input className="font-mono" value={dadosForm.codigoPlano} onChange={e => setDadosForm(f => ({ ...f, codigoPlano: e.target.value }))} />
+                  </div>
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Plano (nome)</Label>
-                <Input value={dadosForm.plano} onChange={e => setDadosForm(f => ({ ...f, plano: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Código do Plano</Label>
-                <Input className="font-mono" value={dadosForm.codigoPlano} onChange={e => setDadosForm(f => ({ ...f, codigoPlano: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Valor Total (R$)</Label>
-                <Input type="number" step="0.01" value={dadosForm.valorTotal} onChange={e => setDadosForm(f => ({ ...f, valorTotal: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Forma de Pagamento</Label>
-                <Select value={dadosForm.formaPagamento} onValueChange={v => setDadosForm(f => ({ ...f, formaPagamento: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                  <SelectContent>
-                    {FORMAS_PAGAMENTO.map(fp => <SelectItem key={fp} value={fp}>{fp}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Dia de Vencimento (1–31)</Label>
-                <Input type="number" min={1} max={31} placeholder="10" value={dadosForm.diaVencimento}
-                  onChange={e => setDadosForm(f => ({ ...f, diaVencimento: e.target.value }))}
-                  data-testid="input-dados-dia-vencimento" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Valor do Plano / Mensalidade (R$)</Label>
-                <Input type="number" step="0.01" placeholder="0,00" value={dadosForm.valorMensal}
-                  onChange={e => setDadosForm(f => ({ ...f, valorMensal: e.target.value }))}
-                  data-testid="input-dados-valor-mensal" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Estado Civil</Label>
-                <Select value={dadosForm.estadoCivil} onValueChange={v => setDadosForm(f => ({ ...f, estadoCivil: v }))}>
-                  <SelectTrigger data-testid="select-dados-estado-civil"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="SOLTEIRO">Solteiro(a)</SelectItem>
-                    <SelectItem value="CASADO">Casado(a)</SelectItem>
-                    <SelectItem value="DIVORCIADO">Divorciado(a)</SelectItem>
-                    <SelectItem value="VIUVO">Viúvo(a)</SelectItem>
-                    <SelectItem value="UNIAO_ESTAVEL">União Estável</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1 sm:col-span-2">
-                <Label className="text-xs text-muted-foreground">Nome da Mãe</Label>
-                <Input value={dadosForm.nomeMae} onChange={e => setDadosForm(f => ({ ...f, nomeMae: e.target.value }))} data-testid="input-dados-nome-mae" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">RG</Label>
-                <Input value={dadosForm.rg} onChange={e => setDadosForm(f => ({ ...f, rg: e.target.value }))} data-testid="input-dados-rg" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Órgão Emissor</Label>
-                <Input placeholder="SSP" value={dadosForm.rgOrgaoEmissor} onChange={e => setDadosForm(f => ({ ...f, rgOrgaoEmissor: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">UF do RG</Label>
-                <Select value={dadosForm.rgUf} onValueChange={v => setDadosForm(f => ({ ...f, rgUf: v }))}>
-                  <SelectTrigger data-testid="select-dados-rg-uf"><SelectValue /></SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {UFS_BR.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1 sm:col-span-2">
-                <Label className="text-xs text-muted-foreground">Observação</Label>
-                <Textarea value={dadosForm.observacao} onChange={e => setDadosForm(f => ({ ...f, observacao: e.target.value }))} rows={2} />
+              <div className="pt-2 border-t">
+                <DocUploader label="Documentos do Titular" files={dadosEditDocsTitular} onChange={setDadosEditDocsTitular} />
               </div>
             </div>
-            {dadosErro && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">{dadosErro}</p>}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setDadosEditando(null)}>Cancelar</Button>
-            <Button onClick={handleSalvarDados} disabled={dadosSalvando} data-testid="btn-salvar-dados-proposta">
-              {dadosSalvando ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Salvando...</> : "Salvar"}
-            </Button>
+          )}
+
+          {/* ── STEP 2 — Dependentes ── */}
+          {dadosEditStep === 2 && (
+            <div className="space-y-4 py-1">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold">Dependentes</p>
+                  <p className="text-xs text-muted-foreground">{dadosEditDeps.length} dependente(s) registrado(s).</p>
+                </div>
+                <Button size="sm" variant="outline" className="gap-1.5 text-xs"
+                  onClick={() => setDadosEditDeps(prev => [...prev, { _id: `de${Date.now()}`, nome: "", cpf: "", dataNascimento: "", grauParentesco: "FILHO(A)", nomeMae: "", estadoCivil: "", sexo: "", planoId: "", codigoPlano: "", planoNome: "", valor: "", documentos: [] as DocFile[] }])}>
+                  <UserPlus className="h-3.5 w-3.5" /> Adicionar
+                </Button>
+              </div>
+              {dadosEditDeps.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-2 text-muted-foreground border-2 border-dashed rounded-lg">
+                  <UserPlus className="h-8 w-8 opacity-30" />
+                  <p className="text-sm">Nenhum dependente cadastrado.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {dadosEditDeps.map((dep, i) => (
+                    <div key={dep._id} className="rounded-lg border p-3 space-y-3 bg-muted/10">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-primary">Dependente {i + 1}</span>
+                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-red-500 hover:bg-red-50"
+                          onClick={() => setDadosEditDeps(prev => prev.filter(d => d._id !== dep._id))}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="space-y-1 sm:col-span-2">
+                          <Label className="text-xs text-muted-foreground">Nome Completo</Label>
+                          <Input value={dep.nome} onChange={e => updateDadosEditDep(dep._id, "nome", e.target.value)} className="h-8 text-sm" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">CPF</Label>
+                          <Input value={dep.cpf} onChange={e => updateDadosEditDep(dep._id, "cpf", e.target.value)} className="h-8 text-sm font-mono" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Nascimento</Label>
+                          <Input type="date" value={dep.dataNascimento} onChange={e => updateDadosEditDep(dep._id, "dataNascimento", e.target.value)} className="h-8 text-sm" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Parentesco</Label>
+                          <Select value={dep.grauParentesco} onValueChange={v => updateDadosEditDep(dep._id, "grauParentesco", v)}>
+                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>{GRAUS_PARENTESCO.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Sexo</Label>
+                          <Select value={dep.sexo} onValueChange={v => updateDadosEditDep(dep._id, "sexo", v)}>
+                            <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="..." /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="M">Masculino</SelectItem>
+                              <SelectItem value="F">Feminino</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Estado Civil</Label>
+                          <Select value={dep.estadoCivil} onValueChange={v => updateDadosEditDep(dep._id, "estadoCivil", v)}>
+                            <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="..." /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="SOLTEIRO">Solteiro(a)</SelectItem>
+                              <SelectItem value="CASADO">Casado(a)</SelectItem>
+                              <SelectItem value="DIVORCIADO">Divorciado(a)</SelectItem>
+                              <SelectItem value="VIUVO">Viúvo(a)</SelectItem>
+                              <SelectItem value="UNIAO_ESTAVEL">União Estável</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1 sm:col-span-2">
+                          <Label className="text-xs text-muted-foreground">Nome da Mãe</Label>
+                          <Input value={dep.nomeMae} onChange={e => updateDadosEditDep(dep._id, "nomeMae", e.target.value)} className="h-8 text-sm" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Plano (nome)</Label>
+                          <Input value={dep.planoNome} onChange={e => updateDadosEditDep(dep._id, "planoNome", e.target.value)} className="h-8 text-sm" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Código do Plano</Label>
+                          <Input value={dep.codigoPlano} onChange={e => updateDadosEditDep(dep._id, "codigoPlano", e.target.value)} className="h-8 text-sm font-mono" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Valor (R$)</Label>
+                          <Input value={dep.valor} onChange={e => updateDadosEditDep(dep._id, "valor", e.target.value)} className="h-8 text-sm" />
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t">
+                        <DocUploader
+                          label={`Documentos — ${dep.nome || `Dependente ${i + 1}`}`}
+                          files={dep.documentos}
+                          onChange={docs => updateDadosEditDepDocs(dep._id, docs)}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── STEP 3 — Financeiro ── */}
+          {dadosEditStep === 3 && (
+            <div className="space-y-4 py-1">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Dados Financeiros</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Forma de Pagamento</Label>
+                  <Select value={dadosForm.formaPagamento} onValueChange={v => setDadosForm(f => ({ ...f, formaPagamento: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>{FORMAS_PAGAMENTO.map(fp => <SelectItem key={fp} value={fp}>{fp}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Dia de Vencimento (1–31)</Label>
+                  <Input type="number" min={1} max={31} placeholder="10" value={dadosForm.diaVencimento}
+                    onChange={e => setDadosForm(f => ({ ...f, diaVencimento: e.target.value }))}
+                    data-testid="input-dados-dia-vencimento" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Valor do Plano / Mensalidade (R$)</Label>
+                  <Input type="number" step="0.01" placeholder="0,00" value={dadosForm.valorMensal}
+                    onChange={e => setDadosForm(f => ({ ...f, valorMensal: e.target.value }))}
+                    data-testid="input-dados-valor-mensal" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Valor Total (R$)</Label>
+                  <Input type="number" step="0.01" value={dadosForm.valorTotal} onChange={e => setDadosForm(f => ({ ...f, valorTotal: e.target.value }))} />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs text-muted-foreground">Observação</Label>
+                  <Textarea value={dadosForm.observacao} onChange={e => setDadosForm(f => ({ ...f, observacao: e.target.value }))} rows={3} />
+                </div>
+              </div>
+              {dadosErro && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">{dadosErro}</p>}
+            </div>
+          )}
+
+          <DialogFooter className="flex-row gap-2 sm:justify-between">
+            <div>{dadosEditStep > 1 && <Button variant="outline" onClick={() => setDadosEditStep(s => (s - 1) as 1|2|3)}>Voltar</Button>}</div>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => { setDadosEditando(null); setDadosEditStep(1); }}>Cancelar</Button>
+              {dadosEditStep < 3 ? (
+                <Button onClick={() => setDadosEditStep(s => (s + 1) as 1|2|3)}>Próximo</Button>
+              ) : (
+                <Button onClick={handleSalvarDados} disabled={dadosSalvando} data-testid="btn-salvar-dados-proposta">
+                  {dadosSalvando ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Salvando...</> : "Salvar"}
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

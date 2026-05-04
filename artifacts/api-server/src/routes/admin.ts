@@ -389,8 +389,9 @@ router.get("/admin/propostas", async (_req, res) => {
 router.patch("/admin/propostas/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { dadosTitular, valorTotal, contratoId, responsavelFinanceiroId } = req.body as {
+    const { dadosTitular, dadosDependentes, valorTotal, contratoId, responsavelFinanceiroId } = req.body as {
       dadosTitular?: Record<string, unknown>;
+      dadosDependentes?: Record<string, unknown>[];
       valorTotal?: string;
       contratoId?: string | null;
       responsavelFinanceiroId?: string | null;
@@ -406,6 +407,7 @@ router.patch("/admin/propostas/:id", async (req, res) => {
     if (dadosTitular !== undefined) {
       updates.dadosTitular = { ...(proposta.dadosTitular as Record<string, unknown>), ...dadosTitular };
     }
+    if (dadosDependentes !== undefined) updates.dadosDependentes = dadosDependentes;
     if (valorTotal !== undefined) updates.valorTotal = valorTotal;
     // contratoId / responsavelFinanceiroId só atualizam se vier valor não-vazio (impede nullification)
     if (contratoId !== undefined && contratoId !== null && String(contratoId).trim() !== "") {
