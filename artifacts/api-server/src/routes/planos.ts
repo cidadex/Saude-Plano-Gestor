@@ -6,6 +6,17 @@ import {
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth.js";
 
+const PLANO_ORDER = ["5254","5252","5285","9714","5403","5123","5404","9717","5397","5127","5283","5402"];
+const sortPlanos = <T extends { codigo: string | null }>(list: T[]): T[] =>
+  [...list].sort((a, b) => {
+    const ia = PLANO_ORDER.indexOf(a.codigo ?? "");
+    const ib = PLANO_ORDER.indexOf(b.codigo ?? "");
+    if (ia === -1 && ib === -1) return (a.codigo ?? "").localeCompare(b.codigo ?? "");
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+
 const router = Router();
 router.use(requireAuth);
 
@@ -14,8 +25,8 @@ router.use(requireAuth);
 // GET /api/planos — todos (qualquer usuário autenticado)
 router.get("/planos", async (_req, res) => {
   try {
-    const planos = await db.select().from(planosTable).orderBy(asc(planosTable.categoria), asc(planosTable.nome));
-    res.json({ planos });
+    const planos = await db.select().from(planosTable).orderBy(asc(planosTable.nome));
+    res.json({ planos: sortPlanos(planos) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: String(err) });
@@ -26,8 +37,8 @@ router.get("/planos", async (_req, res) => {
 router.get("/admin/planos", async (req, res) => {
   if (req.user?.role !== "admin") return res.status(403).json({ error: "Acesso negado" });
   try {
-    const planos = await db.select().from(planosTable).orderBy(asc(planosTable.categoria), asc(planosTable.nome));
-    res.json({ planos });
+    const planos = await db.select().from(planosTable).orderBy(asc(planosTable.nome));
+    res.json({ planos: sortPlanos(planos) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: String(err) });

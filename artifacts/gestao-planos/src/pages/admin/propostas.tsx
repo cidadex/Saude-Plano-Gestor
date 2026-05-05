@@ -19,6 +19,17 @@ type ContratoSelect = { id: string; nome: string; ativo: boolean; asaasModo: "SA
 type ResponsavelSelect = { id: string; nome: string; tipo: "PF" | "PJ"; cpfCnpj: string };
 type DepAdmin = { _id: string; nome: string; cpf: string; dataNascimento: string; grauParentesco: string; nomeMae: string; estadoCivil: string; sexo: string; planoId: string; codigoPlano: string; planoNome: string; valor: string; documentos: DocFile[] };
 
+const PLANO_ORDER = ["5254","5252","5285","9714","5403","5123","5404","9717","5397","5127","5283","5402"];
+const sortPlanos = <T extends { codigo: string | null }>(list: T[]): T[] =>
+  [...list].sort((a, b) => {
+    const ia = PLANO_ORDER.indexOf(a.codigo ?? "");
+    const ib = PLANO_ORDER.indexOf(b.codigo ?? "");
+    if (ia === -1 && ib === -1) return (a.codigo ?? "").localeCompare(b.codigo ?? "");
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+
 const GRAUS_PARENTESCO = ["CÔNJUGE", "FILHO(A)", "PAI/MÃE", "OUTRO", "AGREGADO"];
 const FORMAS_PAGAMENTO = ["BOLETO", "PIX", "CARTAO"];
 
@@ -317,7 +328,7 @@ export default function AdminPropostas() {
       apiFetch("/admin/responsaveis") as Promise<{ responsaveis: ResponsavelSelect[] }>,
     ]).then(([v, p, c, r]) => {
       setVendedoresList(v.vendedores ?? []);
-      setPlanosList((p.planos ?? []).filter(pl => pl.ativo));
+      setPlanosList(sortPlanos((p.planos ?? []).filter(pl => pl.ativo)));
       setContratosList((c.contratos ?? []).filter(ct => ct.ativo));
       setResponsaveisList(r.responsaveis ?? []);
     }).catch(console.error).finally(() => setLoadingNovaForm(false));

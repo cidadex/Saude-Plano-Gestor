@@ -15,6 +15,17 @@ import { Search, SlidersHorizontal, Plus, Check, Loader2, Sparkles, X, ChevronDo
 import { DocUploader, type DocFile } from "@/components/DocUploader";
 
 type PlanoAPI = { id: string; codigo: string | null; nome: string; categoria: string | null; valorTitular: string | null; valorDependente: string | null; ativo: boolean };
+
+const PLANO_ORDER = ["5254","5252","5285","9714","5403","5123","5404","9717","5397","5127","5283","5402"];
+const sortPlanos = <T extends { codigo: string | null }>(list: T[]): T[] =>
+  [...list].sort((a, b) => {
+    const ia = PLANO_ORDER.indexOf(a.codigo ?? "");
+    const ib = PLANO_ORDER.indexOf(b.codigo ?? "");
+    if (ia === -1 && ib === -1) return (a.codigo ?? "").localeCompare(b.codigo ?? "");
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
 type TabelaFaixa = { id: string; tabelaId: string; planoId: string; faixaEtaria: string; valor: string; valorApartamento?: string | null };
 type TabelaVendedor = { id: string; nome: string; tipoPlano?: string | null; faixas: TabelaFaixa[] };
 
@@ -113,10 +124,10 @@ export default function VendedorPropostas() {
   const tabelaAtual = tabelas.find(t => t.id === form.tabelaId) ?? tabelas[0];
 
   const planosNaTabela = useMemo(() => {
-    if (!tabelaAtual || tabelaAtual.faixas.length === 0) return planosAPI;
+    if (!tabelaAtual || tabelaAtual.faixas.length === 0) return sortPlanos(planosAPI);
     const ids = [...new Set(tabelaAtual.faixas.map(f => f.planoId))];
     const filtrados = planosAPI.filter(p => ids.includes(p.id));
-    return filtrados.length > 0 ? filtrados : planosAPI;
+    return sortPlanos(filtrados.length > 0 ? filtrados : planosAPI);
   }, [tabelaAtual, planosAPI]);
 
   const faixasTitular = useMemo(() => {
