@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Paperclip, X, Loader2, FileText, CheckCircle2, AlertCircle } from "lucide-react";
+import { Paperclip, X, Loader2, FileText, CheckCircle2, AlertCircle, Eye, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export interface DocFile {
@@ -24,9 +24,40 @@ interface UploadingFile {
   error?: string;
 }
 
+function objectPathToUrl(objectPath: string): string {
+  if (!objectPath.startsWith("/objects/")) return objectPath;
+  const rest = objectPath.slice("/objects/".length);
+  return `/api/storage/objects/${rest}`;
+}
+
+async function downloadFile(file: DocFile) {
+  const url = objectPathToUrl(file.objectPath);
+  try {
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) throw new Error("Falha ao baixar arquivo");
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+  } catch {
+    alert("Não foi possível baixar o arquivo.");
+  }
+}
+
+function viewFile(file: DocFile) {
+  const url = objectPathToUrl(file.objectPath);
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
 export function DocUploader({ label = "Documentos", files, onChange, disabled, accept = "*/*" }: DocUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState<UploadingFile[]>([]);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   const handleFiles = async (selected: FileList) => {
     const arr = Array.from(selected);
@@ -78,11 +109,20 @@ export function DocUploader({ label = "Documentos", files, onChange, disabled, a
     onChange(files.filter((_, i) => i !== idx));
   };
 
+  const handleDownload = async (f: DocFile) => {
+    setDownloading(f.objectPath);
+    await downloadFile(f);
+    setDownloading(null);
+  };
+
   const formatBytes = (b: number) => {
     if (b < 1024) return `${b} B`;
     if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} KB`;
     return `${(b / (1024 * 1024)).toFixed(1)} MB`;
   };
+
+  const isViewable = (f: DocFile) =>
+    f.contentType.startsWith("image/") || f.contentType === "application/pdf";
 
   return (
     <div className="space-y-2">
@@ -116,16 +156,46 @@ export function DocUploader({ label = "Documentos", files, onChange, disabled, a
           {files.map((f, i) => (
             <div key={`${f.objectPath}-${i}`} className="flex items-center gap-2 rounded-md bg-background border px-2 py-1.5">
               <FileText className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-              <span className="text-xs font-medium flex-1 truncate" title={f.name}>{f.name}</span>
+              <span className="text-xs font-medium flex-1 truncate min-w-0" title={f.name}>{f.name}</span>
               <span className="text-xs text-muted-foreground shrink-0">{formatBytes(f.size)}</span>
+
+              {/* Visualizar — só para imagens e PDF */}
+              {isViewable(f) && (
+                <button
+                  type="button"
+                  title="Visualizar"
+                  onClick={() => viewFile(f)}
+                  className="text-muted-foreground hover:text-blue-600 transition-colors ml-1 shrink-0"
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </button>
+              )}
+
+              {/* Baixar */}
               <button
                 type="button"
-                onClick={() => removeFile(i)}
-                disabled={disabled}
-                className="text-muted-foreground hover:text-red-500 transition-colors ml-1"
+                title="Baixar"
+                onClick={() => handleDownload(f)}
+                disabled={downloading === f.objectPath}
+                className="text-muted-foreground hover:text-green-600 transition-colors shrink-0"
               >
-                <X className="h-3.5 w-3.5" />
+                {downloading === f.objectPath
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <Download className="h-3.5 w-3.5" />
+                }
               </button>
+
+              {/* Remover */}
+              {!disabled && (
+                <button
+                  type="button"
+                  onClick={() => removeFile(i)}
+                  title="Remover"
+                  className="text-muted-foreground hover:text-red-500 transition-colors ml-0.5 shrink-0"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
           ))}
 
