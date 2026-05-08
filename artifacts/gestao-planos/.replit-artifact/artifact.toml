@@ -14,6 +14,10 @@ name = "web"
 paths = [ "/" ]
 localPort = 22072
 
+[services.env]
+PORT = "22072"
+BASE_PATH = "/"
+
 [services.development]
 run = "pnpm --filter @workspace/gestao-planos run dev"
 
@@ -25,7 +29,3 @@ serve = "static"
 [[services.production.rewrites]]
 from = "/*"
 to = "/index.html"
-
-[services.env]
-PORT = "22072"
-BASE_PATH = "/"
