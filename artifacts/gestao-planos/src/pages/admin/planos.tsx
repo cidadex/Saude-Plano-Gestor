@@ -45,8 +45,6 @@ type TabelaPreco = {
   faixas: TabelaFaixa[];
 };
 
-type Vendedor = { id: string; nome: string };
-
 type FaixaForm = {
   faixaEtaria: string;
   valor: string;
@@ -71,12 +69,11 @@ const FAIXAS_DEFAULT: FaixaForm[] = [
 ];
 
 function TabelaModal({
-  open, onClose, tabela, vendedores, planos, onSaved,
+  open, onClose, tabela, planos, onSaved,
 }: {
   open: boolean;
   onClose: () => void;
   tabela?: TabelaPreco;
-  vendedores: Vendedor[];
   planos: PlanoAPI[];
   onSaved: () => void;
 }) {
@@ -84,7 +81,6 @@ function TabelaModal({
   const isEdit = !!tabela;
 
   const [form, setForm] = useState({
-    vendedorId: tabela?.vendedorId ?? "",
     nome: tabela?.nome ?? "",
     tipoPlano: tabela?.tipoPlano ?? "",
     ano: tabela?.ano ? String(tabela.ano) : String(new Date().getFullYear()),
@@ -115,7 +111,6 @@ function TabelaModal({
     setFaixas(prev => prev.filter((_, idx) => idx !== i));
 
   const handleSave = async (): Promise<void> => {
-    if (!form.vendedorId) { toast({ variant: "destructive", title: "Selecione um vendedor" }); return; }
     if (!form.nome.trim()) { toast({ variant: "destructive", title: "Informe o nome da tabela" }); return; }
 
     const validFaixas = faixas.filter(f => f.faixaEtaria && f.valor && f.planoId);
@@ -124,7 +119,6 @@ function TabelaModal({
     setSaving(true);
     try {
       const body = {
-        vendedorId: form.vendedorId,
         nome: form.nome,
         tipoPlano: form.tipoPlano || null,
         ano: form.ano ? parseInt(form.ano) : null,
@@ -160,28 +154,15 @@ function TabelaModal({
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar Tabela de Preço" : "Nova Tabela de Preço"}</DialogTitle>
           <DialogDescription>
-            Defina o vendedor, tipo de plano e os valores por faixa etária.
+            Cadastre os valores dos planos. A tabela será associada ao vendedor no cadastro da equipe.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label>Vendedor *</Label>
-              <Select value={form.vendedorId} onValueChange={v => setField("vendedorId", v)} disabled={isEdit}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecionar vendedor..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {vendedores.map(v => (
-                    <SelectItem key={v.id} value={v.id}>{v.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-1.5">
               <Label>Nome da tabela *</Label>
-              <Input value={form.nome} onChange={e => setField("nome", e.target.value)} placeholder="Ex: NOSSO PLANO (SEM OBSTETRÍCIA)" />
+              <Input value={form.nome} onChange={e => setField("nome", e.target.value)} placeholder="Ex: Tabela Comercial Fortaleza 2026" />
             </div>
           </div>
 
@@ -294,7 +275,6 @@ export default function AdminPlanos() {
   const { toast } = useToast();
   const [planos, setPlanos] = useState<PlanoAPI[]>([]);
   const [tabelas, setTabelas] = useState<TabelaPreco[]>([]);
-  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [planoEditando, setPlanoEditando] = useState<PlanoAPI | null>(null);
@@ -314,14 +294,12 @@ export default function AdminPlanos() {
   const carregar = useCallback(async () => {
     setLoading(true);
     try {
-      const [dadosPlanos, dadosTabelas, dadosVendedores] = await Promise.all([
+      const [dadosPlanos, dadosTabelas] = await Promise.all([
         apiFetch("/admin/planos") as Promise<{ planos: PlanoAPI[] }>,
         apiFetch("/admin/tabelas-preco") as Promise<{ tabelas: TabelaPreco[] }>,
-        apiFetch("/admin/vendedores") as Promise<{ vendedores: Vendedor[] }>,
       ]);
       setPlanos(dadosPlanos.planos ?? []);
       setTabelas(dadosTabelas.tabelas ?? []);
-      setVendedores(dadosVendedores.vendedores ?? []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -404,7 +382,7 @@ export default function AdminPlanos() {
       <div className="flex items-start justify-between pb-4 border-b">
         <div className="flex flex-col gap-1">
           <h2 className="text-3xl font-bold tracking-tight text-foreground">Gestão de Planos</h2>
-          <p className="text-muted-foreground">Edite valores e status dos planos. Tabelas de faixa etária por vendedor estão abaixo.</p>
+          <p className="text-muted-foreground">Cadastre as tabelas e os valores de cada plano; a associação ao vendedor é feita na Equipe de Vendas.</p>
         </div>
         <Button variant="outline" size="sm" onClick={carregar} className="gap-2">
           <RefreshCw className="h-4 w-4" /> Atualizar
@@ -509,7 +487,7 @@ export default function AdminPlanos() {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold text-foreground">Tabelas de Preço por Faixa Etária</h3>
-            <p className="text-sm text-muted-foreground">Preços específicos por vendedor, definidos por faixa de idade.</p>
+            <p className="text-sm text-muted-foreground">Cada tabela pode ser associada a um vendedor e contém os valores dos planos por faixa.</p>
           </div>
           <Button
             size="sm" className="gap-2"
@@ -533,8 +511,8 @@ export default function AdminPlanos() {
                 <CardHeader className="bg-primary/5 pb-3 border-b">
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-sm">
-                      <span className="font-bold">{tabela.vendedorNome}</span>
-                      <span className="text-muted-foreground font-normal"> — {tabela.tipoPlano ?? tabela.nome}</span>
+                      <span className="font-bold">{tabela.nome}</span>
+                      <span className="text-muted-foreground font-normal"> — {tabela.vendedorNome ?? "Disponível para associação"}</span>
                       {tabela.ano && <span className="ml-1 text-xs text-muted-foreground">({tabela.ano})</span>}
                     </CardTitle>
                     <div className="flex items-center gap-1 shrink-0">
@@ -686,7 +664,6 @@ export default function AdminPlanos() {
           open={tabelaModalOpen}
           onClose={() => { setTabelaModalOpen(false); setTabelaEditando(undefined); }}
           tabela={tabelaEditando}
-          vendedores={vendedores}
           planos={planos}
           onSaved={carregar}
         />
@@ -698,7 +675,7 @@ export default function AdminPlanos() {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir tabela de preço</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir a tabela <strong>{tabelaExcluindo?.nome}</strong> do vendedor <strong>{tabelaExcluindo?.vendedorNome}</strong>? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir a tabela <strong>{tabelaExcluindo?.nome}</strong>? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

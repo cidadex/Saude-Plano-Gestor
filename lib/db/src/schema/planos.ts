@@ -31,7 +31,7 @@ export const planosTable = pgTable("planos", {
 // Tabela de preço por faixa etária — vinculada a um vendedor
 export const tabelasPrecoTable = pgTable("tabelas_preco", {
   id: text("id").primaryKey(),
-  vendedorId: text("vendedor_id").notNull().references(() => vendedoresTable.id),
+  vendedorId: text("vendedor_id").unique().references(() => vendedoresTable.id),
   nome: text("nome").notNull(),
   tipoPlano: text("tipo_plano"),
   ano: integer("ano"),

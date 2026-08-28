@@ -43,6 +43,9 @@ interface FormData {
   responsavelFinanceiroId: string;
   vendedorId: string;
   representante: string;
+  tabelaPrecoId: string;
+  planoId: string;
+  faixaId: string;
   planoCode: string;
   formaPagamento: string;
   diaVencimento: string;
@@ -55,7 +58,20 @@ interface FormData {
 
 type CampoExtraido = { campo: keyof FormData; label: string; valor: string };
 
-type Plano = { id: string; codigo: string; nome: string; categoria: string; valorTitular: number | string };
+type PlanoFaixa = {
+  id: string;
+  faixaEtaria: string;
+  valor: string;
+  valorApartamento: string | null;
+};
+type Plano = {
+  id: string;
+  codigo: string | null;
+  nome: string;
+  categoria: string | null;
+  faixas: PlanoFaixa[];
+};
+type TabelaPrecoOpt = { id: string; nome: string };
 type ContratoOpt = { id: string; nome: string; ativo: boolean; asaasModo: "SANDBOX" | "PRODUCAO" };
 type ResponsavelOpt = { id: string; nome: string; tipo: "PF" | "PJ"; cpfCnpj: string };
 type VendedorOpt = { id: string; nome: string };
@@ -128,7 +144,8 @@ const formVazio: FormData = {
   estadoCivil: "", nomeMae: "", telefone: "", email: "",
   cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "CE",
   contratoId: "", responsavelFinanceiroId: "", vendedorId: "", representante: "",
-  planoCode: "", formaPagamento: "", diaVencimento: "", valorMensal: "",
+  tabelaPrecoId: "", planoId: "", faixaId: "", planoCode: "",
+  formaPagamento: "", diaVencimento: "", valorMensal: "",
   observacao: "", docRgUrl: "", docComprovanteUrl: "", tipo: "TITULAR",
 };
 
@@ -149,19 +166,19 @@ export default function CadastroCliente({ open, onClose, onCreated }: CadastroCl
   const [contratos, setContratos] = useState<ContratoOpt[]>([]);
   const [responsaveis, setResponsaveis] = useState<ResponsavelOpt[]>([]);
   const [vendedores, setVendedores] = useState<VendedorOpt[]>([]);
+  const [tabelaPreco, setTabelaPreco] = useState<TabelaPrecoOpt | null>(null);
+  const [carregandoPlanos, setCarregandoPlanos] = useState(false);
 
   // Carrega listas auxiliares ao abrir o modal
   useEffect(() => {
     if (!open) return;
     void (async () => {
       try {
-        const [pl, ct, rs, vd] = await Promise.all([
-          apiFetch<{ planos: Plano[] }>("/planos"),
+        const [ct, rs, vd] = await Promise.all([
           apiFetch<{ contratos: ContratoOpt[] }>("/admin/contratos"),
           apiFetch<{ responsaveis: ResponsavelOpt[] }>("/admin/responsaveis"),
           apiFetch<{ vendedores: VendedorOpt[] }>("/admin/vendedores"),
         ]);
-        setPlanos(pl.planos);
         setContratos(ct.contratos.filter(c => c.ativo));
         setResponsaveis(rs.responsaveis);
         setVendedores(vd.vendedores);
@@ -171,7 +188,7 @@ export default function CadastroCliente({ open, onClose, onCreated }: CadastroCl
     })();
   }, [open, toast]);
 
-  const planoSelecionado = useMemo(() => planos.find(p => p.codigo === form.planoCode), [planos, form.planoCode]);
+  const planoSelecionado = useMemo(() => planos.find(p => p.id === form.planoId), [planos, form.planoId]);
   const contratoSelecionado = useMemo(() => contratos.find(c => c.id === form.contratoId), [contratos, form.contratoId]);
   const responsavelSelecionado = useMemo(() => responsaveis.find(r => r.id === form.responsavelFinanceiroId), [responsaveis, form.responsavelFinanceiroId]);
 
@@ -179,19 +196,59 @@ export default function CadastroCliente({ open, onClose, onCreated }: CadastroCl
     setForm(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSelectPlano = (codigo: string) => {
-    const p = planos.find(x => x.codigo === codigo);
+  const handleSelectPlano = (planoId: string) => {
+    const p = planos.find(x => x.id === planoId);
+    const faixaUnica = p?.faixas.length === 1 ? p.faixas[0] : null;
     setForm(prev => ({
       ...prev,
-      planoCode: codigo,
-      // Sugere o valor titular como mensalidade (editável)
-      valorMensal: prev.valorMensal || (p ? String(p.valorTitular) : ""),
+      planoId,
+      planoCode: p?.codigo ?? "",
+      tabelaPrecoId: tabelaPreco?.id ?? "",
+      faixaId: faixaUnica?.id ?? "",
+      valorMensal: faixaUnica?.valor ?? "",
     }));
   };
 
-  const handleSelectVendedor = (id: string) => {
+  const handleSelectFaixa = (faixaId: string) => {
+    const faixa = planoSelecionado?.faixas.find(f => f.id === faixaId);
+    setForm(prev => ({
+      ...prev,
+      faixaId,
+      valorMensal: faixa?.valor ?? "",
+    }));
+  };
+
+  const handleSelectVendedor = async (id: string): Promise<void> => {
     const v = vendedores.find(x => x.id === id);
-    setForm(prev => ({ ...prev, vendedorId: id, representante: v?.nome ?? "" }));
+    setForm(prev => ({
+      ...prev,
+      vendedorId: id,
+      representante: v?.nome ?? "",
+      tabelaPrecoId: "",
+      planoId: "",
+      faixaId: "",
+      planoCode: "",
+      valorMensal: "",
+    }));
+    setPlanos([]);
+    setTabelaPreco(null);
+    setCarregandoPlanos(true);
+    try {
+      const data = await apiFetch<{ tabela: TabelaPrecoOpt | null; planos: Plano[] }>(
+        `/admin/vendedores/${id}/planos-disponiveis`,
+      );
+      setTabelaPreco(data.tabela);
+      setPlanos(data.planos);
+      setForm(prev => ({ ...prev, tabelaPrecoId: data.tabela?.id ?? "" }));
+    } catch (e) {
+      toast({
+        title: "Erro ao carregar planos",
+        description: e instanceof Error ? e.message : "Falha",
+        variant: "destructive",
+      });
+    } finally {
+      setCarregandoPlanos(false);
+    }
   };
 
   const handleAnalisar = () => {
@@ -212,6 +269,8 @@ export default function CadastroCliente({ open, onClose, onCreated }: CadastroCl
     setJaAnalisou(false);
     setCamposExtraidos([]);
     setForm({ ...formVazio });
+    setPlanos([]);
+    setTabelaPreco(null);
     setStep(1);
   };
 
@@ -220,7 +279,8 @@ export default function CadastroCliente({ open, onClose, onCreated }: CadastroCl
     if (!form.contratoId) { toast({ title: "Selecione o contrato", variant: "destructive" }); return; }
     if (!form.responsavelFinanceiroId) { toast({ title: "Selecione o responsável financeiro", variant: "destructive" }); return; }
     if (!form.vendedorId) { toast({ title: "Selecione o vendedor", variant: "destructive" }); return; }
-    if (!form.planoCode) { toast({ title: "Selecione o plano", variant: "destructive" }); return; }
+    if (!form.planoId) { toast({ title: "Selecione o plano", variant: "destructive" }); return; }
+    if (!form.faixaId) { toast({ title: "Selecione a faixa de preço", variant: "destructive" }); return; }
     if (!form.formaPagamento) { toast({ title: "Selecione a forma de pagamento", variant: "destructive" }); return; }
     if (!form.diaVencimento) { toast({ title: "Informe o dia de vencimento", variant: "destructive" }); return; }
     if (!form.valorMensal) { toast({ title: "Informe o valor mensal", variant: "destructive" }); return; }
@@ -250,6 +310,9 @@ export default function CadastroCliente({ open, onClose, onCreated }: CadastroCl
       responsavelFinanceiroId: form.responsavelFinanceiroId,
       vendedorId: form.vendedorId,
       representante: form.representante || null,
+      tabelaPrecoId: form.tabelaPrecoId,
+      planoId: form.planoId,
+      faixaId: form.faixaId,
       planoCode: form.planoCode,
       codigoPlano: form.planoCode,
       formaPagamento: form.formaPagamento,
@@ -278,6 +341,7 @@ export default function CadastroCliente({ open, onClose, onCreated }: CadastroCl
   const handleFechar = () => {
     setStep(1); setJaAnalisou(false); setTextoColar("");
     setCamposExtraidos([]); setForm({ ...formVazio });
+    setPlanos([]); setTabelaPreco(null); setCarregandoPlanos(false);
     onClose();
   };
 
@@ -421,7 +485,7 @@ export default function CadastroCliente({ open, onClose, onCreated }: CadastroCl
             {/* Vendedor */}
             <div className="space-y-2">
               <Label>Vendedor responsável *</Label>
-              <Select value={form.vendedorId} onValueChange={handleSelectVendedor}>
+              <Select value={form.vendedorId} onValueChange={v => void handleSelectVendedor(v)}>
                 <SelectTrigger data-testid="select-vendedor"><SelectValue placeholder="Selecione o vendedor..." /></SelectTrigger>
                 <SelectContent>
                   {vendedores.map(v => <SelectItem key={v.id} value={v.id}>{v.nome}</SelectItem>)}
@@ -432,23 +496,65 @@ export default function CadastroCliente({ open, onClose, onCreated }: CadastroCl
             {/* Plano */}
             <div className="space-y-2">
               <Label>Plano *</Label>
-              <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
-                {planos.map(p => {
-                  const valor = typeof p.valorTitular === "string" ? Number(p.valorTitular) : p.valorTitular;
+              {carregandoPlanos && (
+                <div className="flex items-center gap-2 rounded-lg border p-4 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Carregando tabela e planos do vendedor...
+                </div>
+              )}
+              {!carregandoPlanos && !form.vendedorId && (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                  Selecione primeiro o vendedor responsável para carregar a tabela de preços dele.
+                </div>
+              )}
+              {!carregandoPlanos && form.vendedorId && !tabelaPreco && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                  Este vendedor ainda não possui uma tabela de preços associada. Edite o vendedor em Equipe de Vendas.
+                </div>
+              )}
+              {!carregandoPlanos && tabelaPreco && planos.length === 0 && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                  A tabela <strong>{tabelaPreco.nome}</strong> não possui planos com preços cadastrados.
+                </div>
+              )}
+              {!carregandoPlanos && planos.length > 0 && (
+                <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                  {planos.map(p => {
+                    const valores = p.faixas.map(f => Number(f.valor)).filter(Number.isFinite);
+                    const menorValor = valores.length > 0 ? Math.min(...valores) : 0;
                   return (
                     <button
                       key={p.id}
                       type="button"
-                      onClick={() => handleSelectPlano(p.codigo)}
-                      className={`p-3 rounded-lg border text-left transition-all ${form.planoCode === p.codigo ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/40"}`}
+                      onClick={() => handleSelectPlano(p.id)}
+                      className={`p-3 rounded-lg border text-left transition-all ${form.planoId === p.id ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/40"}`}
                     >
-                      <div className="font-mono font-bold text-sm">{p.codigo}</div>
+                      <div className="font-mono font-bold text-sm">{p.codigo ?? "Sem código"}</div>
                       <div className="text-xs text-muted-foreground mt-0.5 leading-tight line-clamp-2">{p.nome}</div>
-                      <div className="text-xs font-semibold text-primary mt-1">R$ {valor.toFixed(2).replace(".", ",")}</div>
+                      <div className="text-xs font-semibold text-primary mt-1">
+                        A partir de R$ {menorValor.toFixed(2).replace(".", ",")}
+                      </div>
                     </button>
                   );
-                })}
-              </div>
+                  })}
+                </div>
+              )}
+              {planoSelecionado && (
+                <div className="space-y-1.5 rounded-lg border bg-muted/20 p-3">
+                  <Label>Faixa de preço *</Label>
+                  <Select value={form.faixaId} onValueChange={handleSelectFaixa}>
+                    <SelectTrigger data-testid="select-faixa-plano">
+                      <SelectValue placeholder="Selecione a faixa etária..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {planoSelecionado.faixas.map(f => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {f.faixaEtaria} — R$ {Number(f.valor).toFixed(2).replace(".", ",")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             {/* Pagamento */}
@@ -468,7 +574,8 @@ export default function CadastroCliente({ open, onClose, onCreated }: CadastroCl
               </div>
               <div className="space-y-1.5">
                 <Label>Valor Mensal (R$) *</Label>
-                <Input value={form.valorMensal} onChange={e => handleChange("valorMensal", e.target.value)} placeholder="0,00" />
+                <Input value={form.valorMensal} readOnly placeholder="Selecione plano e faixa" className="bg-muted/50" />
+                <p className="text-[11px] text-muted-foreground">Valor definido pela tabela do vendedor.</p>
               </div>
             </div>
 

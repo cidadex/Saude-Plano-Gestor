@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { eq, sql, desc, and, or, inArray } from "drizzle-orm";
+import { eq, sql, desc, and, or, inArray, ne } from "drizzle-orm";
 import {
   db,
   usersTable,
@@ -11,6 +11,8 @@ import {
   boletosTable,
   contratosTable,
   planosTable,
+  tabelasPrecoTable,
+  tabelasPrecoFaixasTable,
   responsaveisFinanceirosTable,
 } from "@workspace/db";
 import { count as drizzleCount, sum as drizzleSum } from "drizzle-orm";
@@ -42,9 +44,12 @@ router.get("/admin/vendedores", async (_req, res) => {
         tipoComissao: vendedoresTable.tipoComissao,
         createdAt: vendedoresTable.createdAt,
         active: usersTable.active,
+        tabelaPrecoId: tabelasPrecoTable.id,
+        tabelaPrecoNome: tabelasPrecoTable.nome,
       })
       .from(vendedoresTable)
       .leftJoin(usersTable, eq(usersTable.id, vendedoresTable.userId))
+      .leftJoin(tabelasPrecoTable, eq(tabelasPrecoTable.vendedorId, vendedoresTable.id))
       .orderBy(vendedoresTable.nome);
 
     // Conta clientes por vendedor
@@ -70,49 +75,71 @@ router.get("/admin/vendedores", async (_req, res) => {
 // Criar vendedor
 router.post("/admin/vendedores", async (req, res) => {
   try {
-    const { nome, email, telefone, comissionado, tipoComissao, senha } = req.body as {
+    const { nome, email, telefone, comissionado, tipoComissao, senha, tabelaPrecoId } = req.body as {
       nome: string;
       email: string;
       telefone?: string;
       comissionado: boolean;
       tipoComissao?: "VENDA" | "SERVICO" | "AMBOS";
       senha: string;
+      tabelaPrecoId: string;
     };
 
-    if (!nome || !email || !senha) {
-      return res.status(400).json({ error: "nome, email e senha são obrigatórios" });
+    if (!nome || !email || !senha || !tabelaPrecoId) {
+      return res.status(400).json({ error: "nome, email, senha e tabelaPrecoId são obrigatórios" });
     }
+    if (senha.length < 6) return res.status(400).json({ error: "A senha deve ter no mínimo 6 caracteres" });
 
     // Verifica duplicata de email
     const [existing] = await db.select({ id: usersTable.id })
       .from(usersTable).where(eq(usersTable.email, email.toLowerCase().trim())).limit(1);
     if (existing) return res.status(409).json({ error: "E-mail já cadastrado" });
 
+    const [tabela] = await db
+      .select({ id: tabelasPrecoTable.id, vendedorId: tabelasPrecoTable.vendedorId })
+      .from(tabelasPrecoTable)
+      .where(eq(tabelasPrecoTable.id, tabelaPrecoId))
+      .limit(1);
+    if (!tabela) return res.status(404).json({ error: "Tabela de preço não encontrada" });
+    if (tabela.vendedorId) return res.status(409).json({ error: "Tabela de preço já atribuída a outro vendedor" });
+
     const passwordHash = await bcrypt.hash(senha, 10);
     const uid = `user-v-${Date.now()}`;
     const vid = `v-${Date.now()}`;
 
-    await db.insert(usersTable).values({
-      id: uid,
-      email: email.toLowerCase().trim(),
-      passwordHash,
-      role: "vendedor",
-      nome,
-      active: true,
+    await db.transaction(async (tx) => {
+      await tx.insert(usersTable).values({
+        id: uid,
+        email: email.toLowerCase().trim(),
+        passwordHash,
+        role: "vendedor",
+        nome,
+        active: true,
+      });
+      await tx.insert(vendedoresTable).values({
+        id: vid,
+        userId: uid,
+        nome,
+        email: email.toLowerCase().trim(),
+        telefone: telefone ?? null,
+        comissionado: comissionado ?? false,
+        tipoComissao: comissionado ? (tipoComissao ?? "VENDA") : null,
+      });
+      const tabelasAtribuidas = await tx
+        .update(tabelasPrecoTable)
+        .set({ vendedorId: vid })
+        .where(and(eq(tabelasPrecoTable.id, tabelaPrecoId), sql`${tabelasPrecoTable.vendedorId} is null`))
+        .returning({ id: tabelasPrecoTable.id });
+      if (tabelasAtribuidas.length !== 1) {
+        throw new Error("TABELA_PRECO_JA_ATRIBUIDA");
+      }
     });
 
-    await db.insert(vendedoresTable).values({
-      id: vid,
-      userId: uid,
-      nome,
-      email: email.toLowerCase().trim(),
-      telefone: telefone ?? null,
-      comissionado: comissionado ?? false,
-      tipoComissao: comissionado ? (tipoComissao ?? "VENDA") : null,
-    });
-
-    res.status(201).json({ vendedor: { id: vid, userId: uid, nome, email, telefone, comissionado, tipoComissao } });
+    res.status(201).json({ vendedor: { id: vid, userId: uid, nome, email, telefone, comissionado, tipoComissao, tabelaPrecoId } });
   } catch (err) {
+    if (err instanceof Error && err.message === "TABELA_PRECO_JA_ATRIBUIDA") {
+      return res.status(409).json({ error: "Tabela de preço já atribuída a outro vendedor" });
+    }
     console.error(err);
     res.status(500).json({ error: String(err) });
   }
@@ -122,31 +149,63 @@ router.post("/admin/vendedores", async (req, res) => {
 router.put("/admin/vendedores/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, email, telefone, comissionado, tipoComissao } = req.body as {
+    const { nome, email, telefone, comissionado, tipoComissao, tabelaPrecoId } = req.body as {
       nome: string;
       email: string;
       telefone?: string;
       comissionado: boolean;
       tipoComissao?: "VENDA" | "SERVICO" | "AMBOS";
+      tabelaPrecoId: string;
     };
+    if (!nome || !email || !tabelaPrecoId) {
+      return res.status(400).json({ error: "nome, email e tabelaPrecoId são obrigatórios" });
+    }
 
     const [vendedor] = await db.select().from(vendedoresTable).where(eq(vendedoresTable.id, id)).limit(1);
     if (!vendedor) return res.status(404).json({ error: "Vendedor não encontrado" });
 
-    await db.update(vendedoresTable).set({
-      nome,
-      email: email.toLowerCase().trim(),
-      telefone: telefone ?? null,
-      comissionado: comissionado ?? false,
-      tipoComissao: comissionado ? (tipoComissao ?? "VENDA") : null,
-    }).where(eq(vendedoresTable.id, id));
+    const normalizedEmail = email.toLowerCase().trim();
+    const [emailEmUso] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(and(eq(usersTable.email, normalizedEmail), ne(usersTable.id, vendedor.userId)))
+      .limit(1);
+    if (emailEmUso) return res.status(409).json({ error: "E-mail já cadastrado" });
 
-    // Atualiza também o usuário
-    await db.update(usersTable).set({
-      nome,
-      email: email.toLowerCase().trim(),
-      updatedAt: new Date(),
-    }).where(eq(usersTable.id, vendedor.userId));
+    const [tabela] = await db
+      .select({ id: tabelasPrecoTable.id, vendedorId: tabelasPrecoTable.vendedorId })
+      .from(tabelasPrecoTable)
+      .where(eq(tabelasPrecoTable.id, tabelaPrecoId))
+      .limit(1);
+    if (!tabela) return res.status(404).json({ error: "Tabela de preço não encontrada" });
+    if (tabela.vendedorId && tabela.vendedorId !== id) {
+      return res.status(409).json({ error: "Tabela de preço já atribuída a outro vendedor" });
+    }
+
+    await db.transaction(async (tx) => {
+      await tx.update(vendedoresTable).set({
+        nome,
+        email: normalizedEmail,
+        telefone: telefone ?? null,
+        comissionado: comissionado ?? false,
+        tipoComissao: comissionado ? (tipoComissao ?? "VENDA") : null,
+      }).where(eq(vendedoresTable.id, id));
+
+      await tx.update(usersTable).set({
+        nome,
+        email: normalizedEmail,
+        updatedAt: new Date(),
+      }).where(eq(usersTable.id, vendedor.userId));
+
+      await tx
+        .update(tabelasPrecoTable)
+        .set({ vendedorId: null })
+        .where(eq(tabelasPrecoTable.vendedorId, id));
+      await tx
+        .update(tabelasPrecoTable)
+        .set({ vendedorId: id })
+        .where(eq(tabelasPrecoTable.id, tabelaPrecoId));
+    });
 
     res.json({ ok: true });
   } catch (err) {
@@ -669,6 +728,7 @@ router.post("/admin/clientes", async (req, res) => {
       return res.status(400).json({ error: "Nome e CPF são obrigatórios" });
     }
     if (!body.vendedorId) return res.status(400).json({ error: "vendedorId é obrigatório" });
+    if (!body.planoId || !body.faixaId) return res.status(400).json({ error: "planoId e faixaId são obrigatórios" });
     if (!body.contratoId) return res.status(400).json({ error: "contratoId é obrigatório" });
     if (!body.responsavelFinanceiroId) return res.status(400).json({ error: "responsavelFinanceiroId é obrigatório" });
 
@@ -684,6 +744,35 @@ router.post("/admin/clientes", async (req, res) => {
     const [dup] = await db.select({ id: clientesTable.id })
       .from(clientesTable).where(eq(clientesTable.cpf, cpfDigits)).limit(1);
     if (dup) return res.status(409).json({ error: "Já existe um cliente com este CPF" });
+
+    const [precoSelecionado] = await db
+      .select({
+        planoId: planosTable.id,
+        codigo: planosTable.codigo,
+        faixaId: tabelasPrecoFaixasTable.id,
+        valor: tabelasPrecoFaixasTable.valor,
+      })
+      .from(tabelasPrecoTable)
+      .innerJoin(
+        tabelasPrecoFaixasTable,
+        and(
+          eq(tabelasPrecoFaixasTable.tabelaId, tabelasPrecoTable.id),
+          eq(tabelasPrecoFaixasTable.id, String(body.faixaId)),
+          eq(tabelasPrecoFaixasTable.planoId, String(body.planoId)),
+        ),
+      )
+      .innerJoin(
+        planosTable,
+        and(
+          eq(planosTable.id, tabelasPrecoFaixasTable.planoId),
+          eq(planosTable.ativo, true),
+        ),
+      )
+      .where(eq(tabelasPrecoTable.vendedorId, String(body.vendedorId)))
+      .limit(1);
+    if (!precoSelecionado) {
+      return res.status(400).json({ error: "Plano e faixa não pertencem à tabela de preço do vendedor selecionado" });
+    }
 
     const id = `cli-${Date.now()}`;
     const dataNasc = body.dataNascimento ? String(body.dataNascimento) : null;
@@ -702,6 +791,8 @@ router.post("/admin/clientes", async (req, res) => {
     const valuesToInsert = {
       id,
       vendedorId: String(body.vendedorId),
+      planoId: precoSelecionado.planoId,
+      faixaId: precoSelecionado.faixaId,
       contratoId: String(body.contratoId),
       responsavelFinanceiroId: String(body.responsavelFinanceiroId),
       nome: String(body.nome).trim(),
@@ -730,9 +821,9 @@ router.post("/admin/clientes", async (req, res) => {
         body.diaVencimento !== undefined && body.diaVencimento !== null && body.diaVencimento !== ""
           ? Number(body.diaVencimento)
           : null,
-      valorMensal: body.valorMensal != null ? String(body.valorMensal) : null,
-      planoCode: body.planoCode ? String(body.planoCode) : null,
-      codigoPlano: body.codigoPlano ? String(body.codigoPlano) : null,
+      valorMensal: precoSelecionado.valor,
+      planoCode: precoSelecionado.codigo,
+      codigoPlano: precoSelecionado.codigo,
       observacao: body.observacao ? String(body.observacao) : null,
       representante: body.representante ? String(body.representante) : null,
     } as typeof clientesTable.$inferInsert;

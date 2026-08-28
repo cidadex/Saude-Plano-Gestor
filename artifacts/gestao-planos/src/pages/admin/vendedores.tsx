@@ -25,26 +25,28 @@ interface Vendedor {
   active: boolean;
   totalClientes: number;
   createdAt: string;
+  tabelaPrecoId: string | null;
+  tabelaPrecoNome: string | null;
 }
 
-const EMPTY: Omit<Vendedor, "id" | "userId" | "active" | "totalClientes" | "createdAt"> & { senha: string } = {
-  nome: "",
-  email: "",
-  telefone: "",
-  comissionado: false,
-  tipoComissao: "VENDA",
-  senha: "",
-};
+interface TabelaPrecoOpt {
+  id: string;
+  nome: string;
+  vendedorId: string | null;
+  vendedorNome: string | null;
+}
 
 function VendedorModal({
   open,
   onClose,
   vendedor,
+  tabelas,
   onSaved,
 }: {
   open: boolean;
   onClose: () => void;
   vendedor?: Vendedor;
+  tabelas: TabelaPrecoOpt[];
   onSaved: () => void;
 }) {
   const { toast } = useToast();
@@ -56,6 +58,7 @@ function VendedorModal({
     comissionado: vendedor?.comissionado ?? false,
     tipoComissao: vendedor?.tipoComissao ?? "VENDA",
     senha: "",
+    tabelaPrecoId: vendedor?.tabelaPrecoId ?? "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -64,6 +67,8 @@ function VendedorModal({
   const handleSave = async (): Promise<void> => {
     if (!form.nome || !form.email) { toast({ variant: "destructive", title: "Nome e e-mail são obrigatórios" }); return; }
     if (!isEdit && !form.senha) { toast({ variant: "destructive", title: "Informe a senha inicial" }); return; }
+    if (!isEdit && form.senha.length < 6) { toast({ variant: "destructive", title: "A senha deve ter no mínimo 6 caracteres" }); return; }
+    if (!form.tabelaPrecoId) { toast({ variant: "destructive", title: "Selecione a tabela de preços do vendedor" }); return; }
     setSaving(true);
     try {
       if (isEdit) {
@@ -107,6 +112,28 @@ function VendedorModal({
               <Input type="password" value={form.senha} onChange={e => set("senha", e.target.value)} placeholder="Mín. 6 caracteres" />
             </div>
           )}
+          <div className="space-y-1.5">
+            <Label>Tabela de preços *</Label>
+            <Select value={form.tabelaPrecoId} onValueChange={v => set("tabelaPrecoId", v)}>
+              <SelectTrigger data-testid="select-tabela-vendedor">
+                <SelectValue placeholder="Selecione uma tabela disponível..." />
+              </SelectTrigger>
+              <SelectContent>
+                {tabelas
+                  .filter(t => !t.vendedorId || t.vendedorId === vendedor?.id)
+                  .map(t => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.nome}{t.vendedorNome ? ` — ${t.vendedorNome}` : ""}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            {tabelas.filter(t => !t.vendedorId || t.vendedorId === vendedor?.id).length === 0 && (
+              <p className="text-xs text-amber-600">
+                Não há tabela disponível. Crie uma em Gestão de Planos antes de cadastrar o vendedor.
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-3 pt-1">
             <Switch checked={form.comissionado} onCheckedChange={v => set("comissionado", v)} id="comissionado" />
             <Label htmlFor="comissionado" className="cursor-pointer">Vendedor comissionado</Label>
@@ -191,6 +218,11 @@ export default function AdminVendedores() {
     queryFn: () => apiFetch("/admin/vendedores") as Promise<{ vendedores: Vendedor[] }>,
   });
 
+  const { data: tabelasData, isLoading: tabelasLoading } = useQuery({
+    queryKey: ["admin-tabelas-preco"],
+    queryFn: () => apiFetch("/admin/tabelas-preco") as Promise<{ tabelas: TabelaPrecoOpt[] }>,
+  });
+
   const statusMutation = useMutation({
     mutationFn: ({ userId, active }: { userId: string; active: boolean }) =>
       apiFetch(`/admin/users/${userId}/status`, { method: "PATCH", body: JSON.stringify({ active }) }),
@@ -209,7 +241,7 @@ export default function AdminVendedores() {
 
   const ativos = data?.vendedores.filter(v => v.active).length ?? 0;
 
-  if (isLoading) return (
+  if (isLoading || tabelasLoading) return (
     <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
   );
 
@@ -262,6 +294,7 @@ export default function AdminVendedores() {
               <TableHead>Vendedor</TableHead>
               <TableHead>Contato</TableHead>
               <TableHead>Comissão</TableHead>
+              <TableHead>Tabela de preços</TableHead>
               <TableHead className="text-center">Clientes</TableHead>
               <TableHead className="text-center">Status</TableHead>
               <TableHead className="text-right">Ações</TableHead>
@@ -270,7 +303,7 @@ export default function AdminVendedores() {
           <TableBody>
             {vendedores.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
                   Nenhum vendedor encontrado.
                 </TableCell>
               </TableRow>
@@ -295,6 +328,13 @@ export default function AdminVendedores() {
                     </Badge>
                   ) : (
                     <span className="text-xs text-muted-foreground">Não comissionado</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {v.tabelaPrecoNome ? (
+                    <Badge variant="outline" className="text-xs">{v.tabelaPrecoNome}</Badge>
+                  ) : (
+                    <span className="text-xs text-amber-600">Sem tabela</span>
                   )}
                 </TableCell>
                 <TableCell className="text-center">
@@ -332,10 +372,15 @@ export default function AdminVendedores() {
       </Card>
 
       <VendedorModal
+        key={editing?.id ?? "novo-vendedor"}
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         vendedor={editing}
-        onSaved={() => qc.invalidateQueries({ queryKey: ["admin-vendedores"] })}
+        tabelas={tabelasData?.tabelas ?? []}
+        onSaved={() => {
+          void qc.invalidateQueries({ queryKey: ["admin-vendedores"] });
+          void qc.invalidateQueries({ queryKey: ["admin-tabelas-preco"] });
+        }}
       />
 
       {resetTarget && (
