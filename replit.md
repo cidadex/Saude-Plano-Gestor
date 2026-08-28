@@ -26,6 +26,21 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
 
+## Replit run setup
+
+The imported project runs with two workflows:
+
+- **Gestão de Planos** — `PORT=22072 BASE_PATH=/ pnpm --filter @workspace/gestao-planos run dev`
+- **API Server** — `PORT=8080 pnpm --filter @workspace/api-server run dev`
+
+The frontend uses its `/api` proxy to reach the API server. The API requires `DATABASE_URL`; the current Replit environment provides it.
+
+For a new development database, initialize the app once with:
+
+1. `pnpm --filter @workspace/db run push`
+2. Start the API workflow.
+3. `curl -X POST http://127.0.0.1:8080/api/seed`
+
 ## Sistema de Gestão de Vendas de Plano de Saúde
 
 ### Arquitetura
