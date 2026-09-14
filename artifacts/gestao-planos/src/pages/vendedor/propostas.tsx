@@ -94,9 +94,34 @@ export default function VendedorPropostas() {
   const [salvarErro, setSalvarErro] = useState("");
 
   useEffect(() => {
+    type TabelaPrecoAPI = {
+      tabela: { id: string; nome: string; tipoPlano?: string | null } | null;
+      planos: Array<{
+        id: string; nome: string; codigo: string | null; categoria: string | null; acomodacao: string | null;
+        faixas: Array<{ id: string; faixaEtaria: string; valor: string; valorApartamento?: string | null }>;
+      }>;
+    };
     Promise.all([
       (apiFetch("/planos") as Promise<{ planos: PlanoAPI[] }>).then(d => setPlanosAPI((d.planos ?? []).filter(p => p.ativo))),
-      (apiFetch("/vendedor/tabela-preco") as Promise<{ tabelas: TabelaVendedor[] }>).then(d => setTabelas(d.tabelas ?? [])),
+      (apiFetch("/vendedor/tabela-preco") as Promise<TabelaPrecoAPI>).then(d => {
+        if (!d.tabela) return;
+        const tabela: TabelaVendedor = {
+          id: d.tabela.id,
+          nome: d.tabela.nome,
+          tipoPlano: d.tabela.tipoPlano,
+          faixas: (d.planos ?? []).flatMap(p =>
+            p.faixas.map(f => ({
+              id: f.id,
+              tabelaId: d.tabela!.id,
+              planoId: p.id,
+              faixaEtaria: f.faixaEtaria,
+              valor: f.valor,
+              valorApartamento: f.valorApartamento ?? null,
+            })),
+          ),
+        };
+        setTabelas([tabela]);
+      }),
     ]).catch(console.error).finally(() => setLoadingPlanos(false));
     (apiFetch("/contratos") as Promise<{ contratos: Array<{ id: string; nome: string; asaasModo?: string }> }>).then(d => setContratosList(d.contratos ?? [])).catch(console.error);
     (apiFetch("/responsaveis-financeiros") as Promise<{ responsaveis: Array<{ id: string; nome: string; tipo: string }> }>).then(d => setResponsaveisList(d.responsaveis ?? [])).catch(console.error);

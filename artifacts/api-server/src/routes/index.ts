@@ -30,8 +30,8 @@ router.use(comunicacoesRouter);
 router.use(planosRouter);      // /planos (public) and /vendedor/tabela-preco (vendedor)
 router.use(contratosPublicRouter);
 router.use(responsaveisRouter);
+router.use(aiRouter);          // /ai/* — accessible to any authenticated role; must come BEFORE adminRouter
 router.use(adminRouter);
 router.use(contratosRouter);
-router.use(aiRouter);
 
 export default router;
