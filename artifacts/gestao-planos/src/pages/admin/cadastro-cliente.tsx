@@ -11,6 +11,7 @@ import {
   Loader2, FileSignature, Users2, Building2, User as UserIcon,
 } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
+import { toUpperNoAccent } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 
 interface CadastroClienteProps {
@@ -601,7 +602,7 @@ export default function CadastroCliente({ open, onClose, onCreated }: CadastroCl
               </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <Label>Observação</Label>
-                <Textarea value={form.observacao} onChange={e => handleChange("observacao", e.target.value)} rows={2} className="resize-none" />
+                <Textarea value={form.observacao} onChange={e => handleChange("observacao", toUpperNoAccent(e.target.value))} rows={2} className="resize-none" />
               </div>
             </div>
           </div>
@@ -645,7 +646,7 @@ function DadosPessoaisForm({ form, onChange }: { form: FormData; onChange: (f: k
     <div className="grid gap-3 sm:grid-cols-2 text-sm">
       <div className="space-y-1.5 sm:col-span-2">
         <Label>Nome Completo *</Label>
-        <Input value={form.nome} onChange={e => onChange("nome", e.target.value)} data-testid="input-nome-cliente" />
+        <Input value={form.nome} onChange={e => onChange("nome", toUpperNoAccent(e.target.value))} data-testid="input-nome-cliente" />
       </div>
       <div className="space-y-1.5">
         <Label>CPF *</Label>
@@ -684,7 +685,7 @@ function DadosPessoaisForm({ form, onChange }: { form: FormData; onChange: (f: k
       </div>
       <div className="space-y-1.5">
         <Label>Órgão Emissor</Label>
-        <Input value={form.rgOrgaoEmissor} onChange={e => onChange("rgOrgaoEmissor", e.target.value)} placeholder="SSP" />
+        <Input value={form.rgOrgaoEmissor} onChange={e => onChange("rgOrgaoEmissor", toUpperNoAccent(e.target.value))} placeholder="SSP" />
       </div>
       <div className="space-y-1.5">
         <Label>UF do RG</Label>
@@ -697,7 +698,7 @@ function DadosPessoaisForm({ form, onChange }: { form: FormData; onChange: (f: k
       </div>
       <div className="space-y-1.5 sm:col-span-2">
         <Label>Nome da Mãe</Label>
-        <Input value={form.nomeMae} onChange={e => onChange("nomeMae", e.target.value)} />
+        <Input value={form.nomeMae} onChange={e => onChange("nomeMae", toUpperNoAccent(e.target.value))} />
       </div>
       <div className="space-y-1.5">
         <Label>Telefone</Label>
@@ -713,7 +714,7 @@ function DadosPessoaisForm({ form, onChange }: { form: FormData; onChange: (f: k
       </div>
       <div className="space-y-1.5 sm:col-span-1">
         <Label>Logradouro</Label>
-        <Input value={form.logradouro} onChange={e => onChange("logradouro", e.target.value)} />
+        <Input value={form.logradouro} onChange={e => onChange("logradouro", toUpperNoAccent(e.target.value))} />
       </div>
       <div className="space-y-1.5">
         <Label>Número</Label>
@@ -721,15 +722,15 @@ function DadosPessoaisForm({ form, onChange }: { form: FormData; onChange: (f: k
       </div>
       <div className="space-y-1.5">
         <Label>Complemento</Label>
-        <Input value={form.complemento} onChange={e => onChange("complemento", e.target.value)} />
+        <Input value={form.complemento} onChange={e => onChange("complemento", toUpperNoAccent(e.target.value))} />
       </div>
       <div className="space-y-1.5">
         <Label>Bairro</Label>
-        <Input value={form.bairro} onChange={e => onChange("bairro", e.target.value)} />
+        <Input value={form.bairro} onChange={e => onChange("bairro", toUpperNoAccent(e.target.value))} />
       </div>
       <div className="space-y-1.5">
         <Label>Cidade</Label>
-        <Input value={form.cidade} onChange={e => onChange("cidade", e.target.value)} />
+        <Input value={form.cidade} onChange={e => onChange("cidade", toUpperNoAccent(e.target.value))} />
       </div>
       <div className="space-y-1.5">
         <Label>UF</Label>

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { apiFetch } from "@/lib/api";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, toUpperNoAccent } from "@/lib/format";
 import { Textarea } from "@/components/ui/textarea";
 import { Search, SlidersHorizontal, Loader2, RefreshCw, AlertCircle, Receipt, Plus, Sparkles, ChevronDown, Check, X, UserPlus, Trash2, User } from "lucide-react";
 import { DocUploader, type DocFile } from "@/components/DocUploader";
@@ -726,7 +726,7 @@ export default function AdminPropostas() {
                 <div className="space-y-1 sm:col-span-2">
                   <Label className="text-xs text-muted-foreground">Nome Completo *</Label>
                   <Input placeholder="NOME COMPLETO" value={novaForm.clienteNome}
-                    onChange={e => setNovaForm(f => ({ ...f, clienteNome: e.target.value }))} data-testid="input-nova-nome" />
+                    onChange={e => setNovaForm(f => ({ ...f, clienteNome: toUpperNoAccent(e.target.value) }))} data-testid="input-nova-nome" />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">CPF *</Label>
@@ -774,7 +774,7 @@ export default function AdminPropostas() {
                 <div className="space-y-1 sm:col-span-2">
                   <Label className="text-xs text-muted-foreground">Nome da Mãe</Label>
                   <Input placeholder="Nome completo da mãe" value={novaForm.nomeMae}
-                    onChange={e => setNovaForm(f => ({ ...f, nomeMae: e.target.value }))} data-testid="input-nova-nome-mae" />
+                    onChange={e => setNovaForm(f => ({ ...f, nomeMae: toUpperNoAccent(e.target.value) }))} data-testid="input-nova-nome-mae" />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">RG</Label>
@@ -783,7 +783,7 @@ export default function AdminPropostas() {
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Órgão Emissor</Label>
                   <Input placeholder="SSP" value={novaForm.rgOrgaoEmissor}
-                    onChange={e => setNovaForm(f => ({ ...f, rgOrgaoEmissor: e.target.value }))} data-testid="input-nova-rg-orgao" />
+                    onChange={e => setNovaForm(f => ({ ...f, rgOrgaoEmissor: toUpperNoAccent(e.target.value) }))} data-testid="input-nova-rg-orgao" />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">UF do RG</Label>
@@ -802,7 +802,7 @@ export default function AdminPropostas() {
                 <div className="space-y-1 sm:col-span-2">
                   <Label className="text-xs text-muted-foreground">Logradouro</Label>
                   <Input placeholder="Rua..." value={novaForm.logradouro}
-                    onChange={e => setNovaForm(f => ({ ...f, logradouro: e.target.value }))} />
+                    onChange={e => setNovaForm(f => ({ ...f, logradouro: toUpperNoAccent(e.target.value) }))} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Número</Label>
@@ -811,11 +811,11 @@ export default function AdminPropostas() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Bairro</Label>
-                  <Input value={novaForm.bairro} onChange={e => setNovaForm(f => ({ ...f, bairro: e.target.value }))} />
+                  <Input value={novaForm.bairro} onChange={e => setNovaForm(f => ({ ...f, bairro: toUpperNoAccent(e.target.value) }))} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Cidade</Label>
-                  <Input value={novaForm.cidade} onChange={e => setNovaForm(f => ({ ...f, cidade: e.target.value }))} />
+                  <Input value={novaForm.cidade} onChange={e => setNovaForm(f => ({ ...f, cidade: toUpperNoAccent(e.target.value) }))} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Estado (UF)</Label>
@@ -972,7 +972,7 @@ export default function AdminPropostas() {
                         <div className="space-y-1 sm:col-span-2">
                           <Label className="text-xs text-muted-foreground">Nome da Mãe</Label>
                           <Input placeholder="Nome completo da mãe" value={dep.nomeMae}
-                            onChange={e => updateDep(dep._id, "nomeMae", e.target.value)} className="h-8 text-sm" />
+                            onChange={e => updateDep(dep._id, "nomeMae", toUpperNoAccent(e.target.value))} className="h-8 text-sm" />
                         </div>
                       </div>
 
@@ -1121,7 +1121,7 @@ export default function AdminPropostas() {
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label>Observações</Label>
                   <Textarea placeholder="Informações adicionais..." value={novaForm.observacao}
-                    onChange={e => setNovaForm(f => ({ ...f, observacao: e.target.value }))}
+                    onChange={e => setNovaForm(f => ({ ...f, observacao: toUpperNoAccent(e.target.value) }))}
                     className="resize-none" rows={2} />
                 </div>
               </div>
@@ -1334,7 +1334,7 @@ export default function AdminPropostas() {
                 </div>
                 <div className="space-y-1 sm:col-span-2">
                   <Label className="text-xs text-muted-foreground">Nome da Mãe</Label>
-                  <Input value={dadosForm.nomeMae} onChange={e => setDadosForm(f => ({ ...f, nomeMae: e.target.value }))} data-testid="input-dados-nome-mae" />
+                  <Input value={dadosForm.nomeMae} onChange={e => setDadosForm(f => ({ ...f, nomeMae: toUpperNoAccent(e.target.value) }))} data-testid="input-dados-nome-mae" />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">RG</Label>
@@ -1342,7 +1342,7 @@ export default function AdminPropostas() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Órgão Emissor</Label>
-                  <Input placeholder="SSP" value={dadosForm.rgOrgaoEmissor} onChange={e => setDadosForm(f => ({ ...f, rgOrgaoEmissor: e.target.value }))} />
+                  <Input placeholder="SSP" value={dadosForm.rgOrgaoEmissor} onChange={e => setDadosForm(f => ({ ...f, rgOrgaoEmissor: toUpperNoAccent(e.target.value) }))} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">UF do RG</Label>
@@ -1357,7 +1357,7 @@ export default function AdminPropostas() {
                 </div>
                 <div className="space-y-1 sm:col-span-2">
                   <Label className="text-xs text-muted-foreground">Logradouro</Label>
-                  <Input value={dadosForm.logradouro} onChange={e => setDadosForm(f => ({ ...f, logradouro: e.target.value }))} />
+                  <Input value={dadosForm.logradouro} onChange={e => setDadosForm(f => ({ ...f, logradouro: toUpperNoAccent(e.target.value) }))} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Número</Label>
@@ -1365,11 +1365,11 @@ export default function AdminPropostas() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Bairro</Label>
-                  <Input value={dadosForm.bairro} onChange={e => setDadosForm(f => ({ ...f, bairro: e.target.value }))} />
+                  <Input value={dadosForm.bairro} onChange={e => setDadosForm(f => ({ ...f, bairro: toUpperNoAccent(e.target.value) }))} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Cidade</Label>
-                  <Input value={dadosForm.cidade} onChange={e => setDadosForm(f => ({ ...f, cidade: e.target.value }))} />
+                  <Input value={dadosForm.cidade} onChange={e => setDadosForm(f => ({ ...f, cidade: toUpperNoAccent(e.target.value) }))} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Estado (UF)</Label>
@@ -1430,7 +1430,7 @@ export default function AdminPropostas() {
                       <div className="grid gap-2 sm:grid-cols-2">
                         <div className="space-y-1 sm:col-span-2">
                           <Label className="text-xs text-muted-foreground">Nome Completo</Label>
-                          <Input value={dep.nome} onChange={e => updateDadosEditDep(dep._id, "nome", e.target.value)} className="h-8 text-sm" />
+                          <Input value={dep.nome} onChange={e => updateDadosEditDep(dep._id, "nome", toUpperNoAccent(e.target.value))} className="h-8 text-sm" />
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">CPF</Label>
@@ -1472,7 +1472,7 @@ export default function AdminPropostas() {
                         </div>
                         <div className="space-y-1 sm:col-span-2">
                           <Label className="text-xs text-muted-foreground">Nome da Mãe</Label>
-                          <Input value={dep.nomeMae} onChange={e => updateDadosEditDep(dep._id, "nomeMae", e.target.value)} className="h-8 text-sm" />
+                          <Input value={dep.nomeMae} onChange={e => updateDadosEditDep(dep._id, "nomeMae", toUpperNoAccent(e.target.value))} className="h-8 text-sm" />
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">Plano (nome)</Label>
@@ -1531,7 +1531,7 @@ export default function AdminPropostas() {
                 </div>
                 <div className="space-y-1 sm:col-span-2">
                   <Label className="text-xs text-muted-foreground">Observação</Label>
-                  <Textarea value={dadosForm.observacao} onChange={e => setDadosForm(f => ({ ...f, observacao: e.target.value }))} rows={3} />
+                  <Textarea value={dadosForm.observacao} onChange={e => setDadosForm(f => ({ ...f, observacao: toUpperNoAccent(e.target.value) }))} rows={3} />
                 </div>
               </div>
               {dadosErro && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">{dadosErro}</p>}

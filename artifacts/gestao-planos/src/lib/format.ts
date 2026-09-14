@@ -1,3 +1,14 @@
+/**
+ * Converte para MAIÚSCULAS removendo acentos/diacríticos.
+ * Use em campos de texto como nome, endereço, bairro, cidade.
+ */
+export function toUpperNoAccent(str: string): string {
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+}
+
 export function formatMoney(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',

@@ -23,12 +23,15 @@ router.use(clienteRouter);
 router.use(vendedorRouter);
 router.use(gerenteRouter);
 router.use(comunicacoesRouter);
-// Public-among-authenticated routers come BEFORE admin-only routers so the admin guard doesn't block them
+// Public-among-authenticated routers MUST come BEFORE adminRouter.
+// adminRouter uses a router-level middleware that blocks non-admins for every
+// request that reaches it — even when no route matches — so any route meant
+// for non-admin roles must be registered in a router that is mounted first.
+router.use(planosRouter);      // /planos (public) and /vendedor/tabela-preco (vendedor)
 router.use(contratosPublicRouter);
 router.use(responsaveisRouter);
 router.use(adminRouter);
 router.use(contratosRouter);
 router.use(aiRouter);
-router.use(planosRouter);
 
 export default router;

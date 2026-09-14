@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { usePropostas, type PropostaAPI } from "@/hooks/useVendedorData";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, toUpperNoAccent } from "@/lib/format";
 import { apiFetch } from "@/lib/api";
 import { Search, SlidersHorizontal, Plus, Check, Loader2, Sparkles, X, ChevronDown, UserPlus, Trash2, AlertCircle, User } from "lucide-react";
 import { DocUploader, type DocFile } from "@/components/DocUploader";
@@ -558,7 +558,7 @@ export default function VendedorPropostas() {
                 <div className="space-y-1 sm:col-span-2">
                   <Label className="text-xs text-muted-foreground">Nome Completo *</Label>
                   <Input placeholder="NOME COMPLETO" value={form.clienteNome}
-                    onChange={e => setForm(f => ({ ...f, clienteNome: e.target.value }))} data-testid="input-proposta-nome" />
+                    onChange={e => setForm(f => ({ ...f, clienteNome: toUpperNoAccent(e.target.value) }))} data-testid="input-proposta-nome" />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">CPF *</Label>
@@ -605,7 +605,7 @@ export default function VendedorPropostas() {
                 <div className="space-y-1 sm:col-span-2">
                   <Label className="text-xs text-muted-foreground">Nome da Mãe</Label>
                   <Input placeholder="Nome completo da mãe" value={form.nomeMae}
-                    onChange={e => setForm(f => ({ ...f, nomeMae: e.target.value }))} data-testid="input-proposta-nome-mae" />
+                    onChange={e => setForm(f => ({ ...f, nomeMae: toUpperNoAccent(e.target.value) }))} data-testid="input-proposta-nome-mae" />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">RG</Label>
@@ -614,7 +614,7 @@ export default function VendedorPropostas() {
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Órgão Emissor</Label>
                   <Input placeholder="SSP" value={form.rgOrgaoEmissor}
-                    onChange={e => setForm(f => ({ ...f, rgOrgaoEmissor: e.target.value }))} data-testid="input-proposta-rg-orgao" />
+                    onChange={e => setForm(f => ({ ...f, rgOrgaoEmissor: toUpperNoAccent(e.target.value) }))} data-testid="input-proposta-rg-orgao" />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">UF do RG</Label>
@@ -631,7 +631,7 @@ export default function VendedorPropostas() {
                 </div>
                 <div className="space-y-1 sm:col-span-2">
                   <Label className="text-xs text-muted-foreground">Logradouro</Label>
-                  <Input placeholder="Rua, Avenida..." value={form.logradouro} onChange={e => setForm(f => ({ ...f, logradouro: e.target.value }))} />
+                  <Input placeholder="Rua, Avenida..." value={form.logradouro} onChange={e => setForm(f => ({ ...f, logradouro: toUpperNoAccent(e.target.value) }))} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Número</Label>
@@ -639,11 +639,11 @@ export default function VendedorPropostas() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Bairro</Label>
-                  <Input value={form.bairro} onChange={e => setForm(f => ({ ...f, bairro: e.target.value }))} />
+                  <Input value={form.bairro} onChange={e => setForm(f => ({ ...f, bairro: toUpperNoAccent(e.target.value) }))} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Cidade</Label>
-                  <Input value={form.cidade} onChange={e => setForm(f => ({ ...f, cidade: e.target.value }))} />
+                  <Input value={form.cidade} onChange={e => setForm(f => ({ ...f, cidade: toUpperNoAccent(e.target.value) }))} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Estado</Label>
@@ -752,7 +752,7 @@ export default function VendedorPropostas() {
                           <div className="space-y-1 sm:col-span-2">
                             <Label className="text-xs text-muted-foreground">Nome Completo</Label>
                             <Input placeholder="Nome completo" value={dep.nome}
-                              onChange={e => updateDep(dep._id, "nome", e.target.value)} className="h-8 text-sm" />
+                              onChange={e => updateDep(dep._id, "nome", toUpperNoAccent(e.target.value))} className="h-8 text-sm" />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs text-muted-foreground">CPF</Label>
@@ -797,7 +797,7 @@ export default function VendedorPropostas() {
                           <div className="space-y-1 sm:col-span-2">
                             <Label className="text-xs text-muted-foreground">Nome da Mãe</Label>
                             <Input placeholder="Nome completo da mãe" value={dep.nomeMae}
-                              onChange={e => updateDep(dep._id, "nomeMae", e.target.value)} className="h-8 text-sm" />
+                              onChange={e => updateDep(dep._id, "nomeMae", toUpperNoAccent(e.target.value))} className="h-8 text-sm" />
                           </div>
                         </div>
 

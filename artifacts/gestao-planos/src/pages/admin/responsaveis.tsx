@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiFetch, ApiError } from "@/lib/api";
+import { toUpperNoAccent } from "@/lib/format";
 import { Users2, Plus, Pencil, Trash2, KeyRound, Search, Building2, User as UserIcon, Mail } from "lucide-react";
 
 type Responsavel = {
@@ -295,7 +296,7 @@ export default function AdminResponsaveis() {
             </div>
             <div className="space-y-1.5">
               <Label>{form.tipo === "PJ" ? "Razão Social" : "Nome Completo"} *</Label>
-              <Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} data-testid="input-nome-responsavel" />
+              <Input value={form.nome} onChange={e => setForm({ ...form, nome: toUpperNoAccent(e.target.value) })} data-testid="input-nome-responsavel" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -315,7 +316,7 @@ export default function AdminResponsaveis() {
               </div>
               <div className="space-y-1.5 col-span-2">
                 <Label>Logradouro</Label>
-                <Input value={form.logradouro} onChange={e => setForm({ ...form, logradouro: e.target.value })} />
+                <Input value={form.logradouro} onChange={e => setForm({ ...form, logradouro: toUpperNoAccent(e.target.value) })} />
               </div>
               <div className="space-y-1.5">
                 <Label>Número</Label>
@@ -323,15 +324,15 @@ export default function AdminResponsaveis() {
               </div>
               <div className="space-y-1.5">
                 <Label>Complemento</Label>
-                <Input value={form.complemento} onChange={e => setForm({ ...form, complemento: e.target.value })} />
+                <Input value={form.complemento} onChange={e => setForm({ ...form, complemento: toUpperNoAccent(e.target.value) })} />
               </div>
               <div className="space-y-1.5">
                 <Label>Bairro</Label>
-                <Input value={form.bairro} onChange={e => setForm({ ...form, bairro: e.target.value })} />
+                <Input value={form.bairro} onChange={e => setForm({ ...form, bairro: toUpperNoAccent(e.target.value) })} />
               </div>
               <div className="space-y-1.5 col-span-2">
                 <Label>Cidade</Label>
-                <Input value={form.cidade} onChange={e => setForm({ ...form, cidade: e.target.value })} />
+                <Input value={form.cidade} onChange={e => setForm({ ...form, cidade: toUpperNoAccent(e.target.value) })} />
               </div>
               <div className="space-y-1.5">
                 <Label>UF</Label>
@@ -341,7 +342,7 @@ export default function AdminResponsaveis() {
 
             <div className="space-y-1.5">
               <Label>Observação</Label>
-              <Textarea value={form.observacao} onChange={e => setForm({ ...form, observacao: e.target.value })} rows={2} className="resize-none" />
+              <Textarea value={form.observacao} onChange={e => setForm({ ...form, observacao: toUpperNoAccent(e.target.value) })} rows={2} className="resize-none" />
             </div>
 
             {!editing && (

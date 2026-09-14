@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiFetch } from "@/lib/api";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, toUpperNoAccent } from "@/lib/format";
 import { Plus, Pencil, KeyRound, Power, PowerOff, Users, Loader2, Search } from "lucide-react";
 
 interface Vendedor {
@@ -124,7 +124,7 @@ function VendedorModal({
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
             <Label>Nome completo *</Label>
-            <Input value={form.nome} onChange={e => set("nome", e.target.value)} placeholder="Nome do vendedor" />
+            <Input value={form.nome} onChange={e => set("nome", toUpperNoAccent(e.target.value))} placeholder="Nome do vendedor" />
           </div>
           <div className="space-y-1.5">
             <Label>E-mail *</Label>
