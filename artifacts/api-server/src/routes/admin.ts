@@ -795,6 +795,10 @@ router.patch("/admin/propostas/:id/ativar", async (req, res) => {
           .where(or(...cpfs.map((candidate) => eq(clientesTable.cpf, candidate))))
           .for("update")
           .limit(1);
+        // Só bloqueia se o beneficiário existente já estiver ATIVO
+        if (existente && existente.status === "ATIVO") {
+          throw new Error("CLIENTE_ATIVO_CPF_DUPLICADO");
+        }
         cliente = existente;
       }
 
@@ -1079,10 +1083,24 @@ router.post("/admin/clientes", async (req, res) => {
       }
     }
 
-    // Verifica duplicidade
-    const [dup] = await db.select({ id: clientesTable.id })
-      .from(clientesTable).where(eq(clientesTable.cpf, cpfDigits)).limit(1);
-    if (dup) return res.status(409).json({ error: "Já existe um cliente com este CPF" });
+    // Comissão manual informada no ato do cadastro (opcional, substitui o cálculo automático)
+    const comissaoManualRaw = body.comissao !== undefined && body.comissao !== null && body.comissao !== ""
+      ? Number(String(body.comissao).replace(",", "."))
+      : NaN;
+    const comissaoManual = Number.isFinite(comissaoManualRaw) && comissaoManualRaw > 0 ? comissaoManualRaw : null;
+    const comissaoSnap = comissaoManual !== null
+      ? (Math.round((comissaoManual + Number.EPSILON) * 100) / 100).toFixed(2)
+      : null;
+
+    // Verifica duplicidade — só bloqueia se o beneficiário existente estiver ATIVO
+    const [existingByCpf] = await db
+      .select({ id: clientesTable.id, status: clientesTable.status })
+      .from(clientesTable)
+      .where(eq(clientesTable.cpf, cpfDigits))
+      .limit(1);
+    if (existingByCpf && existingByCpf.status === "ATIVO") {
+      return res.status(409).json({ error: "Já existe um beneficiário ativo com este CPF" });
+    }
 
     const [precoSelecionado] = await db
       .select({
@@ -1113,7 +1131,6 @@ router.post("/admin/clientes", async (req, res) => {
       return res.status(400).json({ error: "Plano e faixa não pertencem à tabela de preço do vendedor selecionado" });
     }
 
-    const id = `cli-${randomUUID()}`;
     const dataNasc = body.dataNascimento ? String(body.dataNascimento) : null;
     // Converte DD/MM/YYYY → YYYY-MM-DD se necessário
     let dataNascIso: string | null = null;
@@ -1127,8 +1144,9 @@ router.post("/admin/clientes", async (req, res) => {
       }
     }
 
-    const valuesToInsert = {
-      id,
+    const today = new Date().toISOString().slice(0, 10);
+
+    const baseValues = {
       vendedorId: String(body.vendedorId),
       planoId: precoSelecionado.planoId,
       faixaId: precoSelecionado.faixaId,
@@ -1162,17 +1180,73 @@ router.post("/admin/clientes", async (req, res) => {
           : null,
       valorMensal: precoSelecionado.valor,
       status: "ATIVO" as const,
-      dataAtivacao: new Date().toISOString().slice(0, 10),
+      dataAtivacao: today,
       planoCode: precoSelecionado.codigo,
       codigoPlano: precoSelecionado.codigo,
       observacao: body.observacao ? String(body.observacao) : null,
       representante: body.representante ? String(body.representante) : null,
-    } as typeof clientesTable.$inferInsert;
+    } as Partial<typeof clientesTable.$inferInsert>;
 
     const cliente = await db.transaction(async (tx) => {
-      const [created] = await tx.insert(clientesTable).values(valuesToInsert).returning();
-      if (!created) throw new Error("CLIENTE_NAO_CRIADO");
-      await ensureActivationCommission(tx, created, created.dataAtivacao);
+      let created: typeof clientesTable.$inferSelect;
+
+      if (existingByCpf) {
+        // Beneficiário existente mas não ATIVO — reutiliza registro e reativa
+        const [updated] = await tx
+          .update(clientesTable)
+          .set({ ...baseValues, comissaoProcessada: false, comissao: null, updatedAt: new Date() })
+          .where(eq(clientesTable.id, existingByCpf.id))
+          .returning();
+        if (!updated) throw new Error("CLIENTE_NAO_CRIADO");
+        created = updated;
+      } else {
+        // Novo beneficiário
+        const [inserted] = await tx
+          .insert(clientesTable)
+          .values({ id: `cli-${randomUUID()}`, ...baseValues } as typeof clientesTable.$inferInsert)
+          .returning();
+        if (!inserted) throw new Error("CLIENTE_NAO_CRIADO");
+        created = inserted;
+      }
+
+      if (comissaoSnap !== null) {
+        // Comissão manual: salva o valor e cria registro de rastreamento
+        await tx
+          .update(clientesTable)
+          .set({ comissao: comissaoSnap, comissaoProcessada: true, updatedAt: new Date() })
+          .where(eq(clientesTable.id, created.id));
+
+        // Cria ou atualiza a linha de comissão (evita duplicata em caso de reativação)
+        const [existingCom] = await tx
+          .select({ id: comissoesTable.id })
+          .from(comissoesTable)
+          .where(and(eq(comissoesTable.clienteId, created.id), eq(comissoesTable.tipo, "VENDA")))
+          .limit(1);
+        if (!existingCom) {
+          const [yr, mo] = [today.slice(0, 4), today.slice(5, 7)];
+          await tx.insert(comissoesTable).values({
+            id: `com-${randomUUID()}`,
+            vendedorId: created.vendedorId,
+            clienteId: created.id,
+            clienteNome: created.nome,
+            tipo: "VENDA",
+            valor: comissaoSnap,
+            mesReferencia: `${mo}/${yr}`,
+            status: "PENDENTE",
+            planoCode: created.planoCode,
+            dataVenda: today,
+            observacao: "Comissão de ativação (informada manualmente)",
+          });
+        } else {
+          await tx
+            .update(comissoesTable)
+            .set({ valor: comissaoSnap, updatedAt: new Date() } as Partial<typeof comissoesTable.$inferInsert>)
+            .where(eq(comissoesTable.id, existingCom.id));
+        }
+      } else {
+        await ensureActivationCommission(tx, created, created.dataAtivacao);
+      }
+
       const [withSnapshot] = await tx
         .select()
         .from(clientesTable)
@@ -1180,6 +1254,7 @@ router.post("/admin/clientes", async (req, res) => {
         .limit(1);
       return withSnapshot ?? created;
     });
+
     res.status(201).json({ cliente });
   } catch (err) {
     if (err instanceof Error && err.message === COMISSAO_CONFIGURACAO_AUSENTE) {

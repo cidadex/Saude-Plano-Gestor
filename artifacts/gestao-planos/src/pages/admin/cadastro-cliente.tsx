@@ -51,6 +51,7 @@ interface FormData {
   formaPagamento: string;
   diaVencimento: string;
   valorMensal: string;
+  comissao: string;
   observacao: string;
   docRgUrl: string;
   docComprovanteUrl: string;
@@ -146,7 +147,7 @@ const formVazio: FormData = {
   cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "CE",
   contratoId: "", responsavelFinanceiroId: "", vendedorId: "", representante: "",
   tabelaPrecoId: "", planoId: "", faixaId: "", planoCode: "",
-  formaPagamento: "", diaVencimento: "", valorMensal: "",
+  formaPagamento: "", diaVencimento: "", valorMensal: "", comissao: "",
   observacao: "", docRgUrl: "", docComprovanteUrl: "", tipo: "TITULAR",
 };
 
@@ -230,6 +231,7 @@ export default function CadastroCliente({ open, onClose, onCreated }: CadastroCl
       faixaId: "",
       planoCode: "",
       valorMensal: "",
+      comissao: "",
     }));
     setPlanos([]);
     setTabelaPreco(null);
@@ -319,6 +321,7 @@ export default function CadastroCliente({ open, onClose, onCreated }: CadastroCl
       formaPagamento: form.formaPagamento,
       diaVencimento: Number(form.diaVencimento),
       valorMensal: form.valorMensal.replace(",", "."),
+      comissao: form.comissao ? Number(form.comissao.replace(",", ".")) : null,
       docRgUrl: form.docRgUrl || null,
       docComprovanteUrl: form.docComprovanteUrl || null,
       tipo: form.tipo || "TITULAR",
@@ -493,6 +496,24 @@ export default function CadastroCliente({ open, onClose, onCreated }: CadastroCl
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Comissão manual por beneficiário */}
+            {form.vendedorId && (
+              <div className="space-y-1.5">
+                <Label>Comissão do Vendedor (R$)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.comissao}
+                  onChange={e => handleChange("comissao", e.target.value)}
+                  placeholder="Ex: 150.00"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Valor da comissão por este beneficiário. Varia por plano — informe manualmente.
+                </p>
+              </div>
+            )}
 
             {/* Plano */}
             <div className="space-y-2">
