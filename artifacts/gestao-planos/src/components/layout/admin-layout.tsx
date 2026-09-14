@@ -191,7 +191,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col md:ml-60">
+      <div className="min-w-0 flex-1 flex flex-col md:ml-60">
         <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-[#0d1526] border-b border-white/[0.06]">
           <button onClick={() => setMobileOpen(true)} className="text-slate-400 hover:text-white">
             <Menu className="h-5 w-5" />

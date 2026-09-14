@@ -20,6 +20,9 @@ export default function VendedorComissoes() {
 
   const totalVenda = comissoesVenda.reduce((a, c) => a + parseFloat(c.valor), 0);
   const totalServico = comissoesServico.reduce((a, c) => a + parseFloat(c.valor), 0);
+  const totalRecebido = comissoes
+    .filter(c => c.status === "PAGO")
+    .reduce((a, c) => a + parseFloat(c.valor), 0);
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -42,7 +45,7 @@ export default function VendedorComissoes() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{formatMoney(totalVenda + totalServico)}</div>
+            <div className="text-3xl font-bold">{formatMoney(totalRecebido)}</div>
           </CardContent>
         </Card>
         <Card>
@@ -65,15 +68,15 @@ export default function VendedorComissoes() {
 
       <Tabs defaultValue="venda" className="w-full mt-8">
         <TabsList className="grid w-full max-w-md grid-cols-2 p-1">
-          <TabsTrigger value="venda" className="text-sm font-medium data-[state=active]:bg-background">Comissões de Venda</TabsTrigger>
+           <TabsTrigger value="venda" className="text-sm font-medium data-[state=active]:bg-background">Ativação (pagamento único)</TabsTrigger>
           <TabsTrigger value="servico" className="text-sm font-medium data-[state=active]:bg-background">Taxa de Serviço</TabsTrigger>
         </TabsList>
 
         <TabsContent value="venda" className="mt-6">
           <Card className="border shadow-sm">
             <CardHeader className="bg-muted/20 pb-4">
-              <CardTitle className="text-lg">Extrato de Agenciamento</CardTitle>
-              <CardDescription>Pagas no primeiro mês após a ativação do plano.</CardDescription>
+               <CardTitle className="text-lg">Comissão de ativação (única)</CardTitle>
+               <CardDescription>Pagamento único após a ativação do plano, conforme a configuração do vendedor.</CardDescription>
             </CardHeader>
             <Table>
               <TableHeader>

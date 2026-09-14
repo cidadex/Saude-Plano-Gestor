@@ -32,6 +32,7 @@ const INICIO_SEMANA = new Date(HOJE);
 INICIO_SEMANA.setDate(HOJE.getDate() - HOJE.getDay());
 
 const MES_ATUAL = `${String(HOJE.getMonth() + 1).padStart(2, "0")}/${HOJE.getFullYear()}`;
+const cardLinkClass = "block rounded-xl transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
 
 export default function VendedorDashboard() {
   const { user } = useAuth();
@@ -108,6 +109,7 @@ export default function VendedorDashboard() {
       <section className="space-y-2.5">
         <p className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-[0.12em]">Minha Carteira</p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Link href="/vendedor/carteira" className={cardLinkClass} aria-label="Ver minha carteira" data-testid="link-card-vendedor-carteira">
           <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 p-5 text-white shadow-lg shadow-emerald-900/20">
             <div className="absolute right-3 top-3 opacity-20"><Users className="h-16 w-16" /></div>
             <p className="text-xs font-semibold uppercase tracking-wider text-emerald-200">Minha Carteira</p>
@@ -119,7 +121,9 @@ export default function VendedorDashboard() {
               <span>{totalDependentes} depend.</span>
             </div>
           </div>
+          </Link>
 
+          <Link href="/vendedor/carteira" className={cardLinkClass} aria-label="Ver receita da carteira" data-testid="link-card-vendedor-receita">
           <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 p-5 text-white shadow-lg shadow-blue-900/20">
             <div className="absolute right-3 top-3 opacity-20"><DollarSign className="h-16 w-16" /></div>
             <p className="text-xs font-semibold uppercase tracking-wider text-blue-200">Receita da Carteira</p>
@@ -129,7 +133,9 @@ export default function VendedorDashboard() {
               Saldo corretora: <span className="font-bold text-white">{formatMoney(saldoCarteira)}</span>
             </div>
           </div>
+          </Link>
 
+          <Link href="/vendedor/comissoes" className={cardLinkClass} aria-label="Ver comissão a receber" data-testid="link-card-vendedor-comissoes">
           <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 p-5 text-white shadow-lg shadow-amber-900/20">
             <div className="absolute right-3 top-3 opacity-20"><Receipt className="h-16 w-16" /></div>
             <p className="text-xs font-semibold uppercase tracking-wider text-amber-200">Comissão a Receber</p>
@@ -139,7 +145,9 @@ export default function VendedorDashboard() {
               Total histórico: <span className="font-bold text-white">{formatMoney(comissaoTotal)}</span>
             </div>
           </div>
+          </Link>
 
+          <Link href="/vendedor/carteira" className={cardLinkClass} aria-label="Ver ativações do mês na carteira" data-testid="link-card-vendedor-ativacoes">
           <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-violet-600 to-purple-700 p-5 text-white shadow-lg shadow-violet-900/20">
             <div className="absolute right-3 top-3 opacity-20"><TrendingUp className="h-16 w-16" /></div>
             <p className="text-xs font-semibold uppercase tracking-wider text-violet-200">Ativações do Mês</p>
@@ -151,6 +159,7 @@ export default function VendedorDashboard() {
               <span>Hoje: {vendasHoje}</span>
             </div>
           </div>
+          </Link>
         </div>
       </section>
 
@@ -158,7 +167,8 @@ export default function VendedorDashboard() {
       <section className="space-y-2.5">
         <p className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-[0.12em]">Pagamentos — {MES_ATUAL.replace("/", "/")} </p>
         <div className="grid gap-4 sm:grid-cols-3">
-          <div className="rounded-xl border bg-card p-5 flex gap-4 items-center shadow-sm">
+          <Link href="/vendedor/boletos" className={cardLinkClass} aria-label="Ver pagamentos em dia" data-testid="link-card-vendedor-pagos">
+          <div className="rounded-xl border bg-card p-5 flex gap-4 items-center shadow-sm h-full">
             <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
               <CheckCircle2 className="h-6 w-6 text-emerald-600" />
             </div>
@@ -168,7 +178,9 @@ export default function VendedorDashboard() {
               <p className="text-xs text-muted-foreground">{pgEmDia.length} boleto{pgEmDia.length !== 1 ? "s" : ""} confirmados</p>
             </div>
           </div>
-          <div className="rounded-xl border bg-card p-5 flex gap-4 items-center shadow-sm">
+          </Link>
+          <Link href="/vendedor/cobranca" className={cardLinkClass} aria-label="Ver pagamentos em atraso" data-testid="link-card-vendedor-atraso">
+          <div className="rounded-xl border bg-card p-5 flex gap-4 items-center shadow-sm h-full">
             <div className="w-12 h-12 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
               <AlertCircle className="h-6 w-6 text-red-600" />
             </div>
@@ -178,7 +190,9 @@ export default function VendedorDashboard() {
               <p className="text-xs text-muted-foreground">{pgEmAtraso.length} boleto{pgEmAtraso.length !== 1 ? "s" : ""} vencido{pgEmAtraso.length !== 1 ? "s" : ""}</p>
             </div>
           </div>
-          <div className="rounded-xl border bg-card p-5 flex gap-4 items-center shadow-sm">
+          </Link>
+          <Link href="/vendedor/boletos" className={cardLinkClass} aria-label="Ver pagamentos a vencer" data-testid="link-card-vendedor-a-vencer">
+          <div className="rounded-xl border bg-card p-5 flex gap-4 items-center shadow-sm h-full">
             <div className="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
               <Clock className="h-6 w-6 text-amber-600" />
             </div>
@@ -188,6 +202,7 @@ export default function VendedorDashboard() {
               <p className="text-xs text-muted-foreground">{pgAVencer.length} boleto{pgAVencer.length !== 1 ? "s" : ""} pendente{pgAVencer.length !== 1 ? "s" : ""}</p>
             </div>
           </div>
+          </Link>
         </div>
       </section>
 

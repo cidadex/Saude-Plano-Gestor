@@ -1,1 +1,2 @@
 - [Imported artifact workflows](imported-artifact-workflows.md) — after artifact registration, use managed workflows only; legacy duplicates can silently shift ports or block services.
+- [Activation commission policy](activation-commission-policy.md) — one-time titular-based commission; preserve history and avoid retroactive payouts.

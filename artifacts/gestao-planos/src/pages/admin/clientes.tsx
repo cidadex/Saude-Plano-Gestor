@@ -289,6 +289,7 @@ export default function AdminClientes() {
                 <TableHead>Responsável</TableHead>
                 <TableHead>Plano</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
+                 <TableHead className="text-right">Comissão</TableHead>
                 <TableHead className="text-center">Venc.</TableHead>
                 <TableHead className="text-center">Status</TableHead>
               </TableRow>
@@ -296,7 +297,7 @@ export default function AdminClientes() {
             <TableBody>
               {filteredClientes.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+                   <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
                     Nenhum cliente encontrado.
                   </TableCell>
                 </TableRow>
@@ -347,6 +348,9 @@ export default function AdminClientes() {
                         <Badge variant="outline" className="font-mono text-xs bg-muted/50">{c.planoCode ?? "—"}</Badge>
                       </TableCell>
                       <TableCell className="text-right font-semibold text-sm">{formatMoney(parseFloat(c.valorMensal ?? "0"))}</TableCell>
+                       <TableCell className="text-right text-sm font-semibold text-amber-600">
+                         {c.comissao == null ? "—" : formatMoney(parseFloat(c.comissao))}
+                       </TableCell>
                       <TableCell className="text-center text-sm text-muted-foreground">Dia {c.diaVencimento ?? "—"}</TableCell>
                       <TableCell className="text-center">
                         <Badge variant="outline" className={`text-xs ${statusBadge(c.status)}`}>{c.status}</Badge>
@@ -355,7 +359,7 @@ export default function AdminClientes() {
 
                     <CollapsibleContent asChild>
                       <TableRow className="bg-muted/20 hover:bg-muted/20">
-                        <TableCell colSpan={10} className="p-0">
+                         <TableCell colSpan={11} className="p-0">
                           <div className="px-6 py-4 border-b">
                             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 text-sm mb-4">
                               <div className="space-y-1.5">
@@ -390,8 +394,8 @@ export default function AdminClientes() {
                                 {c.vrPl && <p><span className="text-muted-foreground">Valor 2025:</span> {formatMoney(parseFloat(c.vrPl))}</p>}
                                 {c.valor2026 && <p><span className="text-muted-foreground">Valor 2026:</span> <span className="font-semibold">{formatMoney(parseFloat(c.valor2026))}</span></p>}
                                 {c.saldo && <p><span className="text-muted-foreground">Saldo:</span> <span className="font-semibold text-emerald-600">{formatMoney(parseFloat(c.saldo))}</span></p>}
-                                {c.comissao && parseFloat(c.comissao) > 0 && (
-                                  <p><span className="text-muted-foreground">Comissão:</span> <span className="font-semibold text-amber-600">{formatMoney(parseFloat(c.comissao))}</span></p>
+                                 {c.comissao != null && (
+                                   <p><span className="text-muted-foreground">Comissão de ativação:</span> <span className="font-semibold text-amber-600">{formatMoney(parseFloat(c.comissao))}</span></p>
                                 )}
                                 {c.observacao && (
                                   <div className="mt-2 p-2 rounded-lg bg-amber-50 border border-amber-200">
@@ -553,7 +557,7 @@ export default function AdminClientes() {
                     <Input type="number" step="0.01" value={editForm.valor2026} onChange={e => setEditForm(f => ({ ...f, valor2026: e.target.value }))} placeholder="0.00" />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Comissão</Label>
+                     <Label className="text-xs text-muted-foreground">Comissão de ativação (snapshot)</Label>
                     <Input type="number" step="0.01" value={editForm.comissao} onChange={e => setEditForm(f => ({ ...f, comissao: e.target.value }))} placeholder="0.00" />
                   </div>
                 </div>

@@ -254,6 +254,7 @@ router.post("/seed", async (_req, res) => {
         const isCorporativo = corporativosClienteIds.has(c.id);
         await tx.insert(clientesTable).values({
           ...c,
+          comissaoProcessada: true,
           contratoId: isCorporativo ? "ctr-corp-acme" : "ctr-padrao",
           responsavelFinanceiroId: clienteResp[c.id],
         });

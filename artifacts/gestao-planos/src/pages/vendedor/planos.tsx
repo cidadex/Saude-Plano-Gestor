@@ -4,19 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/api";
 import { formatMoney } from "@/lib/format";
-import { ChevronDown, ChevronUp, ClipboardList, Shield, Loader2 } from "lucide-react";
-
-type PlanoAPI = {
-  id: string;
-  codigo: string | null;
-  nome: string;
-  categoria: string | null;
-  acomodacao: string | null;
-  valorTitular: string | null;
-  valorDependente: string | null;
-  coberturas: string | null;
-  ativo: boolean;
-};
+import { AlertTriangle, ChevronDown, ChevronUp, Loader2, Shield } from "lucide-react";
 
 type TabelaFaixa = {
   id: string;
@@ -25,12 +13,25 @@ type TabelaFaixa = {
   valorApartamento: string | null;
 };
 
-type TabelaPreco = {
+type PlanoTabela = {
+  id: string;
+  nome: string;
+  codigo: string | null;
+  categoria: string | null;
+  acomodacao: string | null;
+  faixas: TabelaFaixa[];
+};
+
+type TabelaInfo = {
   id: string;
   nome: string;
   tipoPlano: string | null;
   ano: number | null;
-  faixas: TabelaFaixa[];
+};
+
+type ApiResponse = {
+  tabela: TabelaInfo | null;
+  planos: PlanoTabela[];
 };
 
 const categoriaCor: Record<string, string> = {
@@ -39,30 +40,22 @@ const categoriaCor: Record<string, string> = {
   "PLENO": "border-purple-300 bg-purple-50 text-purple-700",
 };
 
-const categoriaDesc: Record<string, string> = {
-  "NOSSO PLANO": "Plano básico da rede própria. Ideal para quem busca cobertura completa com menor custo.",
-  "MIX": "Combina rede própria e credenciada. Mais opções de atendimento.",
-  "PLENO": "Cobertura máxima com apartamento e rede ampla. Para quem quer o melhor.",
-};
-
-const CATEGORIAS = ["NOSSO PLANO", "MIX", "PLENO"];
-
 export default function VendedorPlanos() {
-  const [planos, setPlanos] = useState<PlanoAPI[]>([]);
-  const [tabelas, setTabelas] = useState<TabelaPreco[]>([]);
+  const [tabela, setTabela] = useState<TabelaInfo | null>(null);
+  const [planos, setPlanos] = useState<PlanoTabela[]>([]);
   const [loading, setLoading] = useState(true);
-  const [categoriaAberta, setCategoriaAberta] = useState<string | null>("NOSSO PLANO");
-  const [tabelasVisiveis, setTabelasVisiveis] = useState(false);
+  const [abertos, setAbertos] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const carregar = async () => {
       try {
-        const [dadosPlanos, dadosTabelas] = await Promise.all([
-          apiFetch("/planos") as Promise<{ planos: PlanoAPI[] }>,
-          apiFetch("/vendedor/tabela-preco") as Promise<{ tabelas: TabelaPreco[] }>,
-        ]);
-        setPlanos((dadosPlanos.planos ?? []).filter(p => p.ativo));
-        setTabelas(dadosTabelas.tabelas ?? []);
+        const data = await apiFetch<ApiResponse>("/vendedor/tabela-preco");
+        setTabela(data.tabela);
+        setPlanos(data.planos ?? []);
+        // Open all plans by default
+        if (data.planos?.length) {
+          setAbertos(new Set(data.planos.map(p => p.id)));
+        }
       } catch (err) {
         console.error(err);
       } finally {
@@ -71,6 +64,15 @@ export default function VendedorPlanos() {
     };
     carregar();
   }, []);
+
+  const toggle = (id: string) => {
+    setAbertos(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   if (loading) {
     return (
@@ -82,156 +84,146 @@ export default function VendedorPlanos() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col gap-2 pb-4 border-b">
         <h2 className="text-3xl font-bold tracking-tight text-foreground">Tabela de Planos</h2>
-        <p className="text-muted-foreground">Consulte os planos disponíveis para oferecer aos seus clientes.</p>
+        {tabela ? (
+          <p className="text-muted-foreground">
+            Tabela <strong>{tabela.nome}</strong>
+            {tabela.ano ? ` · ${tabela.ano}` : ""}
+            {tabela.tipoPlano ? ` · ${tabela.tipoPlano}` : ""}
+          </p>
+        ) : (
+          <p className="text-muted-foreground">Valores dos planos que você pode oferecer aos seus clientes.</p>
+        )}
       </div>
 
-      {/* KPIs por categoria */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        {CATEGORIAS.map(cat => {
-          const planosCateg = planos.filter(p => p.categoria === cat);
-          if (!planosCateg.length) return null;
-          const menorPreco = Math.min(...planosCateg.map(p => parseFloat(p.valorTitular ?? "0")));
-          return (
-            <Card key={cat} className="border shadow-sm">
-              <CardContent className="pt-4 pb-3">
-                <div className="flex items-center justify-between mb-1">
-                  <Badge variant="outline" className={`text-xs ${categoriaCor[cat] ?? ""}`}>{cat}</Badge>
-                  <span className="text-xs text-muted-foreground">{planosCateg.length} planos</span>
-                </div>
-                <p className="text-sm text-muted-foreground mt-2">A partir de</p>
-                <p className="text-xl font-bold text-foreground">{formatMoney(menorPreco)}</p>
-                <p className="text-xs text-muted-foreground">/ mês (titular)</p>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Planos por categoria — accordion */}
-      <div className="space-y-3">
-        {CATEGORIAS.map(cat => {
-          const planosCateg = planos.filter(p => p.categoria === cat);
-          if (!planosCateg.length) return null;
-          const aberto = categoriaAberta === cat;
-          return (
-            <Card key={cat} className="overflow-hidden">
-              <button
-                className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/20 transition-colors"
-                onClick={() => setCategoriaAberta(aberto ? null : cat)}
-                data-testid={`btn-categoria-${cat.replace(/ /g, "-").toLowerCase()}`}
-              >
-                <div className="flex items-center gap-3">
-                  <Shield className="h-5 w-5 text-primary" />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-foreground">{cat}</span>
-                      <Badge variant="outline" className={`text-xs ${categoriaCor[cat] ?? ""}`}>
-                        {planosCateg.length} opções
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">{categoriaDesc[cat]}</p>
-                  </div>
-                </div>
-                {aberto
-                  ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
-                  : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                }
-              </button>
-
-              {aberto && (
-                <div className="border-t">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/40">
-                        <TableHead>Código</TableHead>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>Acomodação</TableHead>
-                        <TableHead className="text-right">Vr. Titular</TableHead>
-                        <TableHead className="text-right">Vr. Depend.</TableHead>
-                        <TableHead>Coberturas</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {planosCateg.map(plano => (
-                        <TableRow key={plano.id} data-testid={`row-vendedor-plano-${plano.codigo}`} className="hover:bg-muted/20">
-                          <TableCell>
-                            <Badge variant="outline" className="font-mono text-xs bg-muted/50">{plano.codigo ?? "—"}</Badge>
-                          </TableCell>
-                          <TableCell className="text-sm font-medium">{plano.nome}</TableCell>
-                          <TableCell className="text-sm">{plano.acomodacao ?? "—"}</TableCell>
-                          <TableCell className="text-right font-bold text-sm text-primary">
-                            {plano.valorTitular ? formatMoney(parseFloat(plano.valorTitular)) : "—"}
-                          </TableCell>
-                          <TableCell className="text-right text-sm text-muted-foreground">
-                            {plano.valorDependente ? formatMoney(parseFloat(plano.valorDependente)) : "—"}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {plano.coberturas?.split(",").map(c => (
-                                <Badge key={c} variant="secondary" className="text-[10px] px-1.5 py-0">{c.trim()}</Badge>
-                              ))}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Tabelas por faixa etária — se o vendedor tiver */}
-      {tabelas.length > 0 && (
-        <div className="space-y-3 pt-2">
-          <button
-            className="flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
-            onClick={() => setTabelasVisiveis(v => !v)}
-            data-testid="btn-toggle-tabelas-faixa"
-          >
-            <ClipboardList className="h-4 w-4" />
-            {tabelasVisiveis ? "Ocultar" : "Ver"} minha tabela de preços por faixa etária
-            {tabelasVisiveis ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-          </button>
-
-          {tabelasVisiveis && (
-            <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-              {tabelas.map(tabela => (
-                <Card key={tabela.id} className="overflow-hidden">
-                  <CardHeader className="bg-muted/30 pb-3 border-b">
-                    <CardTitle className="text-sm font-semibold">
-                      {tabela.tipoPlano}
-                      {tabela.ano && <span className="ml-2 text-xs text-muted-foreground font-normal">({tabela.ano})</span>}
-                    </CardTitle>
-                  </CardHeader>
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/20">
-                        <TableHead className="text-xs">Faixa Etária</TableHead>
-                        <TableHead className="text-right text-xs">Enfermaria</TableHead>
-                        <TableHead className="text-right text-xs">Apartamento</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {tabela.faixas.map((f, i) => (
-                        <TableRow key={i}>
-                          <TableCell className="text-sm font-medium">{f.faixaEtaria}</TableCell>
-                          <TableCell className="text-right text-sm">{formatMoney(parseFloat(f.valor))}</TableCell>
-                          <TableCell className="text-right text-sm text-muted-foreground">
-                            {f.valorApartamento ? formatMoney(parseFloat(f.valorApartamento)) : "—"}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </Card>
-              ))}
+      {/* No table assigned */}
+      {!tabela && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="flex items-start gap-3 py-5">
+            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-amber-800">Tabela de preços não vinculada</p>
+              <p className="text-sm text-amber-700 mt-0.5">
+                Você ainda não possui uma tabela de preços associada. Solicite ao administrador que vincule uma tabela ao seu cadastro.
+              </p>
             </div>
-          )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Summary cards by category */}
+      {planos.length > 0 && (() => {
+        const categorias = [...new Set(planos.map(p => p.categoria).filter(Boolean))] as string[];
+        return (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {categorias.map(cat => {
+              const planosCateg = planos.filter(p => p.categoria === cat);
+              const menores = planosCateg.flatMap(p => p.faixas.map(f => Number(f.valor))).filter(v => v > 0);
+              const menor = menores.length ? Math.min(...menores) : 0;
+              return (
+                <Card key={cat} className="border shadow-sm">
+                  <CardContent className="pt-4 pb-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <Badge variant="outline" className={`text-xs ${categoriaCor[cat] ?? ""}`}>{cat}</Badge>
+                      <span className="text-xs text-muted-foreground">{planosCateg.length} plano{planosCateg.length !== 1 ? "s" : ""}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">A partir de</p>
+                    <p className="text-xl font-bold text-foreground">{menor > 0 ? formatMoney(menor) : "—"}</p>
+                    <p className="text-xs text-muted-foreground">/ mês (por faixa etária)</p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      {/* Plans list */}
+      {planos.length === 0 && tabela && (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+            A tabela ainda não possui planos com preços cadastrados. Fale com o administrador.
+          </CardContent>
+        </Card>
+      )}
+
+      {planos.length > 0 && (
+        <div className="space-y-3">
+          {planos.map(plano => {
+            const open = abertos.has(plano.id);
+            return (
+              <Card key={plano.id} className="overflow-hidden">
+                <button
+                  className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/20 transition-colors"
+                  onClick={() => toggle(plano.id)}
+                >
+                  <div className="flex items-center gap-3">
+                    <Shield className="h-5 w-5 text-primary shrink-0" />
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {plano.codigo && (
+                          <Badge variant="outline" className="font-mono text-xs bg-muted/50">{plano.codigo}</Badge>
+                        )}
+                        <span className="font-bold text-foreground text-sm">{plano.nome}</span>
+                        {plano.categoria && (
+                          <Badge variant="outline" className={`text-xs ${categoriaCor[plano.categoria] ?? ""}`}>
+                            {plano.categoria}
+                          </Badge>
+                        )}
+                        {plano.acomodacao && (
+                          <span className="text-xs text-muted-foreground">{plano.acomodacao}</span>
+                        )}
+                      </div>
+                      {!open && plano.faixas.length > 0 && (() => {
+                        const vals = plano.faixas.map(f => Number(f.valor)).filter(v => v > 0);
+                        const min = vals.length ? Math.min(...vals) : 0;
+                        const max = vals.length ? Math.max(...vals) : 0;
+                        return (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {min > 0 ? `${formatMoney(min)}${max !== min ? ` – ${formatMoney(max)}` : ""} / mês` : ""}
+                            {" · "}{plano.faixas.length} faixa{plano.faixas.length !== 1 ? "s" : ""}
+                          </p>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                  {open
+                    ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+                    : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                  }
+                </button>
+
+                {open && (
+                  <div className="border-t">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/40">
+                          <TableHead>Faixa Etária</TableHead>
+                          <TableHead className="text-right">Enfermaria</TableHead>
+                          <TableHead className="text-right">Apartamento</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {plano.faixas.map(faixa => (
+                          <TableRow key={faixa.id} className="hover:bg-muted/20">
+                            <TableCell className="font-medium text-sm">{faixa.faixaEtaria}</TableCell>
+                            <TableCell className="text-right font-bold text-sm text-primary">
+                              {formatMoney(Number(faixa.valor))}
+                            </TableCell>
+                            <TableCell className="text-right text-sm text-muted-foreground">
+                              {faixa.valorApartamento ? formatMoney(Number(faixa.valorApartamento)) : "—"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

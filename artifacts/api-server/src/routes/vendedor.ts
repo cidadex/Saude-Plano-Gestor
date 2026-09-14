@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../middlewares/auth.js";
 import { validarDadosTitular } from "../lib/validacaoProposta.js";
+import { validarSelecaoProposta } from "../lib/validacaoSelecaoProposta.js";
 import {
   db, clientesTable, propostasTable, boletosTable,
   comissoesTable, planosTable, vendedoresTable,
@@ -168,10 +169,11 @@ router.post("/vendedor/propostas", async (req, res) => {
     const vendedorId = req.user!.vendedorId;
     if (!vendedorId) return res.status(403).json({ error: "Somente vendedores" });
 
-    const { dadosTitular, dadosDependentes, planoId, valorTotal, contratoId, responsavelFinanceiroId, titularEhResponsavel } = req.body as {
+    const { dadosTitular, dadosDependentes, planoId, faixaId, valorTotal, contratoId, responsavelFinanceiroId, titularEhResponsavel } = req.body as {
       dadosTitular: Record<string, unknown>;
       dadosDependentes?: Record<string, unknown>[];
       planoId?: string;
+      faixaId?: string;
       valorTotal?: string;
       contratoId?: string;
       responsavelFinanceiroId?: string;
@@ -184,14 +186,27 @@ router.post("/vendedor/propostas", async (req, res) => {
     const erroValidacao = validarDadosTitular(dadosTitular);
     if (erroValidacao) return res.status(400).json({ error: erroValidacao });
 
+    const selecao = await validarSelecaoProposta(db, vendedorId, planoId, faixaId);
+    if (!selecao.ok) return res.status(400).json({ error: selecao.error });
+
+    const dadosTitularPersistidos = {
+      ...dadosTitular,
+      planoId: selecao.planoId,
+      faixaId: selecao.faixaId,
+      plano: selecao.planoNome,
+      codigoPlano: selecao.planoCodigo,
+      valorMensal: selecao.valorTitular,
+      valor: selecao.valorTitular,
+    };
     const id = `prop-${Date.now()}`;
     const [proposta] = await db.insert(propostasTable).values({
       id,
       vendedorId,
       status: "AGUARDANDO_ENVIO",
-      dadosTitular,
+      dadosTitular: dadosTitularPersistidos,
       dadosDependentes: dadosDependentes ?? [],
-      planoId: planoId ?? null,
+      planoId: selecao.planoId,
+      faixaId: selecao.faixaId,
       valorTotal: valorTotal ?? null,
       contratoId,
       responsavelFinanceiroId,

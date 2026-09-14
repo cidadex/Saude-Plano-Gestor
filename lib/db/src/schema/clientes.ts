@@ -1,4 +1,4 @@
-import { pgTable, text, numeric, integer, timestamp, pgEnum, date } from "drizzle-orm/pg-core";
+import { pgTable, text, numeric, integer, timestamp, pgEnum, date, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { vendedoresTable } from "./vendedores";
@@ -71,6 +71,7 @@ export const clientesTable = pgTable("clientes", {
   saldo: numeric("saldo", { precision: 10, scale: 2 }),
   valor2026: numeric("valor_2026", { precision: 10, scale: 2 }),
   comissao: numeric("comissao", { precision: 10, scale: 2 }),
+  comissaoProcessada: boolean("comissao_processada").notNull().default(false),
   dataAtivacao: date("data_ativacao"),
   planoCode: text("plano_code"),
   codigoPlano: text("codigo_plano"),

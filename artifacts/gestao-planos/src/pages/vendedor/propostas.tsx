@@ -124,15 +124,21 @@ export default function VendedorPropostas() {
   const tabelaAtual = tabelas.find(t => t.id === form.tabelaId) ?? tabelas[0];
 
   const planosNaTabela = useMemo(() => {
-    if (!tabelaAtual || tabelaAtual.faixas.length === 0) return sortPlanos(planosAPI);
-    const ids = [...new Set(tabelaAtual.faixas.map(f => f.planoId))];
+    if (!tabelaAtual || tabelaAtual.faixas.length === 0) return [];
+    const ids = [...new Set(
+      tabelaAtual.faixas
+        .filter(f => !f.faixaEtaria.toUpperCase().includes("DEPENDENTE"))
+        .map(f => f.planoId),
+    )];
     const filtrados = planosAPI.filter(p => ids.includes(p.id));
-    return sortPlanos(filtrados.length > 0 ? filtrados : planosAPI);
+    return sortPlanos(filtrados);
   }, [tabelaAtual, planosAPI]);
 
   const faixasTitular = useMemo(() => {
     if (!tabelaAtual || !form.planoId) return [];
-    return tabelaAtual.faixas.filter(f => f.planoId === form.planoId);
+    return tabelaAtual.faixas.filter(
+      f => f.planoId === form.planoId && !f.faixaEtaria.toUpperCase().includes("DEPENDENTE"),
+    );
   }, [tabelaAtual, form.planoId]);
 
   const getFaixasDep = (depPlanoId: string) => {
@@ -209,7 +215,7 @@ export default function VendedorPropostas() {
 
   const handleSalvar = async () => {
     setSalvarErro("");
-    if (form.planoId && faixasTitular.length > 0 && !form.faixaIdTitular) {
+    if (!form.faixaIdTitular) {
       setSalvarErro("Selecione a faixa etária do titular antes de salvar.");
       return;
     }
@@ -226,6 +232,8 @@ export default function VendedorPropostas() {
           contratoId: form.contratoId,
           responsavelFinanceiroId: form.titularEhResponsavel ? undefined : form.responsavelFinanceiroId,
           titularEhResponsavel: form.titularEhResponsavel,
+          planoId: form.planoId,
+          faixaId: form.faixaIdTitular,
           dadosTitular: {
             nome: form.clienteNome.toUpperCase(),
             cpf: form.clienteCpf,
@@ -375,7 +383,7 @@ export default function VendedorPropostas() {
   const updateEditDepDocs = (id: string, docs: DocFile[]) =>
     setEditDeps(prev => prev.map(d => d._id === id ? { ...d, documentos: docs } : d));
 
-  const podeSair1 = !!form.clienteNome && !!form.clienteCpf && !!form.planoId && (faixasTitular.length === 0 || !!form.faixaIdTitular);
+  const podeSair1 = !!form.clienteNome && !!form.clienteCpf && !!form.planoId && !!form.faixaIdTitular;
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">

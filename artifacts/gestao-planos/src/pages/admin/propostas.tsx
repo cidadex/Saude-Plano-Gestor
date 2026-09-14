@@ -15,6 +15,11 @@ import { DocUploader, type DocFile } from "@/components/DocUploader";
 
 type VendedorSelect = { id: string; nome: string; email: string };
 type PlanoSelect = { id: string; codigo: string | null; nome: string; valorTitular: string | null; valorDependente: string | null; ativo: boolean };
+type TabelaPrecoSelect = {
+  id: string;
+  vendedorId: string | null;
+  faixas: Array<{ id: string; planoId: string; faixaEtaria: string; valor: string }>;
+};
 type ContratoSelect = { id: string; nome: string; ativo: boolean; asaasModo: "SANDBOX" | "PRODUCAO" };
 type ResponsavelSelect = { id: string; nome: string; tipo: "PF" | "PJ"; cpfCnpj: string };
 type DepAdmin = { _id: string; nome: string; cpf: string; dataNascimento: string; grauParentesco: string; nomeMae: string; estadoCivil: string; sexo: string; planoId: string; codigoPlano: string; planoNome: string; valor: string; documentos: DocFile[] };
@@ -40,7 +45,7 @@ const NOVA_FORM_INIT = {
   clienteNome: "", clienteCpf: "", dataNascimento: "", sexo: "",
   telefone: "", email: "", cep: "", logradouro: "", numero: "", bairro: "",
   cidade: "", estado: "", estadoCivil: "", nomeMae: "", rg: "", rgOrgaoEmissor: "", rgUf: "CE",
-  planoId: "", codigoPlano: "", planoNome: "", valorManual: "",
+  planoId: "", faixaId: "", codigoPlano: "", planoNome: "", valorManual: "",
   documentosTitular: [] as DocFile[],
   dependentes: [] as DepAdmin[],
   contratoId: "", responsavelFinanceiroId: "", titularEhResponsavel: false,
@@ -116,9 +121,6 @@ export default function AdminPropostas() {
   // Campos de ativação
   const [matricula, setMatricula] = useState("");
   const [dataAtivacao, setDataAtivacao] = useState("");
-  const [planoCodeSelecionado, setPlanoCodeSelecionado] = useState("");
-  const [planoCodeManual, setPlanoCodeManual] = useState("");
-  const [usarManual, setUsarManual] = useState(false);
 
   const carregarPropostas = useCallback(async () => {
     setLoading(true);
@@ -154,9 +156,6 @@ export default function AdminPropostas() {
     setMotivoRecusa("");
     setMatricula("");
     setDataAtivacao(new Date().toISOString().split("T")[0]);
-    setPlanoCodeSelecionado("");
-    setPlanoCodeManual("");
-    setUsarManual(false);
     setErro("");
   };
 
@@ -166,10 +165,9 @@ export default function AdminPropostas() {
     setErro("");
     try {
       if (novoStatus === "ATIVA") {
-        const codigoFinal = usarManual ? planoCodeManual : planoCodeSelecionado;
         await apiFetch(`/admin/propostas/${propostaEditando.id}/ativar`, {
           method: "PATCH",
-          body: JSON.stringify({ matricula, dataAtivacao, planoCode: codigoFinal }),
+          body: JSON.stringify({ matricula, dataAtivacao }),
         });
       } else {
         await apiFetch(`/admin/propostas/${propostaEditando.id}/status`, {
@@ -274,9 +272,8 @@ export default function AdminPropostas() {
     setDadosEditDeps(prev => prev.map(d => d._id === id ? { ...d, documentos: docs } : d));
 
   const proximosStatus = propostaEditando ? (PROXIMOS_STATUS[propostaEditando.status] ?? []) : [];
-  const planoCodeFinal = usarManual ? planoCodeManual : planoCodeSelecionado;
   const podeAtivar = novoStatus === "ATIVA"
-    ? matricula.replace(/\D/g, "").length === 14 && !!dataAtivacao && planoCodeFinal.trim().length >= 4
+    ? matricula.replace(/\D/g, "").length === 14 && !!dataAtivacao
     : !!novoStatus;
 
   // Gerar boleto
@@ -307,6 +304,7 @@ export default function AdminPropostas() {
   const [loadingNovaForm, setLoadingNovaForm] = useState(true);
   const [vendedoresList, setVendedoresList] = useState<VendedorSelect[]>([]);
   const [planosList, setPlanosList] = useState<PlanoSelect[]>([]);
+  const [tabelasPrecoList, setTabelasPrecoList] = useState<TabelaPrecoSelect[]>([]);
   const [contratosList, setContratosList] = useState<ContratoSelect[]>([]);
   const [responsaveisList, setResponsaveisList] = useState<ResponsavelSelect[]>([]);
   const [novaSalvando, setNovaSalvando] = useState(false);
@@ -324,11 +322,13 @@ export default function AdminPropostas() {
     Promise.all([
       apiFetch("/admin/vendedores") as Promise<{ vendedores: VendedorSelect[] }>,
       apiFetch("/planos") as Promise<{ planos: PlanoSelect[] }>,
+      apiFetch("/admin/tabelas-preco") as Promise<{ tabelas: TabelaPrecoSelect[] }>,
       apiFetch("/admin/contratos") as Promise<{ contratos: ContratoSelect[] }>,
       apiFetch("/admin/responsaveis") as Promise<{ responsaveis: ResponsavelSelect[] }>,
-    ]).then(([v, p, c, r]) => {
+    ]).then(([v, p, t, c, r]) => {
       setVendedoresList(v.vendedores ?? []);
       setPlanosList(sortPlanos((p.planos ?? []).filter(pl => pl.ativo)));
+      setTabelasPrecoList(t.tabelas ?? []);
       setContratosList((c.contratos ?? []).filter(ct => ct.ativo));
       setResponsaveisList(r.responsaveis ?? []);
     }).catch(console.error).finally(() => setLoadingNovaForm(false));
@@ -405,6 +405,8 @@ export default function AdminPropostas() {
         method: "POST",
         body: JSON.stringify({
           vendedorId: novaForm.vendedorId,
+          planoId: novaForm.planoId,
+          faixaId: novaForm.faixaId,
           contratoId: novaForm.contratoId,
           responsavelFinanceiroId: novaForm.titularEhResponsavel ? undefined : novaForm.responsavelFinanceiroId,
           titularEhResponsavel: novaForm.titularEhResponsavel,
@@ -468,8 +470,20 @@ export default function AdminPropostas() {
   };
 
   const novaPlanoAtual = planosList.find(p => p.id === novaForm.planoId);
-  const novaPodeAvancar1 = !!novaForm.vendedorId && !!novaForm.clienteNome && !!novaForm.clienteCpf && !!novaForm.planoId;
-  const novaPodeSalvar = !!novaForm.vendedorId && !!novaForm.clienteNome && !!novaForm.clienteCpf && !!novaForm.planoId && !!novaForm.contratoId && (novaForm.titularEhResponsavel || !!novaForm.responsavelFinanceiroId);
+  const tabelaNova = tabelasPrecoList.find(t => t.vendedorId === novaForm.vendedorId);
+  const faixasNovaPlano = tabelaNova?.faixas.filter(
+    f => f.planoId === novaForm.planoId && !f.faixaEtaria.toUpperCase().includes("DEPENDENTE"),
+  ) ?? [];
+  const planosNova = tabelaNova
+    ? planosList.filter(p => tabelaNova.faixas.some(
+      f => f.planoId === p.id && !f.faixaEtaria.toUpperCase().includes("DEPENDENTE"),
+    ))
+    : [];
+  const novaPodeAvancar1 = !!novaForm.vendedorId && !!novaForm.clienteNome && !!novaForm.clienteCpf
+    && !!novaForm.planoId && !!novaForm.faixaId;
+  const novaPodeSalvar = !!novaForm.vendedorId && !!novaForm.clienteNome && !!novaForm.clienteCpf
+    && !!novaForm.planoId && !!novaForm.faixaId && !!novaForm.contratoId
+    && (novaForm.titularEhResponsavel || !!novaForm.responsavelFinanceiroId);
 
   return (
     <div className="space-y-6">
@@ -668,7 +682,7 @@ export default function AdminPropostas() {
               {/* Vendedor */}
               <div className="space-y-1.5">
                 <Label>Vendedor *</Label>
-                <Select value={novaForm.vendedorId} onValueChange={v => setNovaForm(f => ({ ...f, vendedorId: v }))}>
+                <Select value={novaForm.vendedorId} onValueChange={v => setNovaForm(f => ({ ...f, vendedorId: v, planoId: "", faixaId: "", codigoPlano: "", planoNome: "", valorManual: "" }))}>
                   <SelectTrigger data-testid="select-nova-vendedor"><SelectValue placeholder="Selecione o vendedor..." /></SelectTrigger>
                   <SelectContent>
                     {vendedoresList.map(v => <SelectItem key={v.id} value={v.id}>{v.nome}</SelectItem>)}
@@ -822,11 +836,13 @@ export default function AdminPropostas() {
                     <div className="col-span-2 flex items-center justify-center h-16 text-sm text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando planos...
                     </div>
-                  ) : planosList.length === 0 ? (
-                    <div className="col-span-2 text-center py-4 text-sm text-muted-foreground">Nenhum plano ativo.</div>
-                  ) : planosList.map(p => (
+                   ) : !novaForm.vendedorId ? (
+                     <div className="col-span-2 text-center py-4 text-sm text-muted-foreground">Selecione o vendedor primeiro.</div>
+                   ) : planosNova.length === 0 ? (
+                     <div className="col-span-2 text-center py-4 text-sm text-muted-foreground">Nenhum plano na tabela deste vendedor.</div>
+                   ) : planosNova.map(p => (
                     <button key={p.id}
-                      onClick={() => setNovaForm(f => ({ ...f, planoId: p.id, codigoPlano: p.codigo ?? "", planoNome: p.nome, valorManual: p.valorTitular ? parseFloat(p.valorTitular).toFixed(2) : f.valorManual }))}
+                       onClick={() => setNovaForm(f => ({ ...f, planoId: p.id, faixaId: "", codigoPlano: p.codigo ?? "", planoNome: p.nome, valorManual: "" }))}
                       data-testid={`btn-nova-plano-${p.codigo}`}
                       className={`p-3 rounded-lg border text-left transition-all ${novaForm.planoId === p.id ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/40"}`}>
                       <div className="font-mono font-bold text-sm">{p.codigo ?? "—"}</div>
@@ -837,11 +853,33 @@ export default function AdminPropostas() {
                     </button>
                   ))}
                 </div>
-                {novaForm.planoId && (
+                 {novaForm.planoId && (
+                   <div className="space-y-1.5">
+                     <Label className="text-xs text-muted-foreground">Faixa Etária do Titular *</Label>
+                     <Select
+                       value={novaForm.faixaId}
+                       onValueChange={v => {
+                         const faixa = faixasNovaPlano.find(f => f.id === v);
+                         setNovaForm(f => ({
+                           ...f,
+                           faixaId: v,
+                           valorManual: faixa?.valor ? parseFloat(faixa.valor).toFixed(2) : "",
+                         }));
+                       }}
+                     >
+                       <SelectTrigger data-testid="select-nova-faixa"><SelectValue placeholder="Selecione a faixa..." /></SelectTrigger>
+                       <SelectContent>
+                         {faixasNovaPlano.map(f => (
+                           <SelectItem key={f.id} value={f.id}>{f.faixaEtaria} — R$ {parseFloat(f.valor).toFixed(2).replace(".", ",")}</SelectItem>
+                         ))}
+                       </SelectContent>
+                     </Select>
+                   </div>
+                 )}
+                 {novaForm.faixaId && (
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground">Valor do Titular (R$)</Label>
-                    <Input placeholder="0,00" value={novaForm.valorManual}
-                      onChange={e => setNovaForm(f => ({ ...f, valorManual: e.target.value }))}
+                     <Input placeholder="0,00" value={novaForm.valorManual} readOnly
                       data-testid="input-nova-valor" />
                   </div>
                 )}
@@ -1196,53 +1234,6 @@ export default function AdminPropostas() {
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label>
-                    Código do Plano <span className="text-xs text-muted-foreground">(4 dígitos)</span>
-                  </Label>
-                  {!usarManual ? (
-                    <div className="space-y-2">
-                      <Select value={planoCodeSelecionado} onValueChange={setPlanoCodeSelecionado}>
-                        <SelectTrigger data-testid="select-plano-code">
-                          <SelectValue placeholder="Selecione o plano..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {planosList.map(p => (
-                            <SelectItem key={p.codigo ?? ""} value={p.codigo ?? ""}>
-                              <span className="font-mono font-bold">{p.codigo}</span>
-                              <span className="ml-2 text-muted-foreground text-xs">{p.nome}</span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <button
-                        type="button"
-                        className="text-xs text-primary underline underline-offset-2"
-                        onClick={() => setUsarManual(true)}
-                      >
-                        Inserir código manualmente
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <Input
-                        placeholder="Ex: 5254"
-                        maxLength={6}
-                        value={planoCodeManual}
-                        onChange={e => setPlanoCodeManual(e.target.value)}
-                        className="font-mono"
-                        data-testid="input-plano-code-manual"
-                      />
-                      <button
-                        type="button"
-                        className="text-xs text-primary underline underline-offset-2"
-                        onClick={() => { setUsarManual(false); setPlanoCodeManual(""); }}
-                      >
-                        Selecionar da lista
-                      </button>
-                    </div>
-                  )}
-                </div>
               </div>
             )}
 

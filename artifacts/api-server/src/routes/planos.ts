@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, asc, and } from "drizzle-orm";
+import { eq, asc, and, ne } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import {
   db, planosTable, tabelasPrecoTable, tabelasPrecoFaixasTable, vendedoresTable,
@@ -231,6 +231,64 @@ router.put("/admin/tabelas-preco/:id", async (req, res) => {
   }
 });
 
+// GET /api/admin/vendedores-para-tabela — lista vendedores com info de tabela vinculada
+router.get("/admin/vendedores-para-tabela", async (req, res) => {
+  if (req.user?.role !== "admin") return res.status(403).json({ error: "Acesso negado" });
+  try {
+    const rows = await db
+      .select({
+        id: vendedoresTable.id,
+        nome: vendedoresTable.nome,
+        tabelaId: tabelasPrecoTable.id,
+      })
+      .from(vendedoresTable)
+      .leftJoin(tabelasPrecoTable, eq(tabelasPrecoTable.vendedorId, vendedoresTable.id))
+      .orderBy(asc(vendedoresTable.nome));
+
+    res.json({ vendedores: rows.map(r => ({ id: r.id, nome: r.nome, tabelaId: r.tabelaId ?? null })) });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// PATCH /api/admin/tabelas-preco/:id/vincular — vincular ou desvincular vendedor
+router.patch("/admin/tabelas-preco/:id/vincular", async (req, res) => {
+  if (req.user?.role !== "admin") return res.status(403).json({ error: "Acesso negado" });
+  try {
+    const { id } = req.params;
+    const { vendedorId } = req.body as { vendedorId: string | null };
+
+    const [tabela] = await db
+      .select({ id: tabelasPrecoTable.id, vendedorId: tabelasPrecoTable.vendedorId })
+      .from(tabelasPrecoTable)
+      .where(eq(tabelasPrecoTable.id, id))
+      .limit(1);
+    if (!tabela) return res.status(404).json({ error: "Tabela não encontrada" });
+
+    if (vendedorId !== null && vendedorId !== undefined) {
+      // Ensure seller exists
+      const [vend] = await db.select({ id: vendedoresTable.id }).from(vendedoresTable).where(eq(vendedoresTable.id, vendedorId)).limit(1);
+      if (!vend) return res.status(404).json({ error: "Vendedor não encontrado" });
+      // Ensure seller has no other table
+      const [outroTabela] = await db
+        .select({ id: tabelasPrecoTable.id })
+        .from(tabelasPrecoTable)
+        .where(and(eq(tabelasPrecoTable.vendedorId, vendedorId), ne(tabelasPrecoTable.id, id)))
+        .limit(1);
+      if (outroTabela) return res.status(409).json({ error: "Este vendedor já possui uma tabela vinculada" });
+    }
+
+    await db.update(tabelasPrecoTable)
+      .set({ vendedorId: vendedorId ?? null })
+      .where(eq(tabelasPrecoTable.id, id));
+
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Erro ao vincular tabela");
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 // DELETE /api/admin/tabelas-preco/:id — excluir tabela e suas faixas
 router.delete("/admin/tabelas-preco/:id", async (req, res) => {
   if (req.user?.role !== "admin") return res.status(403).json({ error: "Acesso negado" });
@@ -353,22 +411,54 @@ router.get("/vendedor/tabela-preco", async (req, res) => {
   const vendedorId = req.user?.vendedorId;
   if (!vendedorId) return res.status(403).json({ error: "Somente vendedores" });
   try {
-    const tabelas = await db
+    const [tabela] = await db
       .select()
       .from(tabelasPrecoTable)
-      .where(eq(tabelasPrecoTable.vendedorId, vendedorId));
+      .where(eq(tabelasPrecoTable.vendedorId, vendedorId))
+      .limit(1);
 
-    const tabelasComFaixas = await Promise.all(
-      tabelas.map(async (t) => {
-        const faixas = await db
-          .select()
-          .from(tabelasPrecoFaixasTable)
-          .where(eq(tabelasPrecoFaixasTable.tabelaId, t.id));
-        return { ...t, faixas };
+    if (!tabela) {
+      res.json({ tabela: null, planos: [] });
+      return;
+    }
+
+    // Load faixas joined with plan info so the seller can see plan names/codes
+    const rows = await db
+      .select({
+        planoId: planosTable.id,
+        planoNome: planosTable.nome,
+        codigo: planosTable.codigo,
+        categoria: planosTable.categoria,
+        acomodacao: planosTable.acomodacao,
+        faixaId: tabelasPrecoFaixasTable.id,
+        faixaEtaria: tabelasPrecoFaixasTable.faixaEtaria,
+        valor: tabelasPrecoFaixasTable.valor,
+        valorApartamento: tabelasPrecoFaixasTable.valorApartamento,
       })
-    );
+      .from(tabelasPrecoFaixasTable)
+      .innerJoin(planosTable, eq(planosTable.id, tabelasPrecoFaixasTable.planoId))
+      .where(eq(tabelasPrecoFaixasTable.tabelaId, tabela.id))
+      .orderBy(planosTable.nome, tabelasPrecoFaixasTable.faixaEtaria);
 
-    res.json({ tabelas: tabelasComFaixas });
+    // Group by plan
+    const porPlano = new Map<string, {
+      id: string; nome: string; codigo: string | null;
+      categoria: string | null; acomodacao: string | null;
+      faixas: { id: string; faixaEtaria: string; valor: string; valorApartamento: string | null }[];
+    }>();
+    for (const row of rows) {
+      let p = porPlano.get(row.planoId);
+      if (!p) {
+        p = { id: row.planoId, nome: row.planoNome, codigo: row.codigo, categoria: row.categoria, acomodacao: row.acomodacao, faixas: [] };
+        porPlano.set(row.planoId, p);
+      }
+      p.faixas.push({ id: row.faixaId, faixaEtaria: row.faixaEtaria, valor: row.valor, valorApartamento: row.valorApartamento });
+    }
+
+    res.json({
+      tabela: { id: tabela.id, nome: tabela.nome, tipoPlano: tabela.tipoPlano, ano: tabela.ano },
+      planos: [...porPlano.values()],
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: String(err) });

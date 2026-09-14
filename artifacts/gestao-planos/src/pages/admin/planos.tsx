@@ -11,7 +11,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { apiFetch } from "@/lib/api";
 import { formatMoney } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
-import { Pencil, PauseCircle, PlayCircle, Check, AlertTriangle, Loader2, RefreshCw, Plus, Trash2, X } from "lucide-react";
+import { Pencil, PauseCircle, PlayCircle, Check, AlertTriangle, Loader2, RefreshCw, Plus, Trash2, X, Link2, UserCheck, UserX } from "lucide-react";
 
 type PlanoAPI = {
   id: string;
@@ -291,6 +291,12 @@ export default function AdminPlanos() {
   const [tabelaExcluindo, setTabelaExcluindo] = useState<TabelaPreco | null>(null);
   const [excluindo, setExcluindo] = useState(false);
 
+  // Vincular vendedor
+  const [vincularTabela, setVincularTabela] = useState<TabelaPreco | null>(null);
+  const [vendedoresDisponiveis, setVendedoresDisponiveis] = useState<{ id: string; nome: string; tabelaId: string | null }[]>([]);
+  const [vendedorSelecionado, setVendedorSelecionado] = useState<string>("");
+  const [vinculando, setVinculando] = useState(false);
+
   const carregar = useCallback(async () => {
     setLoading(true);
     try {
@@ -369,6 +375,37 @@ export default function AdminPlanos() {
     }
   };
 
+  const abrirVincular = async (tabela: TabelaPreco) => {
+    setVincularTabela(tabela);
+    setVendedorSelecionado(tabela.vendedorId ?? "");
+    try {
+      const data = await apiFetch<{ vendedores: { id: string; nome: string; tabelaId: string | null }[] }>(
+        "/admin/vendedores-para-tabela"
+      );
+      setVendedoresDisponiveis(data.vendedores);
+    } catch {
+      setVendedoresDisponiveis([]);
+    }
+  };
+
+  const handleVincular = async () => {
+    if (!vincularTabela) return;
+    setVinculando(true);
+    try {
+      await apiFetch(`/admin/tabelas-preco/${vincularTabela.id}/vincular`, {
+        method: "PATCH",
+        body: JSON.stringify({ vendedorId: vendedorSelecionado || null }),
+      });
+      toast({ title: vendedorSelecionado ? "Vendedor vinculado com sucesso" : "Vínculo removido" });
+      setVincularTabela(null);
+      await carregar();
+    } catch (err) {
+      toast({ variant: "destructive", title: String(err) });
+    } finally {
+      setVinculando(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -382,7 +419,7 @@ export default function AdminPlanos() {
       <div className="flex items-start justify-between pb-4 border-b">
         <div className="flex flex-col gap-1">
           <h2 className="text-3xl font-bold tracking-tight text-foreground">Gestão de Planos</h2>
-          <p className="text-muted-foreground">Cadastre as tabelas e os valores de cada plano; a associação ao vendedor é feita na Equipe de Vendas.</p>
+          <p className="text-muted-foreground">Cadastre tabelas de preço e associe diretamente a um vendedor usando o ícone <strong>⛓</strong> em cada card.</p>
         </div>
         <Button variant="outline" size="sm" onClick={carregar} className="gap-2">
           <RefreshCw className="h-4 w-4" /> Atualizar
@@ -516,6 +553,14 @@ export default function AdminPlanos() {
                       {tabela.ano && <span className="ml-1 text-xs text-muted-foreground">({tabela.ano})</span>}
                     </CardTitle>
                     <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-blue-600"
+                        title={tabela.vendedorId ? "Alterar vendedor vinculado" : "Vincular a um vendedor"}
+                        onClick={() => void abrirVincular(tabela)}
+                        data-testid={`btn-vincular-tabela-${tabela.id}`}
+                      >
+                        {tabela.vendedorId ? <UserCheck className="h-3.5 w-3.5 text-emerald-600" /> : <Link2 className="h-3.5 w-3.5" />}
+                      </Button>
                       <Button
                         variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
                         title="Editar tabela"
@@ -668,6 +713,61 @@ export default function AdminPlanos() {
           onSaved={carregar}
         />
       )}
+
+      {/* Modal Vincular Vendedor à Tabela */}
+      <Dialog open={!!vincularTabela} onOpenChange={o => !o && setVincularTabela(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="h-4 w-4 text-primary" /> Vincular Vendedor
+            </DialogTitle>
+            <DialogDescription>
+              Tabela: <strong>{vincularTabela?.nome}</strong>
+              {vincularTabela?.ano ? ` (${vincularTabela.ano})` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label>Vendedor</Label>
+              <Select value={vendedorSelecionado} onValueChange={setVendedorSelecionado}>
+                <SelectTrigger data-testid="select-vendedor-tabela">
+                  <SelectValue placeholder="Sem vínculo (disponível para associação)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">— Sem vínculo —</SelectItem>
+                  {vendedoresDisponiveis.map(v => (
+                    <SelectItem
+                      key={v.id}
+                      value={v.id}
+                      disabled={!!v.tabelaId && v.tabelaId !== vincularTabela?.id}
+                    >
+                      {v.nome}
+                      {v.tabelaId && v.tabelaId !== vincularTabela?.id
+                        ? " (já possui tabela)"
+                        : v.tabelaId === vincularTabela?.id ? " (vinculado)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {vendedorSelecionado && (
+              <button
+                className="flex items-center gap-1.5 text-xs text-rose-600 hover:underline"
+                onClick={() => setVendedorSelecionado("")}
+              >
+                <UserX className="h-3.5 w-3.5" /> Remover vínculo
+              </button>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setVincularTabela(null)}>Cancelar</Button>
+            <Button onClick={() => void handleVincular()} disabled={vinculando} data-testid="btn-confirmar-vincular">
+              {vinculando ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirmação de Exclusão de Tabela */}
       <AlertDialog open={!!tabelaExcluindo} onOpenChange={() => setTabelaExcluindo(null)}>
