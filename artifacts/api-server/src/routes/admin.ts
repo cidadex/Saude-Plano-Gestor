@@ -734,8 +734,8 @@ router.patch("/admin/propostas/:id/ativar", async (req, res) => {
       dataAtivacao: string;    // YYYY-MM-DD
     };
 
-    if (!matricula || matricula.replace(/\D/g, "").length !== 14) {
-      return res.status(400).json({ error: "Código do usuário deve ter 14 dígitos" });
+    if (!matricula || matricula.trim().length !== 14) {
+      return res.status(400).json({ error: "Código do usuário deve ter 14 caracteres" });
     }
     if (!dataAtivacao) {
       return res.status(400).json({ error: "Data de ativação é obrigatória" });
@@ -839,7 +839,7 @@ router.patch("/admin/propostas/:id/ativar", async (req, res) => {
           rgOrgaoEmissor: dadosTitular.rgOrgaoEmissor ? String(dadosTitular.rgOrgaoEmissor).trim() : null,
           rgUf: dadosTitular.rgUf ? String(dadosTitular.rgUf).trim() : null,
           estadoCivil: dadosTitular.estadoCivil ? String(dadosTitular.estadoCivil).trim() : null,
-          matricula: matricula.replace(/\D/g, ""),
+          matricula: matricula.trim(),
           valorMensal,
           dataAtivacao,
           status: "ATIVO" as const,
@@ -860,7 +860,7 @@ router.patch("/admin/propostas/:id/ativar", async (req, res) => {
           .update(clientesTable)
           .set({
             status: "ATIVO",
-            matricula: matricula.replace(/\D/g, ""),
+            matricula: matricula.trim(),
             dataAtivacao,
             planoId: selecao.planoId,
             faixaId: selecao.faixaId,

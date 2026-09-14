@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { apiFetch } from "@/lib/api";
-import { formatMoney, toUpperNoAccent } from "@/lib/format";
+import { formatMoney, toUpperNoAccent, buscarCep } from "@/lib/format";
 import { Textarea } from "@/components/ui/textarea";
 import { Search, SlidersHorizontal, Loader2, RefreshCw, AlertCircle, Receipt, Plus, Sparkles, ChevronDown, Check, X, UserPlus, Trash2, User } from "lucide-react";
 import { DocUploader, type DocFile } from "@/components/DocUploader";
@@ -273,7 +273,7 @@ export default function AdminPropostas() {
 
   const proximosStatus = propostaEditando ? (PROXIMOS_STATUS[propostaEditando.status] ?? []) : [];
   const podeAtivar = novoStatus === "ATIVA"
-    ? matricula.replace(/\D/g, "").length === 14 && !!dataAtivacao
+    ? matricula.trim().length === 14 && !!dataAtivacao
     : !!novoStatus;
 
   // Gerar boleto
@@ -796,8 +796,25 @@ export default function AdminPropostas() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">CEP</Label>
-                  <Input placeholder="00000-000" value={novaForm.cep}
-                    onChange={e => setNovaForm(f => ({ ...f, cep: e.target.value }))} />
+                  <Input
+                    placeholder="00000-000"
+                    value={novaForm.cep}
+                    onChange={e => setNovaForm(f => ({ ...f, cep: e.target.value }))}
+                    onBlur={async e => {
+                      const cep = e.target.value.replace(/\D/g, "");
+                      if (cep.length !== 8) return;
+                      try {
+                        const r = await buscarCep(cep);
+                        setNovaForm(f => ({
+                          ...f,
+                          logradouro: f.logradouro || r.logradouro,
+                          bairro: f.bairro || r.bairro,
+                          cidade: f.cidade || r.cidade,
+                          ...(r.estado ? { estado: r.estado } : {}),
+                        }));
+                      } catch { /* CEP não encontrado */ }
+                    }}
+                  />
                 </div>
                 <div className="space-y-1 sm:col-span-2">
                   <Label className="text-xs text-muted-foreground">Logradouro</Label>
@@ -1207,19 +1224,19 @@ export default function AdminPropostas() {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="matricula">
-                    Código do Usuário <span className="text-xs text-muted-foreground">(14 dígitos)</span>
+                    Código do Usuário <span className="text-xs text-muted-foreground">(14 caracteres)</span>
                   </Label>
                   <Input
                     id="matricula"
                     placeholder="00000000000000"
                     maxLength={14}
                     value={matricula}
-                    onChange={e => setMatricula(e.target.value.replace(/\D/g, ""))}
+                    onChange={e => setMatricula(e.target.value.toUpperCase())}
                     className={`font-mono ${matricula && matricula.length !== 14 ? "border-red-400" : ""}`}
                     data-testid="input-matricula"
                   />
                   {matricula && matricula.length !== 14 && (
-                    <p className="text-xs text-red-500">{matricula.length}/14 dígitos</p>
+                    <p className="text-xs text-red-500">{matricula.length}/14 caracteres</p>
                   )}
                 </div>
 
@@ -1353,7 +1370,25 @@ export default function AdminPropostas() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">CEP</Label>
-                  <Input value={dadosForm.cep} onChange={e => setDadosForm(f => ({ ...f, cep: e.target.value }))} />
+                  <Input
+                    placeholder="00000-000"
+                    value={dadosForm.cep}
+                    onChange={e => setDadosForm(f => ({ ...f, cep: e.target.value }))}
+                    onBlur={async e => {
+                      const cep = e.target.value.replace(/\D/g, "");
+                      if (cep.length !== 8) return;
+                      try {
+                        const r = await buscarCep(cep);
+                        setDadosForm(f => ({
+                          ...f,
+                          logradouro: f.logradouro || r.logradouro,
+                          bairro: f.bairro || r.bairro,
+                          cidade: f.cidade || r.cidade,
+                          ...(r.estado ? { estado: r.estado } : {}),
+                        }));
+                      } catch { /* CEP não encontrado */ }
+                    }}
+                  />
                 </div>
                 <div className="space-y-1 sm:col-span-2">
                   <Label className="text-xs text-muted-foreground">Logradouro</Label>

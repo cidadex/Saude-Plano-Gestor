@@ -11,7 +11,7 @@ import {
   Loader2, FileSignature, Users2, Building2, User as UserIcon,
 } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
-import { toUpperNoAccent } from "@/lib/format";
+import { toUpperNoAccent, buscarCep } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 
 interface CadastroClienteProps {
@@ -710,7 +710,22 @@ function DadosPessoaisForm({ form, onChange }: { form: FormData; onChange: (f: k
       </div>
       <div className="space-y-1.5">
         <Label>CEP</Label>
-        <Input value={form.cep} onChange={e => onChange("cep", e.target.value)} />
+        <Input
+          value={form.cep}
+          placeholder="00000-000"
+          onChange={e => onChange("cep", e.target.value)}
+          onBlur={async e => {
+            const cep = e.target.value.replace(/\D/g, "");
+            if (cep.length !== 8) return;
+            try {
+              const r = await buscarCep(cep);
+              if (!form.logradouro) onChange("logradouro", r.logradouro);
+              if (!form.bairro) onChange("bairro", r.bairro);
+              if (!form.cidade) onChange("cidade", r.cidade);
+              if (r.estado) onChange("estado", r.estado);
+            } catch { /* CEP não encontrado */ }
+          }}
+        />
       </div>
       <div className="space-y-1.5 sm:col-span-1">
         <Label>Logradouro</Label>

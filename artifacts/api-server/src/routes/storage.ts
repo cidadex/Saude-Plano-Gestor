@@ -1,17 +1,76 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage.js";
-import { ObjectPermission } from "../lib/objectAcl.js";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { randomUUID } from "crypto";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
 
+// ---------- Local file storage (fallback when Object Storage is not configured) ----------
+
+const UPLOADS_DIR = path.resolve("data/uploads");
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+const multerDiskStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+  filename: (_req, file, cb) => {
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9._\-]/g, "_");
+    cb(null, `${randomUUID()}_${safeName}`);
+  },
+});
+
+const uploadMiddleware = multer({
+  storage: multerDiskStorage,
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
+});
+
+/**
+ * POST /storage/upload
+ *
+ * Recebe arquivo via multipart/form-data e armazena localmente.
+ * Retorna { objectPath } compatível com /storage/objects/* para servir.
+ */
+router.post("/storage/upload", uploadMiddleware.single("file"), (req: Request, res: Response) => {
+  const file = req.file;
+  if (!file) {
+    res.status(400).json({ error: "Nenhum arquivo enviado" });
+    return;
+  }
+  // /objects/local/ prefix → served by the GET below
+  const objectPath = `/objects/local/${file.filename}`;
+  res.json({ objectPath, name: file.originalname, size: file.size, contentType: file.mimetype });
+});
+
+/**
+ * GET /storage/objects/local/*filename
+ *
+ * Serve arquivos armazenados localmente em data/uploads/.
+ * Deve ficar ANTES do wildcard GCS para ter precedência.
+ */
+router.get("/storage/objects/local/*filename", (req: Request, res: Response) => {
+  const raw = req.params.filename;
+  const filename = Array.isArray(raw) ? raw.join("/") : raw;
+  const safeName = path.basename(filename); // prevent path traversal
+  const filepath = path.join(UPLOADS_DIR, safeName);
+  if (!fs.existsSync(filepath)) {
+    res.status(404).json({ error: "Arquivo não encontrado" });
+    return;
+  }
+  res.sendFile(path.resolve(filepath));
+});
+
+// ---------- Legacy presigned-URL endpoint (kept for compatibility) ----------
+
 /**
  * POST /storage/uploads/request-url
  *
- * Request a presigned URL for file upload.
- * The client sends JSON metadata (name, size, contentType) — NOT the file.
- * Then uploads the file directly to the returned presigned URL.
+ * Solicita URL presignada para upload direto ao GCS.
+ * Requer Object Storage configurado no Replit (App Storage).
  */
 router.post("/storage/uploads/request-url", async (req: Request, res: Response) => {
   const { name, size, contentType } = req.body ?? {};
@@ -23,7 +82,6 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
   try {
     const uploadURL = await objectStorageService.getObjectEntityUploadURL();
     const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
-
     res.json({ uploadURL, objectPath, metadata: { name, size: size ?? 0, contentType } });
   } catch (error) {
     req.log.error({ err: error }, "Error generating upload URL");
@@ -34,9 +92,7 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
 /**
  * GET /storage/public-objects/*
  *
- * Serve public assets from PUBLIC_OBJECT_SEARCH_PATHS.
- * These are unconditionally public — no authentication or ACL checks.
- * IMPORTANT: Always provide this endpoint when object storage is set up.
+ * Serve assets públicos de PUBLIC_OBJECT_SEARCH_PATHS (GCS).
  */
 router.get("/storage/public-objects/*filePath", async (req: Request, res: Response) => {
   try {
@@ -47,12 +103,9 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
       res.status(404).json({ error: "File not found" });
       return;
     }
-
     const response = await objectStorageService.downloadObject(file);
-
     res.status(response.status);
     response.headers.forEach((value, key) => res.setHeader(key, value));
-
     if (response.body) {
       const nodeStream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);
       nodeStream.pipe(res);
@@ -68,9 +121,7 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
 /**
  * GET /storage/objects/*
  *
- * Serve object entities from PRIVATE_OBJECT_DIR.
- * These are served from a separate path from /public-objects and can optionally
- * be protected with authentication or ACL checks based on the use case.
+ * Serve object entities do GCS (PRIVATE_OBJECT_DIR).
  */
 router.get("/storage/objects/*path", async (req: Request, res: Response) => {
   try {
@@ -78,27 +129,9 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
     const objectPath = `/objects/${wildcardPath}`;
     const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
-
-    // --- Protected route example (uncomment when using replit-auth) ---
-    // if (!req.isAuthenticated()) {
-    //   res.status(401).json({ error: "Unauthorized" });
-    //   return;
-    // }
-    // const canAccess = await objectStorageService.canAccessObjectEntity({
-    //   userId: req.user.id,
-    //   objectFile,
-    //   requestedPermission: ObjectPermission.READ,
-    // });
-    // if (!canAccess) {
-    //   res.status(403).json({ error: "Forbidden" });
-    //   return;
-    // }
-
     const response = await objectStorageService.downloadObject(objectFile);
-
     res.status(response.status);
     response.headers.forEach((value, key) => res.setHeader(key, value));
-
     if (response.body) {
       const nodeStream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);
       nodeStream.pipe(res);

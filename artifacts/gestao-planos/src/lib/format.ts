@@ -1,3 +1,29 @@
+export interface CepResultado {
+  logradouro: string;
+  bairro: string;
+  cidade: string;
+  estado: string;
+}
+
+/**
+ * Consulta a API ViaCEP e retorna os dados de endereço.
+ * Lança erro se o CEP for inválido ou não encontrado.
+ */
+export async function buscarCep(cep: string): Promise<CepResultado> {
+  const digits = cep.replace(/\D/g, "");
+  if (digits.length !== 8) throw new Error("CEP inválido");
+  const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+  if (!res.ok) throw new Error("Falha ao consultar CEP");
+  const data = await res.json();
+  if (data.erro) throw new Error("CEP não encontrado");
+  return {
+    logradouro: toUpperNoAccent(data.logradouro ?? ""),
+    bairro: toUpperNoAccent(data.bairro ?? ""),
+    cidade: toUpperNoAccent(data.localidade ?? ""),
+    estado: (data.uf ?? "").toUpperCase(),
+  };
+}
+
 /**
  * Converte para MAIÚSCULAS removendo acentos/diacríticos.
  * Use em campos de texto como nome, endereço, bairro, cidade.

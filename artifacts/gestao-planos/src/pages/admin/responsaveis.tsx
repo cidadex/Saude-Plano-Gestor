@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiFetch, ApiError } from "@/lib/api";
-import { toUpperNoAccent } from "@/lib/format";
+import { toUpperNoAccent, buscarCep } from "@/lib/format";
 import { Users2, Plus, Pencil, Trash2, KeyRound, Search, Building2, User as UserIcon, Mail } from "lucide-react";
 
 type Responsavel = {
@@ -312,7 +312,25 @@ export default function AdminResponsaveis() {
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label>CEP</Label>
-                <Input value={form.cep} onChange={e => setForm({ ...form, cep: e.target.value })} />
+                <Input
+                  value={form.cep}
+                  placeholder="00000-000"
+                  onChange={e => setForm({ ...form, cep: e.target.value })}
+                  onBlur={async e => {
+                    const cep = e.target.value.replace(/\D/g, "");
+                    if (cep.length !== 8) return;
+                    try {
+                      const r = await buscarCep(cep);
+                      setForm(f => ({
+                        ...f,
+                        logradouro: f.logradouro || r.logradouro,
+                        bairro: f.bairro || r.bairro,
+                        cidade: f.cidade || r.cidade,
+                        ...(r.estado ? { estado: r.estado } : {}),
+                      }));
+                    } catch { /* CEP não encontrado */ }
+                  }}
+                />
               </div>
               <div className="space-y-1.5 col-span-2">
                 <Label>Logradouro</Label>

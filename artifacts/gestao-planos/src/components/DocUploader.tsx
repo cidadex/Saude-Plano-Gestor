@@ -72,21 +72,16 @@ export function DocUploader({ label = "Documentos", files, onChange, disabled, a
       const file = arr[i];
       const uid = newUploading[i].id;
       try {
-        const res = await fetch("/api/storage/uploads/request-url", {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const res = await fetch("/api/storage/upload", {
           method: "POST",
           credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream" }),
+          body: formData,
         });
-        if (!res.ok) throw new Error("Falha ao obter URL de upload");
-        const { uploadURL, objectPath } = await res.json();
-
-        const put = await fetch(uploadURL, {
-          method: "PUT",
-          body: file,
-          headers: { "Content-Type": file.type || "application/octet-stream" },
-        });
-        if (!put.ok) throw new Error("Falha ao enviar arquivo");
+        if (!res.ok) throw new Error("Falha ao enviar arquivo");
+        const { objectPath } = await res.json();
 
         results.push({ name: file.name, objectPath, contentType: file.type || "application/octet-stream", size: file.size });
 

@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { usePropostas, type PropostaAPI } from "@/hooks/useVendedorData";
-import { formatMoney, toUpperNoAccent } from "@/lib/format";
+import { formatMoney, toUpperNoAccent, buscarCep } from "@/lib/format";
 import { apiFetch } from "@/lib/api";
 import { Search, SlidersHorizontal, Plus, Check, Loader2, Sparkles, X, ChevronDown, UserPlus, Trash2, AlertCircle, User } from "lucide-react";
 import { DocUploader, type DocFile } from "@/components/DocUploader";
@@ -627,7 +627,25 @@ export default function VendedorPropostas() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">CEP</Label>
-                  <Input placeholder="00000-000" value={form.cep} onChange={e => setForm(f => ({ ...f, cep: e.target.value }))} />
+                  <Input
+                    placeholder="00000-000"
+                    value={form.cep}
+                    onChange={e => setForm(f => ({ ...f, cep: e.target.value }))}
+                    onBlur={async e => {
+                      const cep = e.target.value.replace(/\D/g, "");
+                      if (cep.length !== 8) return;
+                      try {
+                        const r = await buscarCep(cep);
+                        setForm(f => ({
+                          ...f,
+                          logradouro: f.logradouro || r.logradouro,
+                          bairro: f.bairro || r.bairro,
+                          cidade: f.cidade || r.cidade,
+                          ...(r.estado ? { estado: r.estado } : {}),
+                        }));
+                      } catch { /* CEP não encontrado */ }
+                    }}
+                  />
                 </div>
                 <div className="space-y-1 sm:col-span-2">
                   <Label className="text-xs text-muted-foreground">Logradouro</Label>
