@@ -297,5 +297,7 @@ adminRouter.delete("/admin/responsaveis/:id", async (req, res) => {
   }
 });
 
-router.use(adminRouter);
+// adminRouter é exportado separadamente para ser montado no nível correto
+// NÃO montar aqui dentro do router público (causaria catch-all 403 para não-admins)
+export { adminRouter as responsaveisAdminRouter };
 export default router;

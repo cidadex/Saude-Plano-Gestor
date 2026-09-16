@@ -1,2 +1,3 @@
 - [Imported artifact workflows](imported-artifact-workflows.md) — after artifact registration, use managed workflows only; legacy duplicates can silently shift ports or block services.
 - [Activation commission policy](activation-commission-policy.md) — one-time titular-based commission; preserve history and avoid retroactive payouts.
+- [Express catch-all admin router pattern](express-catchall-admin-router.md) — sub-routers with role-check middleware mounted without a path prefix block ALL unmatched requests; must be exported separately.
