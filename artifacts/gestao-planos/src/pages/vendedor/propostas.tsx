@@ -15,6 +15,7 @@ import { Search, SlidersHorizontal, Plus, Check, Loader2, Sparkles, X, ChevronDo
 import { DocUploader, type DocFile } from "@/components/DocUploader";
 
 type PlanoAPI = { id: string; codigo: string | null; nome: string; categoria: string | null; valorTitular: string | null; valorDependente: string | null; ativo: boolean };
+type PlanoTabela = { id: string; nome: string; codigo: string | null; categoria: string | null; acomodacao: string | null };
 
 const PLANO_ORDER = ["5254","5252","5285","9714","5403","5123","5404","9717","5397","5127","5283","5402"];
 const sortPlanos = <T extends { codigo: string | null }>(list: T[]): T[] =>
@@ -74,6 +75,7 @@ const FORM_INIT = {
 export default function VendedorPropostas() {
   const { propostas, loading, reload } = usePropostas();
   const [planosAPI, setPlanosAPI] = useState<PlanoAPI[]>([]);
+  const [planosDaTabela, setPlanosDaTabela] = useState<PlanoTabela[]>([]);
   const [tabelas, setTabelas] = useState<TabelaVendedor[]>([]);
   const [loadingPlanos, setLoadingPlanos] = useState(true);
   const [contratosList, setContratosList] = useState<Array<{ id: string; nome: string; asaasModo?: string }>>([]);
@@ -121,6 +123,14 @@ export default function VendedorPropostas() {
           ),
         };
         setTabelas([tabela]);
+        // Salva metadados dos planos diretamente da tabela (independente de ativo/inativo no cadastro)
+        setPlanosDaTabela((d.planos ?? []).map(p => ({
+          id: p.id,
+          nome: p.nome,
+          codigo: p.codigo,
+          categoria: p.categoria,
+          acomodacao: p.acomodacao,
+        })));
       }),
     ]).catch(console.error).finally(() => setLoadingPlanos(false));
     (apiFetch("/contratos") as Promise<{ contratos: Array<{ id: string; nome: string; asaasModo?: string }> }>).then(d => setContratosList(d.contratos ?? [])).catch(console.error);
@@ -149,15 +159,15 @@ export default function VendedorPropostas() {
   const tabelaAtual = tabelas.find(t => t.id === form.tabelaId) ?? tabelas[0];
 
   const planosNaTabela = useMemo(() => {
-    if (!tabelaAtual || tabelaAtual.faixas.length === 0) return [];
-    const ids = [...new Set(
+    if (!tabelaAtual || tabelaAtual.faixas.length === 0 || planosDaTabela.length === 0) return [];
+    // Usa planos diretamente da tabela-preco (não filtra por ativo/inativo do cadastro global)
+    const ids = new Set(
       tabelaAtual.faixas
         .filter(f => !f.faixaEtaria.toUpperCase().includes("DEPENDENTE"))
         .map(f => f.planoId),
-    )];
-    const filtrados = planosAPI.filter(p => ids.includes(p.id));
-    return sortPlanos(filtrados);
-  }, [tabelaAtual, planosAPI]);
+    );
+    return sortPlanos(planosDaTabela.filter(p => ids.has(p.id)));
+  }, [tabelaAtual, planosDaTabela]);
 
   const faixasTitular = useMemo(() => {
     if (!tabelaAtual || !form.planoId) return [];
@@ -175,7 +185,7 @@ export default function VendedorPropostas() {
     return form.valorTitular + form.dependentes.reduce((s, d) => s + d.valor, 0);
   }, [form.valorTitular, form.dependentes]);
 
-  const handleSelecionarPlano = (plano: PlanoAPI) => {
+  const handleSelecionarPlano = (plano: PlanoTabela) => {
     setForm(f => ({ ...f, planoId: plano.id, codigoPlano: plano.codigo ?? "", planoNome: plano.nome, faixaIdTitular: "", valorTitular: 0 }));
   };
 
