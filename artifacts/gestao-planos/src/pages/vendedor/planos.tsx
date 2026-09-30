@@ -201,8 +201,7 @@ export default function VendedorPlanos() {
                       <TableHeader>
                         <TableRow className="bg-muted/40">
                           <TableHead>Faixa Etária</TableHead>
-                          <TableHead className="text-right">Enfermaria</TableHead>
-                          <TableHead className="text-right">Apartamento</TableHead>
+                          <TableHead className="text-right">Valor</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -211,9 +210,6 @@ export default function VendedorPlanos() {
                             <TableCell className="font-medium text-sm">{faixa.faixaEtaria}</TableCell>
                             <TableCell className="text-right font-bold text-sm text-primary">
                               {formatMoney(Number(faixa.valor))}
-                            </TableCell>
-                            <TableCell className="text-right text-sm text-muted-foreground">
-                              {faixa.valorApartamento ? formatMoney(Number(faixa.valorApartamento)) : "—"}
                             </TableCell>
                           </TableRow>
                         ))}

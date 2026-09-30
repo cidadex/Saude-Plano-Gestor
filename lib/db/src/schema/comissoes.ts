@@ -5,7 +5,7 @@ import { z } from "zod/v4";
 import { vendedoresTable } from "./vendedores";
 import { clientesTable } from "./clientes";
 
-export const tipoComissaoRegEnum = pgEnum("tipo_comissao_reg", ["VENDA", "SERVICO"]);
+export const tipoComissaoRegEnum = pgEnum("tipo_comissao_reg", ["VENDA", "SERVICO", "MENSALIDADE"]);
 export const statusComissaoEnum = pgEnum("status_comissao", ["PENDENTE", "PAGO"]);
 
 export const comissoesTable = pgTable("comissoes", {
@@ -21,11 +21,15 @@ export const comissoesTable = pgTable("comissoes", {
   dataVenda: text("data_venda"),
   dataPagamento: text("data_pagamento"),
   observacao: text("observacao"),
+  boletoId: text("boleto_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   clienteIdVendaUnique: uniqueIndex("comissoes_cliente_id_venda_unique")
     .on(table.clienteId)
     .where(sql`${table.tipo} = 'VENDA'`),
+  boletoIdMensalUnique: uniqueIndex("comissoes_boleto_id_mensal_unique")
+    .on(table.boletoId)
+    .where(sql`${table.tipo} = 'MENSALIDADE'`),
 }));
 
 export const insertComissaoSchema = createInsertSchema(comissoesTable).omit({ createdAt: true });

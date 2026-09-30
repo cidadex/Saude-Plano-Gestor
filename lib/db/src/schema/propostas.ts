@@ -27,6 +27,7 @@ export const propostasTable = pgTable("propostas", {
   responsavelFinanceiroId: text("responsavel_financeiro_id").references(() => responsaveisFinanceirosTable.id),
   valorTotal: text("valor_total"),
   motivoRecusa: text("motivo_recusa"),
+  codigoOperadora: text("codigo_operadora"),
   dataEnvioOperadora: timestamp("data_envio_operadora"),
   dataRetorno: timestamp("data_retorno"),
   dataAtivacao: timestamp("data_ativacao"),

@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import { eq, sql, desc, and, or, inArray, ne } from "drizzle-orm";
@@ -22,12 +22,10 @@ import { requireAuth } from "../middlewares/auth.js";
 import { validarDadosTitular } from "../lib/validacaoProposta.js";
 import { validarSelecaoProposta } from "../lib/validacaoSelecaoProposta.js";
 import {
-  ensureActivationCommission,
-  COMISSAO_CONFIGURACAO_AUSENTE,
-  COMISSAO_CONFIGURACAO_MENSAGEM,
-  COMISSAO_VALOR_MENSAL_AUSENTE,
-  COMISSAO_VALOR_MENSAL_MENSAGEM,
-} from "../lib/ativacaoComissao.js";
+  aplicarComissaoMensal,
+  gerarComissaoMensalDoBoleto,
+  ComissaoInvalidaError,
+} from "../lib/comissaoMensal.js";
 
 const router = Router();
 
@@ -37,34 +35,6 @@ router.use((req, res, next) => {
   if (req.user?.role !== "admin") return res.status(403).json({ error: "Acesso negado" });
   next();
 });
-
-type ComissaoModalidade = "FIXO" | "PERCENTUAL";
-
-function validarConfiguracaoComissao(
-  comissionado: boolean,
-  modalidade: ComissaoModalidade | null | undefined,
-  valor: string | number | null | undefined,
-): { modalidade: ComissaoModalidade | null; valor: string | null; error?: string } {
-  if (!comissionado) return { modalidade: null, valor: null };
-  if (modalidade !== "FIXO" && modalidade !== "PERCENTUAL") {
-    return { modalidade: null, valor: null, error: "comissaoModalidade deve ser FIXO ou PERCENTUAL" };
-  }
-
-  const parsed = valor === null || valor === undefined || valor === ""
-    ? NaN
-    : Number(String(valor).replace(",", "."));
-  const rounded = Number.isFinite(parsed)
-    ? Math.round((parsed + Number.EPSILON) * 100) / 100
-    : NaN;
-  if (!Number.isFinite(rounded) || rounded <= 0) {
-    return { modalidade: null, valor: null, error: "comissaoValor deve ser maior que zero para vendedores comissionados" };
-  }
-  if (modalidade === "PERCENTUAL" && rounded > 100) {
-    return { modalidade: null, valor: null, error: "comissaoValor percentual não pode ser maior que 100" };
-  }
-
-  return { modalidade, valor: rounded.toFixed(2) };
-}
 
 function isUniqueViolation(err: unknown): boolean {
   return typeof err === "object" && err !== null && "code" in err && (err as { code?: unknown }).code === "23505";
@@ -119,14 +89,12 @@ router.get("/admin/vendedores", async (_req, res) => {
 // Criar vendedor
 router.post("/admin/vendedores", async (req, res) => {
   try {
-    const { nome, email, telefone, comissionado, tipoComissao, comissaoModalidade, comissaoValor, senha, tabelaPrecoId } = req.body as {
+    const { nome, email, telefone, comissionado, tipoComissao, senha, tabelaPrecoId } = req.body as {
       nome: string;
       email: string;
       telefone?: string;
       comissionado: boolean;
       tipoComissao?: "VENDA" | "SERVICO" | "AMBOS";
-      comissaoModalidade?: ComissaoModalidade | null;
-      comissaoValor?: string | number | null;
       senha: string;
       tabelaPrecoId: string;
     };
@@ -149,13 +117,6 @@ router.post("/admin/vendedores", async (req, res) => {
     if (!tabela) return res.status(404).json({ error: "Tabela de preço não encontrada" });
     if (tabela.vendedorId) return res.status(409).json({ error: "Tabela de preço já atribuída a outro vendedor" });
 
-    const comissaoConfig = validarConfiguracaoComissao(
-      comissionado === true,
-      comissaoModalidade,
-      comissaoValor,
-    );
-    if (comissaoConfig.error) return res.status(400).json({ error: comissaoConfig.error });
-
     const passwordHash = await bcrypt.hash(senha, 10);
     const uid = `user-v-${Date.now()}`;
     const vid = `v-${Date.now()}`;
@@ -177,8 +138,6 @@ router.post("/admin/vendedores", async (req, res) => {
         telefone: telefone ?? null,
         comissionado: comissionado ?? false,
         tipoComissao: comissionado ? (tipoComissao ?? "VENDA") : null,
-        comissaoModalidade: comissaoConfig.modalidade,
-        comissaoValor: comissaoConfig.valor,
       });
       const tabelasAtribuidas = await tx
         .update(tabelasPrecoTable)
@@ -199,8 +158,6 @@ router.post("/admin/vendedores", async (req, res) => {
         telefone,
         comissionado,
         tipoComissao: comissionado ? (tipoComissao ?? "VENDA") : null,
-        comissaoModalidade: comissaoConfig.modalidade,
-        comissaoValor: comissaoConfig.valor,
         tabelaPrecoId,
       },
     });
@@ -217,14 +174,12 @@ router.post("/admin/vendedores", async (req, res) => {
 router.put("/admin/vendedores/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, email, telefone, comissionado, tipoComissao, comissaoModalidade, comissaoValor, tabelaPrecoId } = req.body as {
+    const { nome, email, telefone, comissionado, tipoComissao, tabelaPrecoId } = req.body as {
       nome: string;
       email: string;
       telefone?: string;
       comissionado: boolean;
       tipoComissao?: "VENDA" | "SERVICO" | "AMBOS";
-      comissaoModalidade?: ComissaoModalidade | null;
-      comissaoValor?: string | number | null;
       tabelaPrecoId: string;
     };
     if (!nome || !email || !tabelaPrecoId) {
@@ -253,18 +208,6 @@ router.put("/admin/vendedores/:id", async (req, res) => {
     }
 
     const effectiveComissionado = comissionado ?? vendedor.comissionado;
-    const effectiveModalidade = comissaoModalidade !== undefined
-      ? comissaoModalidade
-      : vendedor.comissaoModalidade;
-    const effectiveValor = comissaoValor !== undefined
-      ? comissaoValor
-      : vendedor.comissaoValor;
-    const comissaoConfig = validarConfiguracaoComissao(
-      effectiveComissionado === true,
-      effectiveModalidade,
-      effectiveValor,
-    );
-    if (comissaoConfig.error) return res.status(400).json({ error: comissaoConfig.error });
 
     await db.transaction(async (tx) => {
       await tx.update(vendedoresTable).set({
@@ -273,8 +216,6 @@ router.put("/admin/vendedores/:id", async (req, res) => {
         telefone: telefone ?? null,
         comissionado: effectiveComissionado,
         tipoComissao: effectiveComissionado ? (tipoComissao ?? vendedor.tipoComissao ?? "VENDA") : null,
-        comissaoModalidade: comissaoConfig.modalidade,
-        comissaoValor: comissaoConfig.valor,
       }).where(eq(vendedoresTable.id, id));
 
       await tx.update(usersTable).set({
@@ -470,7 +411,6 @@ router.post("/admin/propostas", async (req, res) => {
     };
     if (!vendedorId) return res.status(400).json({ error: "vendedorId é obrigatório" });
     if (!dadosTitular) return res.status(400).json({ error: "dadosTitular é obrigatório" });
-    if (!contratoId) return res.status(400).json({ error: "contratoId é obrigatório" });
     if (!titularEhResponsavel && !responsavelFinanceiroId) return res.status(400).json({ error: "responsavelFinanceiroId é obrigatório" });
     const erroValidacao = validarDadosTitular(dadosTitular);
     if (erroValidacao) return res.status(400).json({ error: erroValidacao });
@@ -498,7 +438,7 @@ router.post("/admin/propostas", async (req, res) => {
       planoId: selecao.planoId,
       faixaId: selecao.faixaId,
       valorTotal: valorTotal ?? null,
-      contratoId,
+      contratoId: contratoId || null,
       responsavelFinanceiroId,
     }).returning();
 
@@ -607,12 +547,16 @@ router.get("/admin/propostas", async (_req, res) => {
         vendedorNome: vendedoresTable.nome,
         vendedorEmail: vendedoresTable.email,
         contratoId: propostasTable.contratoId,
+        codigoOperadora: propostasTable.codigoOperadora,
         contratoNome: contratosTable.nome,
         responsavelFinanceiroId: propostasTable.responsavelFinanceiroId,
         responsavelNome: responsaveisFinanceirosTable.nome,
         responsavelTipo: responsaveisFinanceirosTable.tipo,
+        comissaoMensalTitular: clientesTable.comissaoMensal,
+        vendedorComissionado: vendedoresTable.comissionado,
       })
       .from(propostasTable)
+      .leftJoin(clientesTable, eq(clientesTable.id, propostasTable.clienteId))
       .leftJoin(vendedoresTable, eq(vendedoresTable.id, propostasTable.vendedorId))
       .leftJoin(contratosTable, eq(contratosTable.id, propostasTable.contratoId))
       .leftJoin(responsaveisFinanceirosTable, eq(responsaveisFinanceirosTable.id, propostasTable.responsavelFinanceiroId))
@@ -667,10 +611,11 @@ router.patch("/admin/propostas/:id", async (req, res) => {
 });
 
 // Atualizar status geral de uma proposta
-router.patch("/admin/propostas/:id/status", async (req, res) => {
+export const atualizarStatusPropostaHandler: RequestHandler = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { status, motivoRecusa } = req.body as {
+    const id = String(req.params.id);
+    const { status, motivoRecusa, codigoOperadora } = req.body as {
+      codigoOperadora?: string;
       status: "AGUARDANDO_ENVIO" | "ENVIADA_OPERADORA" | "ACEITA" | "RECUSADA" | "ATIVA";
       motivoRecusa?: string;
     };
@@ -707,6 +652,11 @@ router.patch("/admin/propostas/:id/status", async (req, res) => {
     };
 
     if (status === "ENVIADA_OPERADORA") {
+      const codigo = String(codigoOperadora ?? "").trim().toUpperCase();
+      if (!codigo) {
+        return res.status(400).json({ error: "Informe o código do beneficiário na operadora" });
+      }
+      updateData.codigoOperadora = codigo;
       updateData.dataEnvioOperadora = new Date();
     } else if (status === "ACEITA" || status === "RECUSADA") {
       updateData.dataRetorno = new Date();
@@ -722,16 +672,20 @@ router.patch("/admin/propostas/:id/status", async (req, res) => {
     console.error(err);
     res.status(500).json({ error: String(err) });
   }
-});
+};
+router.patch("/admin/propostas/:id/status", atualizarStatusPropostaHandler);
 
 // Ativar proposta com campos obrigatórios de ativação. Plan/faixa/código são
 // sempre resolvidos da seleção persistida e da tabela de preço do vendedor.
-router.patch("/admin/propostas/:id/ativar", async (req, res) => {
+export const ativarPropostaHandler: RequestHandler = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { matricula, dataAtivacao } = req.body as {
+    const id = String(req.params.id);
+    const { matricula, dataAtivacao, contratoId: contratoIdBody, comissaoMensalTitular, comissaoMensalDependentes } = req.body as {
       matricula: string;       // 14 dígitos — código do usuário
       dataAtivacao: string;    // YYYY-MM-DD
+      contratoId?: string;
+      comissaoMensalTitular?: string | number | null;
+      comissaoMensalDependentes?: (string | number | null)[];
     };
 
     if (!matricula || matricula.trim().length !== 14) {
@@ -751,6 +705,23 @@ router.patch("/admin/propostas/:id/ativar", async (req, res) => {
         .for("update")
         .limit(1);
       if (!proposta) throw new Error("PROPOSTA_NAO_ENCONTRADA");
+
+      const contratoEscolhido = String(contratoIdBody ?? proposta.contratoId ?? "").trim();
+      if (!contratoEscolhido) throw new Error("CONTRATO_OBRIGATORIO");
+      const [contratoAtivacao] = await tx
+        .select({ id: contratosTable.id })
+        .from(contratosTable)
+        .where(eq(contratosTable.id, contratoEscolhido))
+        .limit(1);
+      if (!contratoAtivacao) throw new Error("CONTRATO_INVALIDO");
+      proposta.contratoId = contratoEscolhido;
+
+      const [vendedorAtivacao] = await tx
+        .select({ comissionado: vendedoresTable.comissionado })
+        .from(vendedoresTable)
+        .where(eq(vendedoresTable.id, proposta.vendedorId))
+        .limit(1);
+      const vendedorComissionado = vendedorAtivacao?.comissionado === true;
 
       const selecao = await validarSelecaoProposta(tx, proposta.vendedorId, proposta.planoId, proposta.faixaId);
       if (!selecao.ok) throw new Error(`SELECAO_PROPOSTA_INVALIDA:${selecao.error}`);
@@ -866,6 +837,7 @@ router.patch("/admin/propostas/:id/ativar", async (req, res) => {
             status: "ATIVO",
             matricula: matricula.trim(),
             dataAtivacao,
+            contratoId: contratoEscolhido,
             planoId: selecao.planoId,
             faixaId: selecao.faixaId,
             valorMensal: selecao.valorTitular,
@@ -878,7 +850,13 @@ router.patch("/admin/propostas/:id/ativar", async (req, res) => {
         cliente = atualizado ?? cliente;
       }
 
-      await ensureActivationCommission(tx, cliente, dataAtivacao);
+      await aplicarComissaoMensal(
+        tx,
+        id,
+        cliente.id,
+        { titular: comissaoMensalTitular, dependentes: comissaoMensalDependentes },
+        vendedorComissionado,
+      );
 
       const [updatedProposta] = await tx
         .update(propostasTable)
@@ -887,6 +865,7 @@ router.patch("/admin/propostas/:id/ativar", async (req, res) => {
           dadosTitular: dadosAtualizados,
           dataAtivacao: new Date(),
           clienteId: cliente.id,
+          contratoId: contratoEscolhido,
           updatedAt: new Date(),
         })
         .where(eq(propostasTable.id, id))
@@ -903,11 +882,14 @@ router.patch("/admin/propostas/:id/ativar", async (req, res) => {
 
     res.json({ ok: true, status: "ATIVA", clienteId: resultado.cliente.id, cliente: resultado.cliente });
   } catch (err) {
-    if (err instanceof Error && err.message === COMISSAO_CONFIGURACAO_AUSENTE) {
-      return res.status(409).json({ error: COMISSAO_CONFIGURACAO_MENSAGEM });
+    if (err instanceof ComissaoInvalidaError) {
+      return res.status(400).json({ error: err.message });
     }
-    if (err instanceof Error && err.message === COMISSAO_VALOR_MENSAL_AUSENTE) {
-      return res.status(409).json({ error: COMISSAO_VALOR_MENSAL_MENSAGEM });
+    if (err instanceof Error && err.message === "CONTRATO_OBRIGATORIO") {
+      return res.status(400).json({ error: "Selecione o contrato para ativar a proposta" });
+    }
+    if (err instanceof Error && err.message === "CONTRATO_INVALIDO") {
+      return res.status(400).json({ error: "Contrato não encontrado" });
     }
     if (isUniqueViolation(err)) {
       return res.status(409).json({ error: "Já existe um cliente com este CPF" });
@@ -929,7 +911,8 @@ router.patch("/admin/propostas/:id/ativar", async (req, res) => {
     console.error(err);
     res.status(500).json({ error: String(err) });
   }
-});
+};
+router.patch("/admin/propostas/:id/ativar", ativarPropostaHandler);
 
 // POST /admin/propostas/:id/gerar-boleto — gera boleto após ativação
 router.post("/admin/propostas/:id/gerar-boleto", async (req, res) => {
@@ -1243,8 +1226,6 @@ router.post("/admin/clientes", async (req, res) => {
             .set({ valor: comissaoSnap, updatedAt: new Date() } as Partial<typeof comissoesTable.$inferInsert>)
             .where(eq(comissoesTable.id, existingCom.id));
         }
-      } else {
-        await ensureActivationCommission(tx, created, created.dataAtivacao);
       }
 
       const [withSnapshot] = await tx
@@ -1257,12 +1238,6 @@ router.post("/admin/clientes", async (req, res) => {
 
     res.status(201).json({ cliente });
   } catch (err) {
-    if (err instanceof Error && err.message === COMISSAO_CONFIGURACAO_AUSENTE) {
-      return res.status(409).json({ error: COMISSAO_CONFIGURACAO_MENSAGEM });
-    }
-    if (err instanceof Error && err.message === COMISSAO_VALOR_MENSAL_AUSENTE) {
-      return res.status(409).json({ error: COMISSAO_VALOR_MENSAL_MENSAGEM });
-    }
     if (isUniqueViolation(err)) {
       return res.status(409).json({ error: "Já existe um cliente com este CPF" });
     }
@@ -1293,9 +1268,6 @@ router.patch("/admin/clientes/:id/status", async (req, res) => {
       if (current.status !== status) {
         await tx.update(clientesTable).set({ status, updatedAt: new Date() }).where(eq(clientesTable.id, id));
       }
-      if (isActivation) {
-        await ensureActivationCommission(tx, { ...current, status: "ATIVO" }, current.dataAtivacao);
-      }
 
       const [updated] = await tx
         .select()
@@ -1307,12 +1279,6 @@ router.patch("/admin/clientes/:id/status", async (req, res) => {
     if (!cliente) return res.status(404).json({ error: "Cliente não encontrado" });
     res.json({ ok: true, status: cliente.status, cliente });
   } catch (err) {
-    if (err instanceof Error && err.message === COMISSAO_CONFIGURACAO_AUSENTE) {
-      return res.status(409).json({ error: COMISSAO_CONFIGURACAO_MENSAGEM });
-    }
-    if (err instanceof Error && err.message === COMISSAO_VALOR_MENSAL_AUSENTE) {
-      return res.status(409).json({ error: COMISSAO_VALOR_MENSAL_MENSAGEM });
-    }
     console.error(err);
     res.status(500).json({ error: String(err) });
   }
@@ -1469,6 +1435,70 @@ router.get("/admin/contratos/:id/detalhe", async (req, res) => {
       pendencias,
     });
   } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+
+// PATCH /admin/propostas/:id/comissao-mensal — define/edita a comissão mensal
+// do titular e dependentes de uma proposta já ativada.
+export const editarComissaoMensalHandler: RequestHandler = async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    const { comissaoMensalTitular, comissaoMensalDependentes } = req.body as {
+      comissaoMensalTitular?: string | number | null;
+      comissaoMensalDependentes?: (string | number | null)[];
+    };
+    await db.transaction(async (tx) => {
+      const [proposta] = await tx.select().from(propostasTable).where(eq(propostasTable.id, id)).limit(1);
+      if (!proposta) throw new Error("PROPOSTA_NAO_ENCONTRADA");
+      if (proposta.status !== "ATIVA" || !proposta.clienteId) {
+        throw new ComissaoInvalidaError("Apenas propostas ativas possuem comissão mensal");
+      }
+      await aplicarComissaoMensal(
+        tx,
+        id,
+        proposta.clienteId,
+        { titular: comissaoMensalTitular, dependentes: comissaoMensalDependentes },
+        false,
+      );
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    if (err instanceof ComissaoInvalidaError) return res.status(400).json({ error: err.message });
+    if (err instanceof Error && err.message === "PROPOSTA_NAO_ENCONTRADA") {
+      return res.status(404).json({ error: "Proposta não encontrada" });
+    }
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+};
+router.patch("/admin/propostas/:id/comissao-mensal", editarComissaoMensalHandler);
+
+// PATCH /admin/boletos/:id/pagar — marca o boleto como pago e gera a comissão mensal
+router.patch("/admin/boletos/:id/pagar", async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    const resultado = await db.transaction(async (tx) => {
+      const [boleto] = await tx.select().from(boletosTable).where(eq(boletosTable.id, id)).for("update").limit(1);
+      if (!boleto) return null;
+      if (boleto.status === "CANCELADO") throw new Error("BOLETO_CANCELADO");
+      if (boleto.status !== "PAGO") {
+        await tx
+          .update(boletosTable)
+          .set({ status: "PAGO", dataPagamento: new Date().toISOString().slice(0, 10) })
+          .where(eq(boletosTable.id, id));
+      }
+      const comissao = await gerarComissaoMensalDoBoleto(tx, id);
+      return { comissao };
+    });
+    if (!resultado) return res.status(404).json({ error: "Boleto não encontrado" });
+    res.json({ ok: true, comissaoGerada: resultado.comissao });
+  } catch (err) {
+    if (err instanceof Error && err.message === "BOLETO_CANCELADO") {
+      return res.status(409).json({ error: "Boleto cancelado não pode ser pago" });
+    }
     console.error(err);
     res.status(500).json({ error: String(err) });
   }

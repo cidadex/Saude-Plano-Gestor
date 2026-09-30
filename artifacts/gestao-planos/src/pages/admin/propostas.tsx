@@ -1,3 +1,4 @@
+import { OrdenacaoFiltros, ordenarPropostas, dentroDoPeriodo, type OrdemProposta } from "@/components/propostas-ordenacao";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { apiFetch } from "@/lib/api";
 import { formatMoney, toUpperNoAccent, buscarCep } from "@/lib/format";
 import { Textarea } from "@/components/ui/textarea";
+import { ComissaoMensalFields, ContratoAtivacaoSelect, EditarComissaoMensalDialog } from "@/components/comissao-mensal";
 import { Search, SlidersHorizontal, Loader2, RefreshCw, AlertCircle, Receipt, Plus, Sparkles, ChevronDown, Check, X, UserPlus, Trash2, User } from "lucide-react";
 import { DocUploader, type DocFile } from "@/components/DocUploader";
 
@@ -35,7 +37,7 @@ const sortPlanos = <T extends { codigo: string | null }>(list: T[]): T[] =>
     return ia - ib;
   });
 
-const GRAUS_PARENTESCO = ["CÔNJUGE", "FILHO(A)", "PAI/MÃE", "OUTRO", "AGREGADO"];
+const GRAUS_PARENTESCO = ["PAI/MAE", "FILHO(A)", "SOGRO(A)", "AGREGADO", "MAE VIUVA", "DEPENDENTE", "CUNHADO", "IRMAO", "NETO", "ENTEADO", "SOBRINHO", "NORA", "TUTELADO", "COMPANHEIRO(A)", "OUTROS"];
 const FORMAS_PAGAMENTO = ["BOLETO", "PIX", "CARTAO"];
 
 const UFS_BR = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
@@ -89,11 +91,15 @@ type PropostaAdmin = {
   dataEnvioOperadora: string | null;
   dataAtivacao: string | null;
   motivoRecusa: string | null;
+  codigoOperadora?: string | null;
   contratoId: string | null;
   contratoNome: string | null;
   responsavelFinanceiroId: string | null;
   responsavelNome: string | null;
   responsavelTipo: "PF" | "PJ" | null;
+  dadosDependentes?: Record<string, unknown>[];
+  comissaoMensalTitular?: string | null;
+  vendedorComissionado?: boolean | null;
 };
 
 export default function AdminPropostas() {
@@ -102,12 +108,19 @@ export default function AdminPropostas() {
   const [search, setSearch] = useState("");
   const [vendedorFilter, setVendedorFilter] = useState("TODOS");
   const [statusFilter, setStatusFilter] = useState("TODOS");
+  const [ordem, setOrdem] = useState<OrdemProposta>("recentes");
+  const [de, setDe] = useState("");
+  const [ate, setAte] = useState("");
 
   const [propostaEditando, setPropostaEditando] = useState<PropostaAdmin | null>(null);
   const [novoStatus, setNovoStatus] = useState("");
+  const [codigoOperadora, setCodigoOperadora] = useState("");
   const [motivoRecusa, setMotivoRecusa] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [comTitular, setComTitular] = useState("");
+  const [comDeps, setComDeps] = useState<string[]>([]);
+  const [comissaoEditando, setComissaoEditando] = useState<PropostaAdmin | null>(null);
 
   // Edit dados
   const [dadosEditando, setDadosEditando] = useState<PropostaAdmin | null>(null);
@@ -121,6 +134,7 @@ export default function AdminPropostas() {
   // Campos de ativação
   const [matricula, setMatricula] = useState("");
   const [dataAtivacao, setDataAtivacao] = useState("");
+  const [contratoAtivacao, setContratoAtivacao] = useState("");
 
   const carregarPropostas = useCallback(async () => {
     setLoading(true);
@@ -139,23 +153,28 @@ export default function AdminPropostas() {
   const vendedores = useMemo(() => Array.from(new Set(propostas.map(p => p.vendedorNome ?? "—"))), [propostas]);
 
   const filteredPropostas = useMemo(() => {
-    return propostas.filter(p => {
+    const lista = propostas.filter(p => {
       const nome = String(p.dadosTitular?.nome ?? "").toLowerCase();
       const cpf = String(p.dadosTitular?.cpf ?? "");
       const vendedor = p.vendedorNome ?? "";
       const matchSearch = nome.includes(search.toLowerCase()) || cpf.includes(search);
       const matchVendedor = vendedorFilter === "TODOS" || vendedor === vendedorFilter;
       const matchStatus = statusFilter === "TODOS" || p.status === statusFilter;
-      return matchSearch && matchVendedor && matchStatus;
+      return matchSearch && matchVendedor && matchStatus && dentroDoPeriodo(p.createdAt, de, ate);
     });
-  }, [search, vendedorFilter, statusFilter, propostas]);
+    return ordenarPropostas(lista, ordem, p => String(p.dadosTitular?.nome ?? ""));
+  }, [search, vendedorFilter, statusFilter, propostas, ordem, de, ate]);
 
   const handleAbrirEdicao = (p: PropostaAdmin) => {
     setPropostaEditando(p);
     setNovoStatus("");
     setMotivoRecusa("");
     setMatricula("");
+    setCodigoOperadora("");
+    setComTitular("");
+    setComDeps((p.dadosDependentes ?? []).map(() => ""));
     setDataAtivacao(new Date().toISOString().split("T")[0]);
+    setContratoAtivacao(p.contratoId ?? "");
     setErro("");
   };
 
@@ -167,12 +186,12 @@ export default function AdminPropostas() {
       if (novoStatus === "ATIVA") {
         await apiFetch(`/admin/propostas/${propostaEditando.id}/ativar`, {
           method: "PATCH",
-          body: JSON.stringify({ matricula, dataAtivacao }),
+          body: JSON.stringify({ matricula, dataAtivacao, contratoId: contratoAtivacao, comissaoMensalTitular: comTitular, comissaoMensalDependentes: comDeps }),
         });
       } else {
         await apiFetch(`/admin/propostas/${propostaEditando.id}/status`, {
           method: "PATCH",
-          body: JSON.stringify({ status: novoStatus, motivoRecusa }),
+          body: JSON.stringify({ status: novoStatus, motivoRecusa, codigoOperadora }),
         });
       }
       await carregarPropostas();
@@ -273,8 +292,10 @@ export default function AdminPropostas() {
 
   const proximosStatus = propostaEditando ? (PROXIMOS_STATUS[propostaEditando.status] ?? []) : [];
   const podeAtivar = novoStatus === "ATIVA"
-    ? matricula.trim().length === 14 && !!dataAtivacao
-    : !!novoStatus;
+    ? matricula.trim().length === 14 && !!dataAtivacao && !!contratoAtivacao &&
+      (propostaEditando?.vendedorComissionado !== true ||
+        (comTitular.trim() !== "" && comDeps.every(v => v.trim() !== "")))
+    : novoStatus === "ENVIADA_OPERADORA" ? codigoOperadora.trim() !== "" : !!novoStatus;
 
   // Gerar boleto
   const [gerandoBoletoId, setGerandoBoletoId] = useState<string | null>(null);
@@ -482,7 +503,7 @@ export default function AdminPropostas() {
   const novaPodeAvancar1 = !!novaForm.vendedorId && !!novaForm.clienteNome && !!novaForm.clienteCpf
     && !!novaForm.planoId && !!novaForm.faixaId;
   const novaPodeSalvar = !!novaForm.vendedorId && !!novaForm.clienteNome && !!novaForm.clienteCpf
-    && !!novaForm.planoId && !!novaForm.faixaId && !!novaForm.contratoId
+    && !!novaForm.planoId && !!novaForm.faixaId
     && (novaForm.titularEhResponsavel || !!novaForm.responsavelFinanceiroId);
 
   return (
@@ -537,6 +558,7 @@ export default function AdminPropostas() {
                 </SelectContent>
               </Select>
             </div>
+            <OrdenacaoFiltros ordem={ordem} onOrdem={setOrdem} de={de} onDe={setDe} ate={ate} onAte={setAte} />
           </div>
         </CardContent>
       </Card>
@@ -616,6 +638,9 @@ export default function AdminPropostas() {
                     <Badge variant="outline" className={`font-medium border whitespace-nowrap ${STATUS_COLORS[prop.status] ?? ""}`}>
                       {STATUS_LABEL[prop.status] ?? prop.status}
                     </Badge>
+                    {prop.codigoOperadora && (
+                      <span className="block text-[10px] font-mono text-muted-foreground mt-1">Op.: {prop.codigoOperadora}</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1.5">
@@ -625,6 +650,11 @@ export default function AdminPropostas() {
                       {PROXIMOS_STATUS[prop.status]?.length > 0 && (
                         <Button size="sm" variant="outline" onClick={() => handleAbrirEdicao(prop)} data-testid={`btn-editar-proposta-${prop.id}`}>
                           Status
+                        </Button>
+                      )}
+                      {prop.status === "ATIVA" && (
+                        <Button size="sm" variant="outline" onClick={() => setComissaoEditando(prop)} data-testid={`btn-comissao-mensal-${prop.id}`}>
+                          Comissão
                         </Button>
                       )}
                       {prop.status === "ATIVA" && (
@@ -1074,7 +1104,7 @@ export default function AdminPropostas() {
 
               {/* Contrato */}
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Contrato *</Label>
+                <Label className="text-xs text-muted-foreground">Contrato (opcional — pode ser definido na ativação)</Label>
                 <Select value={novaForm.contratoId} onValueChange={v => setNovaForm(f => ({ ...f, contratoId: v }))}>
                   <SelectTrigger data-testid="select-nova-contrato"><SelectValue placeholder="Selecione o contrato..." /></SelectTrigger>
                   <SelectContent>
@@ -1203,6 +1233,20 @@ export default function AdminPropostas() {
               </Select>
             </div>
 
+            {novoStatus === "ENVIADA_OPERADORA" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="codigoOperadora">Código do beneficiário na operadora *</Label>
+                <Input
+                  id="codigoOperadora"
+                  value={codigoOperadora}
+                  onChange={e => setCodigoOperadora(e.target.value.toUpperCase())}
+                  placeholder="Ex.: 086NV"
+                  className="font-mono uppercase"
+                  data-testid="input-codigo-operadora"
+                />
+              </div>
+            )}
+
             {novoStatus === "RECUSADA" && (
               <div className="space-y-1.5">
                 <Label>Motivo da recusa</Label>
@@ -1251,6 +1295,18 @@ export default function AdminPropostas() {
                   />
                 </div>
 
+                <ContratoAtivacaoSelect contratos={contratosList} value={contratoAtivacao} onChange={setContratoAtivacao} />
+
+                {propostaEditando && (
+                  <ComissaoMensalFields
+                    titular={comTitular}
+                    onTitular={setComTitular}
+                    dependentes={propostaEditando.dadosDependentes ?? []}
+                    dependentesValores={comDeps}
+                    onDependente={(i, v) => setComDeps(a => a.map((x, j) => j === i ? v : x))}
+                  />
+                )}
+
               </div>
             )}
 
@@ -1275,6 +1331,13 @@ export default function AdminPropostas() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <EditarComissaoMensalDialog
+        proposta={comissaoEditando}
+        basePath="/admin"
+        onClose={() => setComissaoEditando(null)}
+        onSaved={() => void carregarPropostas()}
+      />
 
       {/* Modal Editar Dados da Proposta */}
       <Dialog open={!!dadosEditando} onOpenChange={() => { setDadosEditando(null); setDadosEditStep(1); }}>

@@ -125,7 +125,6 @@ function TabelaModal({
         faixas: validFaixas.map(f => ({
           faixaEtaria: f.faixaEtaria,
           valor: f.valor.replace(",", "."),
-          valorApartamento: f.valorApartamento ? f.valorApartamento.replace(",", ".") : undefined,
           planoId: f.planoId,
         })),
       };
@@ -190,8 +189,7 @@ function TabelaModal({
                   <TableRow className="bg-muted/50">
                     <TableHead className="text-xs">Faixa etária</TableHead>
                     <TableHead className="text-xs">Plano</TableHead>
-                    <TableHead className="text-xs text-right">Enf. (R$)</TableHead>
-                    <TableHead className="text-xs text-right">Apto. (R$)</TableHead>
+                    <TableHead className="text-xs text-right">Valor (R$)</TableHead>
                     <TableHead className="w-8" />
                   </TableRow>
                 </TableHeader>
@@ -224,14 +222,6 @@ function TabelaModal({
                         <Input
                           value={f.valor}
                           onChange={e => setFaixa(i, "valor", e.target.value)}
-                          placeholder="0,00"
-                          className="h-8 text-xs font-mono text-right"
-                        />
-                      </TableCell>
-                      <TableCell className="p-1.5">
-                        <Input
-                          value={f.valorApartamento}
-                          onChange={e => setFaixa(i, "valorApartamento", e.target.value)}
                           placeholder="0,00"
                           className="h-8 text-xs font-mono text-right"
                         />
@@ -584,18 +574,18 @@ export default function AdminPlanos() {
                   <TableHeader>
                     <TableRow className="bg-muted/30">
                       <TableHead className="text-xs">Faixa Etária</TableHead>
-                      <TableHead className="text-right text-xs">Enfermaria</TableHead>
-                      <TableHead className="text-right text-xs">Apartamento</TableHead>
+                      <TableHead className="text-xs">Plano</TableHead>
+                      <TableHead className="text-right text-xs">Valor</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {tabela.faixas.map((f, i) => (
                       <TableRow key={i}>
                         <TableCell className="text-sm font-medium">{f.faixaEtaria}</TableCell>
-                        <TableCell className="text-right text-sm">{formatMoney(parseFloat(f.valor))}</TableCell>
-                        <TableCell className="text-right text-sm text-muted-foreground">
-                          {f.valorApartamento ? formatMoney(parseFloat(f.valorApartamento)) : "—"}
+                        <TableCell className="text-sm">
+                          {(() => { const pl = planos.find(p => p.id === f.planoId); return pl ? <><span className="font-mono mr-1">{pl.codigo}</span>{pl.nome}</> : "—"; })()}
                         </TableCell>
+                        <TableCell className="text-right text-sm">{formatMoney(parseFloat(f.valor))}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

@@ -15,6 +15,12 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
+import { migrarFaixasApartamento } from "./lib/migrarFaixasApartamento.js";
+
+migrarFaixasApartamento()
+  .then((n) => { if (n > 0) logger.info({ n }, "Faixas de apartamento convertidas em linhas próprias"); })
+  .catch((err) => logger.error({ err }, "Falha ao converter faixas de apartamento"));
+
 app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");

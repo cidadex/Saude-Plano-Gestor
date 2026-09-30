@@ -54,6 +54,16 @@ export default function AdminCobranca() {
   const [modalAberto, setModalAberto] = useState(false);
   const [boletoSelecionado, setBoletoSelecionado] = useState<BoletoAdminAPI | null>(null);
 
+  const marcarPago = async (id: string) => {
+    if (!window.confirm("Confirmar pagamento deste boleto? A comissão mensal do vendedor será gerada.")) return;
+    try {
+      await apiFetch(`/admin/boletos/${id}/pagar`, { method: "PATCH" });
+      await carregar();
+    } catch (err) {
+      window.alert(String(err));
+    }
+  };
+
   const carregar = useCallback(async () => {
     setLoading(true);
     try {
@@ -205,7 +215,12 @@ export default function AdminCobranca() {
                       {labelStatus(boleto.status)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-center">
+                  <TableCell className="text-center space-x-1">
+                    <Button size="sm" variant="outline" className="h-8"
+                      onClick={() => void marcarPago(boleto.id)}
+                      data-testid={`btn-pagar-${boleto.id}`}>
+                      Marcar pago
+                    </Button>
                     <Button size="sm" variant="outline"
                       className="h-8 gap-1.5 border-green-300 text-green-700 hover:bg-green-50 hover:border-green-500"
                       onClick={() => { setBoletoSelecionado(boleto); setModalAberto(true); }}

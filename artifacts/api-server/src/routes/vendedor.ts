@@ -181,7 +181,6 @@ router.post("/vendedor/propostas", async (req, res) => {
     };
 
     if (!dadosTitular) return res.status(400).json({ error: "dadosTitular é obrigatório" });
-    if (!contratoId) return res.status(400).json({ error: "contratoId é obrigatório" });
     if (!titularEhResponsavel && !responsavelFinanceiroId) return res.status(400).json({ error: "responsavelFinanceiroId é obrigatório" });
     const erroValidacao = validarDadosTitular(dadosTitular);
     if (erroValidacao) return res.status(400).json({ error: erroValidacao });
@@ -208,7 +207,7 @@ router.post("/vendedor/propostas", async (req, res) => {
       planoId: selecao.planoId,
       faixaId: selecao.faixaId,
       valorTotal: valorTotal ?? null,
-      contratoId,
+      contratoId: contratoId || null,
       responsavelFinanceiroId,
     }).returning();
 

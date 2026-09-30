@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiFetch } from "@/lib/api";
-import { formatMoney, toUpperNoAccent } from "@/lib/format";
+import { toUpperNoAccent } from "@/lib/format";
 import { Plus, Pencil, KeyRound, Power, PowerOff, Users, Loader2, Search } from "lucide-react";
 
 interface Vendedor {
@@ -22,8 +22,6 @@ interface Vendedor {
   email: string;
   telefone?: string | null;
   comissionado: boolean;
-  comissaoModalidade?: "FIXO" | "PERCENTUAL" | null;
-  comissaoValor?: string | null;
   active: boolean;
   totalClientes: number;
   createdAt: string;
@@ -58,8 +56,6 @@ function VendedorModal({
     email: vendedor?.email ?? "",
     telefone: vendedor?.telefone ?? "",
     comissionado: vendedor?.comissionado ?? false,
-    comissaoModalidade: vendedor?.comissaoModalidade ?? "FIXO",
-    comissaoValor: vendedor?.comissaoValor ?? "",
     senha: "",
     tabelaPrecoId: vendedor?.tabelaPrecoId ?? "",
   });
@@ -73,26 +69,11 @@ function VendedorModal({
     if (!isEdit && form.senha.length < 6) { toast({ variant: "destructive", title: "A senha deve ter no mínimo 6 caracteres" }); return; }
     if (!form.tabelaPrecoId) { toast({ variant: "destructive", title: "Selecione a tabela de preços do vendedor" }); return; }
 
-    const comissaoValor = form.comissaoValor.replace(",", ".").trim();
-    const valorComissao = Number(comissaoValor);
-    if (form.comissionado) {
-      if (!comissaoValor || !Number.isFinite(valorComissao) || valorComissao <= 0) {
-        toast({ variant: "destructive", title: "Informe uma comissão de ativação maior que zero" });
-        return;
-      }
-      if (form.comissaoModalidade === "PERCENTUAL" && valorComissao > 100) {
-        toast({ variant: "destructive", title: "A comissão percentual deve ser de no máximo 100%" });
-        return;
-      }
-    }
-
     const payload = {
       nome: form.nome,
       email: form.email,
       telefone: form.telefone,
       comissionado: form.comissionado,
-      comissaoModalidade: form.comissionado ? form.comissaoModalidade : null,
-      comissaoValor: form.comissionado ? comissaoValor : null,
       tabelaPrecoId: form.tabelaPrecoId,
       ...(!isEdit ? { senha: form.senha } : {}),
     };
@@ -167,44 +148,9 @@ function VendedorModal({
             <Label htmlFor="comissionado" className="cursor-pointer">Vendedor comissionado</Label>
           </div>
           {form.comissionado && (
-            <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
-              <div>
-                <Label className="text-amber-900">Comissão de ativação (única)</Label>
-                <p className="mt-1 text-xs text-amber-800/80">
-                  Defina o valor pago uma única vez quando o cliente for ativado. No percentual, o cálculo usa a mensalidade.
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="comissao-modalidade">Modalidade</Label>
-                  <Select value={form.comissaoModalidade} onValueChange={v => set("comissaoModalidade", v)}>
-                    <SelectTrigger id="comissao-modalidade" data-testid="select-comissao-modalidade">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="FIXO">Valor fixo (R$)</SelectItem>
-                      <SelectItem value="PERCENTUAL">Percentual da mensalidade</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="comissao-valor">
-                    {form.comissaoModalidade === "PERCENTUAL" ? "Percentual (%)" : "Valor (R$)"}
-                  </Label>
-                  <Input
-                    id="comissao-valor"
-                    type="number"
-                    min="0.01"
-                    max={form.comissaoModalidade === "PERCENTUAL" ? "100" : undefined}
-                    step="0.01"
-                    value={form.comissaoValor}
-                    onChange={e => set("comissaoValor", e.target.value)}
-                    placeholder={form.comissaoModalidade === "PERCENTUAL" ? "Ex.: 10" : "Ex.: 150,00"}
-                    data-testid="input-comissao-valor"
-                  />
-                </div>
-              </div>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              A comissão é definida por beneficiário na ativação da proposta e paga conforme a mensalidade paga.
+            </p>
           )}
         </div>
         <DialogFooter>
@@ -378,17 +324,10 @@ export default function AdminVendedores() {
                 <TableCell className="text-sm text-muted-foreground">{v.telefone ?? "—"}</TableCell>
                 <TableCell>
                   {v.comissionado ? (
-                     <div className="space-y-1">
-                       <Badge variant="outline" className="text-emerald-700 border-emerald-300 bg-emerald-50 text-xs">
-                         {v.comissaoModalidade === "PERCENTUAL"
-                           ? `${v.comissaoValor ?? "—"}% da mensalidade`
-                           : v.comissaoValor
-                             ? `${formatMoney(Number(v.comissaoValor))} fixos`
-                             : "Configuração incompleta"}
-                       </Badge>
-                       <p className="text-[10px] text-muted-foreground">ativação única</p>
-                     </div>
-                  ) : (
+                     <Badge variant="outline" className="text-emerald-700 border-emerald-300 bg-emerald-50 text-xs">
+                       Comissão mensal por beneficiário
+                     </Badge>
+                   ) : (
                     <span className="text-xs text-muted-foreground">Não comissionado</span>
                   )}
                 </TableCell>

@@ -71,6 +71,7 @@ export const clientesTable = pgTable("clientes", {
   saldo: numeric("saldo", { precision: 10, scale: 2 }),
   valor2026: numeric("valor_2026", { precision: 10, scale: 2 }),
   comissao: numeric("comissao", { precision: 10, scale: 2 }),
+  comissaoMensal: numeric("comissao_mensal", { precision: 10, scale: 2 }),
   comissaoProcessada: boolean("comissao_processada").notNull().default(false),
   dataAtivacao: date("data_ativacao"),
   planoCode: text("plano_code"),

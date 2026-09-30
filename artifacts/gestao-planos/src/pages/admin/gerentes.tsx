@@ -23,6 +23,7 @@ const TODAS_PERMISSOES = [
   { id: "ver_equipe", label: "Equipe de vendas" },
   { id: "ver_propostas", label: "Propostas" },
   { id: "ver_cobranca", label: "Cobrança" },
+  { id: "ativar_propostas", label: "Gerenciar propostas (status, ativação e comissão)" },
 ];
 
 interface Gerente {

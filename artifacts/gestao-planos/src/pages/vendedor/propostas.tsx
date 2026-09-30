@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { usePropostas, type PropostaAPI } from "@/hooks/useVendedorData";
+import { OrdenacaoFiltros, ordenarPropostas, dentroDoPeriodo, type OrdemProposta } from "@/components/propostas-ordenacao"; import { usePropostas, type PropostaAPI } from "@/hooks/useVendedorData";
 import { formatMoney, toUpperNoAccent, buscarCep } from "@/lib/format";
 import { apiFetch } from "@/lib/api";
 import { Search, SlidersHorizontal, Plus, Check, Loader2, Sparkles, X, ChevronDown, UserPlus, Trash2, AlertCircle, User } from "lucide-react";
@@ -47,7 +47,7 @@ type DepVendedor = {
   documentos: DocFile[];
 };
 
-const GRAUS = ["CÔNJUGE", "FILHO(A)", "PAI/MÃE", "OUTRO", "AGREGADO"];
+const GRAUS = ["PAI/MAE", "FILHO(A)", "SOGRO(A)", "AGREGADO", "MAE VIUVA", "DEPENDENTE", "CUNHADO", "IRMAO", "NETO", "ENTEADO", "SOBRINHO", "NORA", "TUTELADO", "COMPANHEIRO(A)", "OUTROS"];
 const STATUS_LABEL: Record<string, string> = { AGUARDANDO_ENVIO: "Aguardando envio", ENVIADA_OPERADORA: "Enviada à operadora", ACEITA: "Aceita", RECUSADA: "Recusada", ATIVA: "Ativo" };
 const STATUS_COLORS: Record<string, string> = { ATIVA: "border-emerald-300 bg-emerald-50 text-emerald-700", AGUARDANDO_ENVIO: "border-amber-300 bg-amber-50 text-amber-700", ENVIADA_OPERADORA: "border-blue-300 bg-blue-50 text-blue-700", ACEITA: "border-teal-300 bg-teal-50 text-teal-700", RECUSADA: "border-red-300 bg-red-50 text-red-700" };
 const formasPagamento = ["BOLETO", "PIX", "CARTAO"];
@@ -82,6 +82,9 @@ export default function VendedorPropostas() {
   const [responsaveisList, setResponsaveisList] = useState<Array<{ id: string; nome: string; tipo: string }>>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("TODOS");
+  const [ordem, setOrdem] = useState<OrdemProposta>("recentes");
+  const [de, setDe] = useState("");
+  const [ate, setAte] = useState("");
   const [novaPropostaAberta, setNovaPropostaAberta] = useState(false);
   const [editandoProposta, setEditandoProposta] = useState<PropostaAPI | null>(null);
   const [editStep, setEditStep] = useState<1|2|3>(1);
@@ -147,14 +150,15 @@ export default function VendedorPropostas() {
 
   const statuses = useMemo(() => Array.from(new Set(propostas.map(p => p.status))), [propostas]);
   const filteredPropostas = useMemo(() => {
-    return propostas.filter(p => {
+    const lista = propostas.filter(p => {
       const nome = getNome(p).toLowerCase();
       const cpf = getCpf(p);
       const matchSearch = nome.includes(search.toLowerCase()) || cpf.includes(search);
       const matchStatus = statusFilter === "TODOS" || p.status === statusFilter;
-      return matchSearch && matchStatus;
+      return matchSearch && matchStatus && dentroDoPeriodo(p.createdAt, de, ate);
     });
-  }, [search, statusFilter, propostas]);
+    return ordenarPropostas(lista, ordem, getNome);
+  }, [search, statusFilter, propostas, ordem, de, ate]);
 
   const tabelaAtual = tabelas.find(t => t.id === form.tabelaId) ?? tabelas[0];
 
@@ -254,7 +258,6 @@ export default function VendedorPropostas() {
       setSalvarErro("Selecione a faixa etária do titular antes de salvar.");
       return;
     }
-    if (!form.contratoId) { setSalvarErro("Selecione o contrato."); return; }
     if (!form.titularEhResponsavel && !form.responsavelFinanceiroId) {
       setSalvarErro("Selecione o responsável financeiro ou marque o titular como responsável.");
       return;
@@ -264,7 +267,6 @@ export default function VendedorPropostas() {
       await apiFetch("/vendedor/propostas", {
         method: "POST",
         body: JSON.stringify({
-          contratoId: form.contratoId,
           responsavelFinanceiroId: form.titularEhResponsavel ? undefined : form.responsavelFinanceiroId,
           titularEhResponsavel: form.titularEhResponsavel,
           planoId: form.planoId,
@@ -463,6 +465,7 @@ export default function VendedorPropostas() {
                 </SelectContent>
               </Select>
             </div>
+            <OrdenacaoFiltros ordem={ordem} onOrdem={setOrdem} de={de} onDe={setDe} ate={ate} onAte={setAte} />
           </div>
         </CardContent>
       </Card>
@@ -946,19 +949,6 @@ export default function VendedorPropostas() {
                 </div>
               </div>
 
-              {/* Contrato */}
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Contrato *</Label>
-                <Select value={form.contratoId} onValueChange={v => setForm(f => ({ ...f, contratoId: v }))}>
-                  <SelectTrigger data-testid="select-vend-contrato"><SelectValue placeholder="Selecione o contrato..." /></SelectTrigger>
-                  <SelectContent>
-                    {contratosList.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.nome} {c.asaasModo === "SANDBOX" && "(sandbox)"}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
               {/* Responsável Financeiro */}
               <div className="rounded-lg border border-blue-200 bg-blue-50/40 p-3 space-y-3">
                 <p className="text-xs font-semibold text-blue-800">Responsável Financeiro *</p>
@@ -1044,7 +1034,7 @@ export default function VendedorPropostas() {
                 <Button
                   className="bg-primary"
                   onClick={handleSalvar}
-                  disabled={salvando || salvo || !form.clienteNome || !form.clienteCpf || !form.planoId || !form.contratoId || (!form.titularEhResponsavel && !form.responsavelFinanceiroId)}
+                  disabled={salvando || salvo || !form.clienteNome || !form.clienteCpf || !form.planoId || (!form.titularEhResponsavel && !form.responsavelFinanceiroId)}
                   data-testid="btn-salvar-proposta"
                 >
                   {salvando ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Salvando...</> : salvo ? <><Check className="h-4 w-4 mr-1" /> Salvo!</> : "Cadastrar Proposta"}

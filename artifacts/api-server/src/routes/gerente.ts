@@ -1,6 +1,8 @@
 import { Router } from "express";
+import { eq } from "drizzle-orm";
 import { db, vendedoresTable, clientesTable, propostasTable, boletosTable, comissoesTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth.js";
+import { ativarPropostaHandler, atualizarStatusPropostaHandler, editarComissaoMensalHandler } from "./admin.js";
 
 const router = Router();
 
@@ -88,7 +90,26 @@ router.get("/gerente/clientes", async (req, res) => {
 router.get("/gerente/propostas", async (req, res) => {
   if (!hasPermissao(req, "ver_propostas")) return res.status(403).json({ error: "Sem permissão" });
   try {
-    const propostas = await db.select().from(propostasTable).orderBy(propostasTable.createdAt);
+    const propostas = await db
+      .select({
+        id: propostasTable.id,
+        vendedorId: propostasTable.vendedorId,
+        status: propostasTable.status,
+        dadosTitular: propostasTable.dadosTitular,
+        dadosDependentes: propostasTable.dadosDependentes,
+        valorTotal: propostasTable.valorTotal,
+        createdAt: propostasTable.createdAt,
+        dataAtivacao: propostasTable.dataAtivacao,
+        clienteId: propostasTable.clienteId,
+        contratoId: propostasTable.contratoId,
+        codigoOperadora: propostasTable.codigoOperadora,
+        dataEnvioOperadora: propostasTable.dataEnvioOperadora,
+        motivoRecusa: propostasTable.motivoRecusa,
+        comissaoMensalTitular: clientesTable.comissaoMensal,
+      })
+      .from(propostasTable)
+      .leftJoin(clientesTable, eq(clientesTable.id, propostasTable.clienteId))
+      .orderBy(propostasTable.createdAt);
     res.json({ propostas });
   } catch (err) {
     res.status(500).json({ error: String(err) });
@@ -117,6 +138,21 @@ router.get("/gerente/boletos", async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: String(err) });
   }
+});
+
+// Ativação de propostas e comissão mensal (requer ativar_propostas)
+router.patch("/gerente/propostas/:id/status", (req, res, next) => {
+  if (!hasPermissao(req, "ativar_propostas")) return res.status(403).json({ error: "Sem permissão" });
+  return atualizarStatusPropostaHandler(req, res, next);
+});
+
+router.patch("/gerente/propostas/:id/ativar", (req, res, next) => {
+  if (!hasPermissao(req, "ativar_propostas")) return res.status(403).json({ error: "Sem permissão" });
+  return ativarPropostaHandler(req, res, next);
+});
+router.patch("/gerente/propostas/:id/comissao-mensal", (req, res, next) => {
+  if (!hasPermissao(req, "ativar_propostas")) return res.status(403).json({ error: "Sem permissão" });
+  return editarComissaoMensalHandler(req, res, next);
 });
 
 export default router;
