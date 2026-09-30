@@ -25,6 +25,7 @@ export default function Login() {
     else if (user.role === "vendedor") navigate("/vendedor");
     else if (user.role === "gerente") navigate("/gerente");
     else if (user.role === "cliente") navigate("/cliente");
+    else if (user.role === "responsavel") navigate("/responsavel");
   }
 
   const handleStaffSubmit = async (e: FormEvent) => {

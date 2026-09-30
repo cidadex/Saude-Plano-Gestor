@@ -101,9 +101,10 @@ export default function VendedorPropostas() {
   useEffect(() => {
     type TabelaPrecoAPI = {
       tabela: { id: string; nome: string; tipoPlano?: string | null } | null;
+      tabelas?: Array<{ id: string; nome: string; tipoPlano?: string | null }>;
       planos: Array<{
         id: string; nome: string; codigo: string | null; categoria: string | null; acomodacao: string | null;
-        faixas: Array<{ id: string; faixaEtaria: string; valor: string; valorApartamento?: string | null }>;
+        faixas: Array<{ id: string; faixaEtaria: string; label?: string; tabelaId?: string; valor: string; valorApartamento?: string | null }>;
       }>;
     };
     Promise.all([
@@ -112,14 +113,14 @@ export default function VendedorPropostas() {
         if (!d.tabela) return;
         const tabela: TabelaVendedor = {
           id: d.tabela.id,
-          nome: d.tabela.nome,
+          nome: (d.tabelas?.length ? d.tabelas : [d.tabela]).map(t => t.nome).join(" + "),
           tipoPlano: d.tabela.tipoPlano,
           faixas: (d.planos ?? []).flatMap(p =>
             p.faixas.map(f => ({
               id: f.id,
-              tabelaId: d.tabela!.id,
+              tabelaId: f.tabelaId ?? d.tabela!.id,
               planoId: p.id,
-              faixaEtaria: f.faixaEtaria,
+              faixaEtaria: f.label ?? f.faixaEtaria,
               valor: f.valor,
               valorApartamento: f.valorApartamento ?? null,
             })),

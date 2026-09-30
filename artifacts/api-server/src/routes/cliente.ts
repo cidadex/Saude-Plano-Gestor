@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { requireAuth } from "../middlewares/auth.js";
 import {
-  db, clientesTable, dependentesTable, boletosTable, planosTable,
+  db, clientesTable, dependentesTable, boletosTable, planosTable, responsaveisFinanceirosTable,
 } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 
 const router = Router();
 
@@ -106,6 +106,50 @@ router.get("/cliente/boletos", requireCliente, async (req, res) => {
       .orderBy(desc(boletosTable.vencimento));
 
     res.json({ boletos });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// GET /responsavel/me — responsável financeiro logado: beneficiários vinculados e suas faturas
+router.get("/responsavel/me", async (req, res) => {
+  try {
+    if (req.user?.role !== "responsavel" || !req.user.responsavelId) {
+      return res.status(403).json({ error: "Acesso exclusivo para responsáveis financeiros" });
+    }
+    const [responsavel] = await db
+      .select({
+        id: responsaveisFinanceirosTable.id, nome: responsaveisFinanceirosTable.nome,
+        cpfCnpj: responsaveisFinanceirosTable.cpfCnpj, email: responsaveisFinanceirosTable.email,
+      })
+      .from(responsaveisFinanceirosTable)
+      .where(eq(responsaveisFinanceirosTable.id, req.user.responsavelId)).limit(1);
+    if (!responsavel) return res.status(404).json({ error: "Responsável não encontrado" });
+
+    const beneficiarios = await db
+      .select({
+        id: clientesTable.id, nome: clientesTable.nome, cpf: clientesTable.cpf, status: clientesTable.status,
+        tipo: clientesTable.tipo, valorMensal: clientesTable.valorMensal,
+      })
+      .from(clientesTable)
+      .where(eq(clientesTable.responsavelFinanceiroId, responsavel.id));
+
+    const ids = beneficiarios.map(b => b.id);
+    const boletos = ids.length
+      ? await db
+          .select({
+            id: boletosTable.id, clienteId: boletosTable.clienteId, valor: boletosTable.valor,
+            vencimento: boletosTable.vencimento, status: boletosTable.status, codigoBarras: boletosTable.codigoBarras,
+            mesReferencia: boletosTable.mesReferencia, linkPagamento: boletosTable.linkPagamento,
+            dataPagamento: boletosTable.dataPagamento,
+          })
+          .from(boletosTable)
+          .where(inArray(boletosTable.clienteId, ids))
+          .orderBy(desc(boletosTable.vencimento))
+      : [];
+
+    res.json({ responsavel, beneficiarios, boletos });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: String(err) });

@@ -42,6 +42,8 @@ type TabelaPreco = {
   ano: number | null;
   vendedorId: string | null;
   vendedorNome: string | null;
+  vendedores: { id: string; nome: string }[];
+  emUso?: boolean;
   faixas: TabelaFaixa[];
 };
 
@@ -60,13 +62,6 @@ const categoriaCor: Record<string, string> = {
 
 const CATEGORIAS = ["NOSSO PLANO", "MIX", "PLENO"];
 
-const FAIXAS_DEFAULT: FaixaForm[] = [
-  { faixaEtaria: "Até 29 anos", valor: "", valorApartamento: "", planoId: "" },
-  { faixaEtaria: "30 a 39 anos", valor: "", valorApartamento: "", planoId: "" },
-  { faixaEtaria: "40 a 49 anos", valor: "", valorApartamento: "", planoId: "" },
-  { faixaEtaria: "50 anos ou mais", valor: "", valorApartamento: "", planoId: "" },
-  { faixaEtaria: "DEPENDENTE (fixo)", valor: "", valorApartamento: "", planoId: "" },
-];
 
 function TabelaModal({
   open, onClose, tabela, planos, onSaved,
@@ -87,34 +82,61 @@ function TabelaModal({
   });
 
   const [faixas, setFaixas] = useState<FaixaForm[]>(
-    tabela?.faixas.length
-      ? tabela.faixas.map(f => ({
-          faixaEtaria: f.faixaEtaria,
-          valor: f.valor,
-          valorApartamento: f.valorApartamento ?? "",
-          planoId: f.planoId,
-        }))
-      : FAIXAS_DEFAULT
+    (tabela?.faixas ?? []).map(f => ({
+      faixaEtaria: f.faixaEtaria,
+      valor: f.valor,
+      valorApartamento: f.valorApartamento ?? "",
+      planoId: f.planoId,
+    })),
   );
-
+  const [vendedorIds, setVendedorIds] = useState<string[]>(tabela?.vendedores?.map(v => v.id) ?? []);
+  const [vendedores, setVendedores] = useState<{ id: string; nome: string }[]>([]);
+  const [planoAtual, setPlanoAtual] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    if (!open) return;
+    apiFetch<{ vendedores: { id: string; nome: string }[] }>("/admin/vendedores-para-tabela")
+      .then(d => setVendedores(d.vendedores))
+      .catch(err => toast({ variant: "destructive", title: String(err) }));
+  }, [open, toast]);
+
   const setField = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  const planosConfigurados = [...new Set(faixas.map(f => f.planoId).filter(Boolean))];
+  const linhas = faixas.map((f, i) => ({ f, i })).filter(x => x.f.planoId === planoAtual);
 
   const setFaixa = (i: number, k: keyof FaixaForm, v: string) =>
     setFaixas(prev => prev.map((f, idx) => idx === i ? { ...f, [k]: v } : f));
 
-  const addFaixa = () =>
-    setFaixas(prev => [...prev, { faixaEtaria: "", valor: "", valorApartamento: "", planoId: "" }]);
+  const addFaixa = () => {
+    if (!planoAtual) { toast({ variant: "destructive", title: "Escolha primeiro o plano que está configurando" }); return; }
+    setFaixas(prev => [...prev, { faixaEtaria: "", valor: "", valorApartamento: "", planoId: planoAtual }]);
+  };
 
-  const removeFaixa = (i: number) =>
-    setFaixas(prev => prev.filter((_, idx) => idx !== i));
+  const removeFaixa = (i: number) => setFaixas(prev => prev.filter((_, idx) => idx !== i));
+
+  const removerPlano = (planoId: string) => {
+    setFaixas(prev => prev.filter(f => f.planoId !== planoId));
+    if (planoAtual === planoId) setPlanoAtual("");
+  };
+
+  const toggleVendedor = (id: string) =>
+    setVendedorIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   const handleSave = async (): Promise<void> => {
     if (!form.nome.trim()) { toast({ variant: "destructive", title: "Informe o nome da tabela" }); return; }
 
-    const validFaixas = faixas.filter(f => f.faixaEtaria && f.valor && f.planoId);
-    if (validFaixas.length === 0) { toast({ variant: "destructive", title: "Adicione ao menos uma faixa com faixa etária, valor e plano" }); return; }
+    const validFaixas = faixas.filter(f => f.faixaEtaria.trim() || f.valor);
+    const incompleta = validFaixas.find(f => !f.faixaEtaria.trim() || !f.valor || !f.planoId);
+    if (incompleta) { toast({ variant: "destructive", title: "Preencha faixa etária e valor em todas as linhas (ou remova a linha)" }); return; }
+    const vistos = new Set<string>();
+    for (const f of validFaixas) {
+      const k = `${f.planoId}|${f.faixaEtaria.trim().toLowerCase()}`;
+      if (vistos.has(k)) { toast({ variant: "destructive", title: `Faixa "${f.faixaEtaria}" duplicada no mesmo plano` }); return; }
+      vistos.add(k);
+    }
+    if (validFaixas.length === 0) { toast({ variant: "destructive", title: "Configure ao menos um plano com faixas e valores" }); return; }
 
     setSaving(true);
     try {
@@ -122,8 +144,9 @@ function TabelaModal({
         nome: form.nome,
         tipoPlano: form.tipoPlano || null,
         ano: form.ano ? parseInt(form.ano) : null,
+        vendedorIds,
         faixas: validFaixas.map(f => ({
-          faixaEtaria: f.faixaEtaria,
+          faixaEtaria: f.faixaEtaria.trim(),
           valor: f.valor.replace(",", "."),
           planoId: f.planoId,
         })),
@@ -146,6 +169,10 @@ function TabelaModal({
   };
 
   const activePlanos = planos.filter(p => p.ativo);
+  const nomePlano = (id: string) => {
+    const p = planos.find(x => x.id === id);
+    return p ? `${p.codigo ?? ""} ${p.nome}`.trim() : id;
+  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -153,16 +180,14 @@ function TabelaModal({
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar Tabela de Preço" : "Nova Tabela de Preço"}</DialogTitle>
           <DialogDescription>
-            Cadastre os valores dos planos. A tabela será associada ao vendedor no cadastro da equipe.
+            Defina os vendedores que usam a tabela e configure um plano por vez, com suas faixas etárias e valores.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          <div className="grid grid-cols-1 gap-4">
-            <div className="space-y-1.5">
-              <Label>Nome da tabela *</Label>
-              <Input value={form.nome} onChange={e => setField("nome", e.target.value)} placeholder="Ex: Tabela Comercial Fortaleza 2026" />
-            </div>
+          <div className="space-y-1.5">
+            <Label>Nome da tabela *</Label>
+            <Input value={form.nome} onChange={e => setField("nome", e.target.value)} placeholder="Ex: Tabela Comercial Fortaleza 2026" data-testid="input-nome-tabela" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -176,83 +201,111 @@ function TabelaModal({
             </div>
           </div>
 
+          <div className="space-y-1.5">
+            <Label>Vendedores que usam esta tabela</Label>
+            <div className="rounded-md border max-h-36 overflow-y-auto divide-y" data-testid="lista-vendedores-tabela">
+              {vendedores.map(v => (
+                <label key={v.id} className="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-muted/40">
+                  <input type="checkbox" checked={vendedorIds.includes(v.id)} onChange={() => toggleVendedor(v.id)} />
+                  {v.nome}
+                </label>
+              ))}
+              {vendedores.length === 0 && <p className="px-3 py-2 text-xs text-muted-foreground">Nenhum vendedor cadastrado.</p>}
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-semibold">Faixas Etárias e Valores</Label>
-              <Button type="button" variant="outline" size="sm" onClick={addFaixa} className="gap-1 h-7 text-xs">
+            <Label className="text-sm font-semibold">Plano, faixas etárias e valores</Label>
+            {planosConfigurados.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {planosConfigurados.map(pid => (
+                  <Badge
+                    key={pid}
+                    variant={pid === planoAtual ? "default" : "outline"}
+                    className="cursor-pointer gap-1"
+                    onClick={() => setPlanoAtual(pid)}
+                  >
+                    {nomePlano(pid).slice(0, 34)}
+                    <X className="h-3 w-3 opacity-70 hover:opacity-100" onClick={e => { e.stopPropagation(); removerPlano(pid); }} />
+                  </Badge>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <Select value={planoAtual} onValueChange={setPlanoAtual}>
+                <SelectTrigger className="h-9 text-sm" data-testid="select-plano-atual">
+                  <SelectValue placeholder="Escolha o plano que quer configurar..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {activePlanos.map(p => (
+                    <SelectItem key={p.id} value={p.id} className="text-xs">
+                      <span className="font-mono mr-1">{p.codigo}</span> {p.nome.slice(0, 40)}
+                      {planosConfigurados.includes(p.id) ? " ✓" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button type="button" variant="outline" size="sm" onClick={addFaixa} className="gap-1 h-9 shrink-0" data-testid="btn-add-faixa">
                 <Plus className="h-3 w-3" /> Adicionar faixa
               </Button>
             </div>
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="text-xs">Faixa etária</TableHead>
-                    <TableHead className="text-xs">Plano</TableHead>
-                    <TableHead className="text-xs text-right">Valor (R$)</TableHead>
-                    <TableHead className="w-8" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {faixas.map((f, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="p-1.5">
-                        <Input
-                          value={f.faixaEtaria}
-                          onChange={e => setFaixa(i, "faixaEtaria", e.target.value)}
-                          placeholder="Ex: Até 29 anos"
-                          className="h-8 text-xs"
-                        />
-                      </TableCell>
-                      <TableCell className="p-1.5 min-w-[140px]">
-                        <Select value={f.planoId} onValueChange={v => setFaixa(i, "planoId", v)}>
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="Plano..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {activePlanos.map(p => (
-                              <SelectItem key={p.id} value={p.id} className="text-xs">
-                                <span className="font-mono mr-1">{p.codigo}</span> {p.nome.slice(0, 30)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell className="p-1.5">
-                        <Input
-                          value={f.valor}
-                          onChange={e => setFaixa(i, "valor", e.target.value)}
-                          placeholder="0,00"
-                          className="h-8 text-xs font-mono text-right"
-                        />
-                      </TableCell>
-                      <TableCell className="p-1.5">
-                        <Button
-                          type="button" variant="ghost" size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-red-500"
-                          onClick={() => removeFaixa(i)}
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </Button>
-                      </TableCell>
+            {planoAtual && (
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="text-xs">Faixa etária</TableHead>
+                      <TableHead className="text-xs text-right">Valor (R$)</TableHead>
+                      <TableHead className="w-8" />
                     </TableRow>
-                  ))}
-                  {faixas.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-4 text-sm text-muted-foreground">
-                        Nenhuma faixa. Clique em "Adicionar faixa" para começar.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {linhas.map(({ f, i }) => (
+                      <TableRow key={i}>
+                        <TableCell className="p-1.5">
+                          <Input
+                            value={f.faixaEtaria}
+                            onChange={e => setFaixa(i, "faixaEtaria", e.target.value)}
+                            placeholder="Ex: Até 29 anos"
+                            className="h-8 text-xs"
+                          />
+                        </TableCell>
+                        <TableCell className="p-1.5">
+                          <Input
+                            value={f.valor}
+                            onChange={e => setFaixa(i, "valor", e.target.value)}
+                            placeholder="0,00"
+                            className="h-8 text-xs font-mono text-right"
+                          />
+                        </TableCell>
+                        <TableCell className="p-1.5">
+                          <Button
+                            type="button" variant="ghost" size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-red-500"
+                            onClick={() => removeFaixa(i)}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {linhas.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-center py-4 text-sm text-muted-foreground">
+                          Nenhuma faixa neste plano. Clique em "Adicionar faixa".
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button onClick={() => void handleSave()} disabled={saving}>
+          <Button onClick={() => void handleSave()} disabled={saving} data-testid="btn-salvar-tabela">
             {saving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Salvando...</> : isEdit ? "Salvar alterações" : "Criar tabela"}
           </Button>
         </DialogFooter>
@@ -283,8 +336,8 @@ export default function AdminPlanos() {
 
   // Vincular vendedor
   const [vincularTabela, setVincularTabela] = useState<TabelaPreco | null>(null);
-  const [vendedoresDisponiveis, setVendedoresDisponiveis] = useState<{ id: string; nome: string; tabelaId: string | null }[]>([]);
-  const [vendedorSelecionado, setVendedorSelecionado] = useState<string>("");
+  const [vendedoresDisponiveis, setVendedoresDisponiveis] = useState<{ id: string; nome: string }[]>([]);
+  const [vendedoresSelecionados, setVendedoresSelecionados] = useState<string[]>([]);
   const [vinculando, setVinculando] = useState(false);
 
   const carregar = useCallback(async () => {
@@ -367,9 +420,9 @@ export default function AdminPlanos() {
 
   const abrirVincular = async (tabela: TabelaPreco) => {
     setVincularTabela(tabela);
-    setVendedorSelecionado(tabela.vendedorId ?? "");
+    setVendedoresSelecionados(tabela.vendedores?.map(v => v.id) ?? []);
     try {
-      const data = await apiFetch<{ vendedores: { id: string; nome: string; tabelaId: string | null }[] }>(
+      const data = await apiFetch<{ vendedores: { id: string; nome: string }[] }>(
         "/admin/vendedores-para-tabela"
       );
       setVendedoresDisponiveis(data.vendedores);
@@ -382,11 +435,11 @@ export default function AdminPlanos() {
     if (!vincularTabela) return;
     setVinculando(true);
     try {
-      await apiFetch(`/admin/tabelas-preco/${vincularTabela.id}/vincular`, {
-        method: "PATCH",
-        body: JSON.stringify({ vendedorId: vendedorSelecionado || null }),
+      await apiFetch(`/admin/tabelas-preco/${vincularTabela.id}/vendedores`, {
+        method: "PUT",
+        body: JSON.stringify({ vendedorIds: vendedoresSelecionados }),
       });
-      toast({ title: vendedorSelecionado ? "Vendedor vinculado com sucesso" : "Vínculo removido" });
+      toast({ title: "Vendedores da tabela atualizados" });
       setVincularTabela(null);
       await carregar();
     } catch (err) {
@@ -539,17 +592,17 @@ export default function AdminPlanos() {
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-sm">
                       <span className="font-bold">{tabela.nome}</span>
-                      <span className="text-muted-foreground font-normal"> — {tabela.vendedorNome ?? "Disponível para associação"}</span>
+                      <span className="text-muted-foreground font-normal"> — {tabela.vendedores?.length ? tabela.vendedores.map(v => v.nome).join(", ") : "Sem vendedores"}</span>
                       {tabela.ano && <span className="ml-1 text-xs text-muted-foreground">({tabela.ano})</span>}
                     </CardTitle>
                     <div className="flex items-center gap-1 shrink-0">
                       <Button
                         variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-blue-600"
-                        title={tabela.vendedorId ? "Alterar vendedor vinculado" : "Vincular a um vendedor"}
+                        title="Definir vendedores da tabela"
                         onClick={() => void abrirVincular(tabela)}
                         data-testid={`btn-vincular-tabela-${tabela.id}`}
                       >
-                        {tabela.vendedorId ? <UserCheck className="h-3.5 w-3.5 text-emerald-600" /> : <Link2 className="h-3.5 w-3.5" />}
+                        {tabela.vendedores?.length ? <UserCheck className="h-3.5 w-3.5 text-emerald-600" /> : <Link2 className="h-3.5 w-3.5" />}
                       </Button>
                       <Button
                         variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
@@ -717,35 +770,25 @@ export default function AdminPlanos() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <div className="space-y-1.5">
-              <Label>Vendedor</Label>
-              <Select value={vendedorSelecionado} onValueChange={setVendedorSelecionado}>
-                <SelectTrigger data-testid="select-vendedor-tabela">
-                  <SelectValue placeholder="Sem vínculo (disponível para associação)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">— Sem vínculo —</SelectItem>
-                  {vendedoresDisponiveis.map(v => (
-                    <SelectItem
-                      key={v.id}
-                      value={v.id}
-                      disabled={!!v.tabelaId && v.tabelaId !== vincularTabela?.id}
-                    >
-                      {v.nome}
-                      {v.tabelaId && v.tabelaId !== vincularTabela?.id
-                        ? " (já possui tabela)"
-                        : v.tabelaId === vincularTabela?.id ? " (vinculado)" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <Label>Vendedores que usam esta tabela</Label>
+            <div className="rounded-md border max-h-60 overflow-y-auto divide-y" data-testid="select-vendedor-tabela">
+              {vendedoresDisponiveis.map(v => (
+                <label key={v.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-muted/40">
+                  <input
+                    type="checkbox"
+                    checked={vendedoresSelecionados.includes(v.id)}
+                    onChange={() => setVendedoresSelecionados(p => p.includes(v.id) ? p.filter(x => x !== v.id) : [...p, v.id])}
+                  />
+                  {v.nome}
+                </label>
+              ))}
             </div>
-            {vendedorSelecionado && (
+            {vendedoresSelecionados.length > 0 && (
               <button
                 className="flex items-center gap-1.5 text-xs text-rose-600 hover:underline"
-                onClick={() => setVendedorSelecionado("")}
+                onClick={() => setVendedoresSelecionados([])}
               >
-                <UserX className="h-3.5 w-3.5" /> Remover vínculo
+                <UserX className="h-3.5 w-3.5" /> Remover todos os vínculos
               </button>
             )}
           </div>

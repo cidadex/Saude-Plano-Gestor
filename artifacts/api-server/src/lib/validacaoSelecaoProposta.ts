@@ -1,4 +1,5 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
+import { idsTabelasDoVendedor } from "./tabelasVendedor.js";
 import {
   db,
   planosTable,
@@ -43,12 +44,8 @@ export async function validarSelecaoProposta(
     };
   }
 
-  const [tabela] = await tx
-    .select({ id: tabelasPrecoTable.id })
-    .from(tabelasPrecoTable)
-    .where(eq(tabelasPrecoTable.vendedorId, vendedorId))
-    .limit(1);
-  if (!tabela) {
+  const tabelaIds = await idsTabelasDoVendedor(tx, vendedorId);
+  if (!tabelaIds.length) {
     return {
       ok: false,
       error: "O vendedor não possui uma tabela de preço atribuída.",
@@ -81,13 +78,13 @@ export async function validarSelecaoProposta(
         eq(planosTable.ativo, true),
       ),
     )
-    .where(eq(tabelasPrecoTable.id, tabela.id))
+    .where(inArray(tabelasPrecoTable.id, tabelaIds))
     .limit(1);
 
   if (!selection) {
     return {
       ok: false,
-      error: "O plano e a faixa selecionados não pertencem à tabela de preço do vendedor.",
+      error: "O plano e a faixa selecionados não pertencem às tabelas de preço do vendedor.",
     };
   }
   if (selection.faixaEtaria.toUpperCase().includes("DEPENDENTE")) {

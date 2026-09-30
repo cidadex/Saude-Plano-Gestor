@@ -39,6 +39,7 @@ import AdminResponsaveis from "@/pages/admin/responsaveis";
 import { ClienteLayout } from "@/components/layout/cliente-layout";
 import ClienteDashboard from "@/pages/cliente/dashboard";
 import ClienteFaturas from "@/pages/cliente/faturas";
+import ResponsavelPainel from "@/pages/responsavel/painel";
 
 import { VendedorLayout } from "@/components/layout/vendedor-layout";
 import VendedorDashboard from "@/pages/vendedor/dashboard";
@@ -171,6 +172,20 @@ function ClienteRoutes() {
   );
 }
 
+function ResponsavelRoutes() {
+  const { user, loading } = useAuth();
+  if (loading) return <LoadingScreen />;
+  if (!user || user.role !== "responsavel") return <Redirect to="/login" />;
+  return (
+    <ClienteLayout>
+      <Switch>
+        <Route path="/responsavel" component={ResponsavelPainel} />
+        <Route component={NotFound} />
+      </Switch>
+    </ClienteLayout>
+  );
+}
+
 function HomeRedirect() {
   const { user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
@@ -179,6 +194,7 @@ function HomeRedirect() {
   if (user.role === "vendedor") return <Redirect to="/vendedor" />;
   if (user.role === "gerente") return <Redirect to="/gerente" />;
   if (user.role === "cliente") return <Redirect to="/cliente" />;
+  if (user.role === "responsavel") return <Redirect to="/responsavel" />;
   return <Redirect to="/login" />;
 }
 
@@ -196,6 +212,8 @@ function Router() {
       <Route path="/gerente/*" component={GerenteRoutes} />
       <Route path="/cliente" component={ClienteRoutes} />
       <Route path="/cliente/*" component={ClienteRoutes} />
+      <Route path="/responsavel" component={ResponsavelRoutes} />
+      <Route path="/responsavel/*" component={ResponsavelRoutes} />
       <Route component={NotFound} />
     </Switch>
   );

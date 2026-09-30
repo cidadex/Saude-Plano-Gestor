@@ -9,6 +9,7 @@ import { AlertTriangle, ChevronDown, ChevronUp, Loader2, Shield } from "lucide-r
 type TabelaFaixa = {
   id: string;
   faixaEtaria: string;
+  label?: string;
   valor: string;
   valorApartamento: string | null;
 };
@@ -31,6 +32,7 @@ type TabelaInfo = {
 
 type ApiResponse = {
   tabela: TabelaInfo | null;
+  tabelas?: TabelaInfo[];
   planos: PlanoTabela[];
 };
 
@@ -42,6 +44,7 @@ const categoriaCor: Record<string, string> = {
 
 export default function VendedorPlanos() {
   const [tabela, setTabela] = useState<TabelaInfo | null>(null);
+  const [tabelas, setTabelas] = useState<TabelaInfo[]>([]);
   const [planos, setPlanos] = useState<PlanoTabela[]>([]);
   const [loading, setLoading] = useState(true);
   const [abertos, setAbertos] = useState<Set<string>>(new Set());
@@ -51,6 +54,7 @@ export default function VendedorPlanos() {
       try {
         const data = await apiFetch<ApiResponse>("/vendedor/tabela-preco");
         setTabela(data.tabela);
+        setTabelas(data.tabelas ?? []);
         setPlanos(data.planos ?? []);
         // Open all plans by default
         if (data.planos?.length) {
@@ -89,7 +93,7 @@ export default function VendedorPlanos() {
         <h2 className="text-3xl font-bold tracking-tight text-foreground">Tabela de Planos</h2>
         {tabela ? (
           <p className="text-muted-foreground">
-            Tabela <strong>{tabela.nome}</strong>
+            Tabela{tabelas.length > 1 ? "s" : ""} <strong>{(tabelas.length ? tabelas : [tabela]).map(t => t.nome).join(" + ")}</strong>
             {tabela.ano ? ` · ${tabela.ano}` : ""}
             {tabela.tipoPlano ? ` · ${tabela.tipoPlano}` : ""}
           </p>
@@ -207,7 +211,7 @@ export default function VendedorPlanos() {
                       <TableBody>
                         {plano.faixas.map(faixa => (
                           <TableRow key={faixa.id} className="hover:bg-muted/20">
-                            <TableCell className="font-medium text-sm">{faixa.faixaEtaria}</TableCell>
+                            <TableCell className="font-medium text-sm">{faixa.label ?? faixa.faixaEtaria}</TableCell>
                             <TableCell className="text-right font-bold text-sm text-primary">
                               {formatMoney(Number(faixa.valor))}
                             </TableCell>

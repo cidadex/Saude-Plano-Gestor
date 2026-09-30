@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 
-const navItems = [
+const navItemsCliente = [
   { href: "/cliente", label: "Início", icon: LayoutDashboard },
   { href: "/cliente/faturas", label: "Minhas Faturas", icon: FileText },
 ];
@@ -16,6 +16,9 @@ export function ClienteLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, toggle } = useTheme();
   const { logout, user } = useAuth();
+  const navItems = user?.role === "responsavel"
+    ? [{ href: "/responsavel", label: "Faturas e beneficiários", icon: FileText }]
+    : navItemsCliente;
 
   const sidebarContent = (
     <div className="flex flex-col h-full">

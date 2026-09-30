@@ -1,5 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
+import { randomUUID } from "crypto";
 import { eq, sql, ilike, or, and } from "drizzle-orm";
 import {
   db,
@@ -151,50 +152,51 @@ adminRouter.post("/admin/responsaveis", async (req, res) => {
       .limit(1);
     if (dup) return res.status(409).json({ error: "Já existe um responsável com este CPF/CNPJ" });
 
-    let userId: string | null = null;
-    const wantLogin = body.criarLogin !== false;
-    if (wantLogin && body.email && body.senha) {
-      if (body.senha.length < 6) return res.status(400).json({ error: "Senha deve ter no mínimo 6 caracteres" });
-      const emailNorm = body.email.toLowerCase().trim();
-      const [emailDup] = await db
-        .select({ id: usersTable.id })
-        .from(usersTable)
-        .where(eq(usersTable.email, emailNorm))
-        .limit(1);
+    const wantLogin = body.criarLogin === true || (body.criarLogin === undefined && !!body.email && !!body.senha);
+    let emailNorm = "";
+    if (wantLogin) {
+      if (!body.email || !body.senha) return res.status(400).json({ error: "E-mail e senha são obrigatórios para criar o login" });
+      emailNorm = body.email.toLowerCase().trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNorm)) return res.status(400).json({ error: "E-mail inválido" });
+      if (body.senha.length < 6) return res.status(400).json({ error: "A senha deve ter no mínimo 6 caracteres" });
+      const [emailDup] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, emailNorm)).limit(1);
       if (emailDup) return res.status(409).json({ error: "E-mail já está em uso por outro usuário" });
-
-      userId = `user-r-${Date.now()}`;
-      await db.insert(usersTable).values({
-        id: userId,
-        email: emailNorm,
-        passwordHash: await bcrypt.hash(body.senha, 10),
-        role: "responsavel",
-        nome: body.nome.trim(),
-        active: true,
-      });
     }
+    const passwordHash = wantLogin ? await bcrypt.hash(body.senha!, 10) : null;
 
-    const id = `resp-${Date.now()}`;
-    const [resp] = await db.insert(responsaveisFinanceirosTable).values({
-      id,
-      userId,
-      tipo: body.tipo ?? "PF",
-      nome: body.nome.trim(),
-      cpfCnpj: docDigits,
-      email: body.email?.toLowerCase().trim() || null,
-      telefone: body.telefone?.trim() || null,
-      cep: body.cep?.trim() || null,
-      logradouro: body.logradouro?.trim() || null,
-      numero: body.numero?.trim() || null,
-      complemento: body.complemento?.trim() || null,
-      bairro: body.bairro?.trim() || null,
-      cidade: body.cidade?.trim() || null,
-      estado: body.estado?.trim() || null,
-      observacao: body.observacao?.trim() || null,
-    }).returning();
+    const id = `resp-${randomUUID()}`;
+    const userId = wantLogin ? `user-r-${randomUUID()}` : null;
+    const resp = await db.transaction(async (tx) => {
+      if (userId && passwordHash) {
+        await tx.insert(usersTable).values({
+          id: userId, email: emailNorm, passwordHash, role: "responsavel", nome: body.nome.trim(), active: true,
+        });
+      }
+      const [r] = await tx.insert(responsaveisFinanceirosTable).values({
+        id,
+        userId,
+        tipo: body.tipo ?? "PF",
+        nome: body.nome.trim(),
+        cpfCnpj: docDigits,
+        email: body.email?.toLowerCase().trim() || null,
+        telefone: body.telefone?.trim() || null,
+        cep: body.cep?.trim() || null,
+        logradouro: body.logradouro?.trim() || null,
+        numero: body.numero?.trim() || null,
+        complemento: body.complemento?.trim() || null,
+        bairro: body.bairro?.trim() || null,
+        cidade: body.cidade?.trim() || null,
+        estado: body.estado?.trim() || null,
+        observacao: body.observacao?.trim() || null,
+      }).returning();
+      return r;
+    });
 
     res.status(201).json({ responsavel: resp });
   } catch (err) {
+    if (typeof err === "object" && err !== null && (err as { code?: string }).code === "23505") {
+      return res.status(409).json({ error: "CPF/CNPJ ou e-mail já cadastrado" });
+    }
     console.error(err);
     res.status(500).json({ error: String(err) });
   }

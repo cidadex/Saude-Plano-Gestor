@@ -27,13 +27,14 @@ interface Vendedor {
   createdAt: string;
   tabelaPrecoId: string | null;
   tabelaPrecoNome: string | null;
+  tabelaPrecoIds: string[];
+  tabelas: { id: string; nome: string }[];
 }
 
 interface TabelaPrecoOpt {
   id: string;
   nome: string;
-  vendedorId: string | null;
-  vendedorNome: string | null;
+  vendedores: { id: string; nome: string }[];
 }
 
 function VendedorModal({
@@ -57,7 +58,7 @@ function VendedorModal({
     telefone: vendedor?.telefone ?? "",
     comissionado: vendedor?.comissionado ?? false,
     senha: "",
-    tabelaPrecoId: vendedor?.tabelaPrecoId ?? "",
+    tabelaPrecoIds: vendedor?.tabelaPrecoIds ?? ([] as string[]),
   });
   const [saving, setSaving] = useState(false);
 
@@ -67,14 +68,14 @@ function VendedorModal({
     if (!form.nome || !form.email) { toast({ variant: "destructive", title: "Nome e e-mail são obrigatórios" }); return; }
     if (!isEdit && !form.senha) { toast({ variant: "destructive", title: "Informe a senha inicial" }); return; }
     if (!isEdit && form.senha.length < 6) { toast({ variant: "destructive", title: "A senha deve ter no mínimo 6 caracteres" }); return; }
-    if (!form.tabelaPrecoId) { toast({ variant: "destructive", title: "Selecione a tabela de preços do vendedor" }); return; }
+    if (!form.tabelaPrecoIds.length) { toast({ variant: "destructive", title: "Selecione ao menos uma tabela de preços" }); return; }
 
     const payload = {
       nome: form.nome,
       email: form.email,
       telefone: form.telefone,
       comissionado: form.comissionado,
-      tabelaPrecoId: form.tabelaPrecoId,
+      tabelaPrecoIds: form.tabelaPrecoIds,
       ...(!isEdit ? { senha: form.senha } : {}),
     };
 
@@ -122,24 +123,30 @@ function VendedorModal({
             </div>
           )}
           <div className="space-y-1.5">
-            <Label>Tabela de preços *</Label>
-            <Select value={form.tabelaPrecoId} onValueChange={v => set("tabelaPrecoId", v)}>
-              <SelectTrigger data-testid="select-tabela-vendedor">
-                <SelectValue placeholder="Selecione uma tabela disponível..." />
-              </SelectTrigger>
-              <SelectContent>
-                {tabelas
-                  .filter(t => !t.vendedorId || t.vendedorId === vendedor?.id)
-                  .map(t => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.nome}{t.vendedorNome ? ` — ${t.vendedorNome}` : ""}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            {tabelas.filter(t => !t.vendedorId || t.vendedorId === vendedor?.id).length === 0 && (
+            <Label>Tabelas de preços * <span className="text-xs text-muted-foreground font-normal">(uma ou mais; podem ser compartilhadas com outros vendedores)</span></Label>
+            <div className="rounded-md border max-h-44 overflow-y-auto divide-y" data-testid="lista-tabelas-vendedor">
+              {tabelas.map(t => {
+                const marcada = form.tabelaPrecoIds.includes(t.id);
+                const outros = t.vendedores.filter(v => v.id !== vendedor?.id).map(v => v.nome);
+                return (
+                  <label key={t.id} className="flex items-start gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-muted/40">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={marcada}
+                      onChange={() => set("tabelaPrecoIds", marcada ? form.tabelaPrecoIds.filter(x => x !== t.id) : [...form.tabelaPrecoIds, t.id])}
+                    />
+                    <span>
+                      {t.nome}
+                      {outros.length > 0 && <span className="block text-xs text-muted-foreground">Também usada por: {outros.join(", ")}</span>}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            {tabelas.length === 0 && (
               <p className="text-xs text-amber-600">
-                Não há tabela disponível. Crie uma em Gestão de Planos antes de cadastrar o vendedor.
+                Não há tabela cadastrada. Crie uma em Gestão de Planos antes de cadastrar o vendedor.
               </p>
             )}
           </div>

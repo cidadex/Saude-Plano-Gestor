@@ -21,6 +21,12 @@ migrarFaixasApartamento()
   .then((n) => { if (n > 0) logger.info({ n }, "Faixas de apartamento convertidas em linhas próprias"); })
   .catch((err) => logger.error({ err }, "Falha ao converter faixas de apartamento"));
 
+import { migrarAssociacoesLegadas } from "./lib/tabelasVendedor.js";
+
+migrarAssociacoesLegadas()
+  .then((n) => { if (n > 0) logger.info({ n }, "Associações legadas de tabela/vendedor migradas"); })
+  .catch((err) => logger.error({ err }, "Falha ao migrar associações de tabela/vendedor"));
+
 import { execucaoAutomatica } from "./lib/mensalidadesAsaas.js";
 
 const rodarAuto = () => execucaoAutomatica().catch((err) => logger.error({ err }, "Falha na emissão automática"));

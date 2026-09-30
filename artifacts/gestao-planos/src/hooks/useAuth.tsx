@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 
-export type UserRole = "admin" | "gerente" | "vendedor" | "cliente";
+export type UserRole = "admin" | "gerente" | "vendedor" | "cliente" | "responsavel";
 
 export interface AuthUser {
   id: string;
@@ -9,6 +9,7 @@ export interface AuthUser {
   nome: string;
   vendedorId?: string;
   gerenteId?: string;
+  responsavelId?: string;
   permissoes?: string[];
 }
 

@@ -6,11 +6,12 @@ const JWT_EXPIRES = "7d";
 export interface JwtPayload {
   userId: string;
   email: string;
-  role: "admin" | "gerente" | "vendedor" | "cliente";
+  role: "admin" | "gerente" | "vendedor" | "cliente" | "responsavel";
   nome: string;
   vendedorId?: string;
   gerenteId?: string;
   clienteId?: string;
+  responsavelId?: string;
   permissoes?: string[];
 }
 

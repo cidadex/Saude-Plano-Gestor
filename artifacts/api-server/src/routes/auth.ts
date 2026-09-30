@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
-import { db, usersTable, vendedoresTable, gerentesTable, clientesTable } from "@workspace/db";
+import { db, usersTable, vendedoresTable, gerentesTable, clientesTable, responsaveisFinanceirosTable } from "@workspace/db";
 import { signToken } from "../lib/jwt.js";
 import { requireAuth } from "../middlewares/auth.js";
 
@@ -36,6 +36,17 @@ router.post("/auth/login", async (req, res) => {
     let vendedorId: string | undefined;
     let gerenteId: string | undefined;
     let permissoes: string[] | undefined;
+    let responsavelId: string | undefined;
+
+    if (user.role === "responsavel") {
+      const [r] = await db.select({ id: responsaveisFinanceirosTable.id }).from(responsaveisFinanceirosTable)
+        .where(eq(responsaveisFinanceirosTable.userId, user.id)).limit(1);
+      if (!r) {
+        res.status(401).json({ error: "Conta sem responsável financeiro vinculado. Contate o administrador." });
+        return;
+      }
+      responsavelId = r.id;
+    }
 
     if (user.role === "vendedor") {
       const [v] = await db.select().from(vendedoresTable).where(eq(vendedoresTable.userId, user.id)).limit(1);
@@ -55,6 +66,7 @@ router.post("/auth/login", async (req, res) => {
       nome: user.nome,
       vendedorId,
       gerenteId,
+      responsavelId,
       permissoes,
     });
 
@@ -66,7 +78,7 @@ router.post("/auth/login", async (req, res) => {
     });
 
     res.json({
-      user: { id: user.id, email: user.email, role: user.role, nome: user.nome, vendedorId, gerenteId, permissoes },
+      user: { id: user.id, email: user.email, role: user.role, nome: user.nome, vendedorId, gerenteId, responsavelId, permissoes },
     });
   } catch (err) {
     console.error(err);
@@ -194,7 +206,7 @@ router.get("/auth/me", requireAuth, async (req, res) => {
     permissoes = (g?.permissoes as string[]) ?? [];
   }
 
-  res.json({ user: { id: user.userId, email: user.email, role: user.role, nome: user.nome, vendedorId, gerenteId, permissoes } });
+  res.json({ user: { id: user.userId, email: user.email, role: user.role, nome: user.nome, vendedorId, gerenteId, responsavelId: user.responsavelId, permissoes } });
 });
 
 export default router;

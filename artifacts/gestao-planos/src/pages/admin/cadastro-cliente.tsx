@@ -63,6 +63,8 @@ type CampoExtraido = { campo: keyof FormData; label: string; valor: string };
 type PlanoFaixa = {
   id: string;
   faixaEtaria: string;
+  label?: string;
+  tabelaId?: string;
   valor: string;
   valorApartamento: string | null;
 };
@@ -205,7 +207,7 @@ export default function CadastroCliente({ open, onClose, onCreated }: CadastroCl
       ...prev,
       planoId,
       planoCode: p?.codigo ?? "",
-      tabelaPrecoId: tabelaPreco?.id ?? "",
+      tabelaPrecoId: faixaUnica?.tabelaId ?? "",
       faixaId: faixaUnica?.id ?? "",
       valorMensal: faixaUnica?.valor ?? "",
     }));
@@ -216,6 +218,7 @@ export default function CadastroCliente({ open, onClose, onCreated }: CadastroCl
     setForm(prev => ({
       ...prev,
       faixaId,
+      tabelaPrecoId: faixa?.tabelaId ?? "",
       valorMensal: faixa?.valor ?? "",
     }));
   };
@@ -242,7 +245,6 @@ export default function CadastroCliente({ open, onClose, onCreated }: CadastroCl
       );
       setTabelaPreco(data.tabela);
       setPlanos(data.planos);
-      setForm(prev => ({ ...prev, tabelaPrecoId: data.tabela?.id ?? "" }));
     } catch (e) {
       toast({
         title: "Erro ao carregar planos",
@@ -570,7 +572,7 @@ export default function CadastroCliente({ open, onClose, onCreated }: CadastroCl
                     <SelectContent>
                       {planoSelecionado.faixas.map(f => (
                         <SelectItem key={f.id} value={f.id}>
-                          {f.faixaEtaria} — R$ {Number(f.valor).toFixed(2).replace(".", ",")}
+                          {f.label ?? f.faixaEtaria} — R$ {Number(f.valor).toFixed(2).replace(".", ",")}
                         </SelectItem>
                       ))}
                     </SelectContent>
