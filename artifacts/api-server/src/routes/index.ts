@@ -11,10 +11,13 @@ import planosRouter from "./planos.js";
 import clienteRouter from "./cliente.js";
 import contratosRouter, { contratosPublicRouter } from "./contratos.js";
 import responsaveisRouter, { responsaveisAdminRouter } from "./responsaveis.js";
+import { asaasWebhookRouter, asaasAdminRouter } from "./asaas.js";
 import storageRouter from "./storage.js";
 
 const router: IRouter = Router();
 
+// Webhook público (token do contrato): precisa vir antes de qualquer router com auth global.
+router.use(asaasWebhookRouter);
 router.use(storageRouter);
 router.use(healthRouter);
 router.use(authRouter);
@@ -32,6 +35,7 @@ router.use(contratosPublicRouter);
 router.use(responsaveisRouter);
 router.use(aiRouter);          // /ai/* — accessible to any authenticated role; must come BEFORE adminRouter
 router.use(responsaveisAdminRouter); // /admin/responsaveis — admin-only; separate from public responsaveisRouter
+router.use(asaasAdminRouter);   // /admin/asaas/* — admin; ANTES do adminRouter
 router.use(adminRouter);
 router.use(contratosRouter);
 

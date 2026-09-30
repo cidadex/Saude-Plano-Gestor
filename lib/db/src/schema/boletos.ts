@@ -1,4 +1,4 @@
-import { pgTable, text, numeric, timestamp, date, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, numeric, timestamp, date, pgEnum, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { clientesTable } from "./clientes";
@@ -22,8 +22,11 @@ export const boletosTable = pgTable("boletos", {
   mesReferencia: text("mes_referencia").notNull(),
   linkPagamento: text("link_pagamento"),
   dataPagamento: date("data_pagamento"),
+  asaasPaymentId: text("asaas_payment_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  asaasPaymentIdUnique: uniqueIndex("boletos_asaas_payment_id_unique").on(table.asaasPaymentId),
+}));
 
 export const insertBoletoSchema = createInsertSchema(boletosTable).omit({ createdAt: true });
 export type InsertBoleto = z.infer<typeof insertBoletoSchema>;

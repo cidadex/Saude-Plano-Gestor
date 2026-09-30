@@ -21,6 +21,12 @@ migrarFaixasApartamento()
   .then((n) => { if (n > 0) logger.info({ n }, "Faixas de apartamento convertidas em linhas próprias"); })
   .catch((err) => logger.error({ err }, "Falha ao converter faixas de apartamento"));
 
+import { execucaoAutomatica } from "./lib/mensalidadesAsaas.js";
+
+const rodarAuto = () => execucaoAutomatica().catch((err) => logger.error({ err }, "Falha na emissão automática"));
+setTimeout(rodarAuto, 60_000);
+setInterval(rodarAuto, 6 * 60 * 60 * 1000);
+
 app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");

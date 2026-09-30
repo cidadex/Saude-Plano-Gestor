@@ -32,6 +32,8 @@ router.get("/admin/contratos", async (_req, res) => {
         descricao: contratosTable.descricao,
         asaasModo: contratosTable.asaasModo,
         asaasApiKey: contratosTable.asaasApiKey,
+        asaasEmissaoAutomatica: contratosTable.asaasEmissaoAutomatica,
+        asaasWebhookToken: contratosTable.asaasWebhookToken,
         ativo: contratosTable.ativo,
         createdAt: contratosTable.createdAt,
       })
@@ -47,6 +49,8 @@ router.get("/admin/contratos", async (_req, res) => {
     const contratos = rows.map(c => ({
       ...c,
       asaasApiKey: undefined,
+      asaasWebhookToken: undefined,
+      asaasWebhookConfigured: !!c.asaasWebhookToken,
       asaasApiKeyMasked: maskKey(c.asaasApiKey),
       asaasApiKeyConfigured: !!c.asaasApiKey && c.asaasApiKey.length > 0,
       totalBeneficiarios: countMap[c.id] ?? 0,
@@ -135,6 +139,7 @@ router.patch("/admin/contratos/:id", async (req, res) => {
       descricao?: string | null;
       asaasApiKey?: string | null;
       asaasModo?: "SANDBOX" | "PRODUCAO";
+      asaasEmissaoAutomatica?: boolean;
       ativo?: boolean;
     };
 
@@ -149,6 +154,7 @@ router.patch("/admin/contratos/:id", async (req, res) => {
       updates.asaasApiKey = body.asaasApiKey.trim();
     }
     if (body.asaasModo !== undefined) updates.asaasModo = body.asaasModo;
+    if (body.asaasEmissaoAutomatica !== undefined) updates.asaasEmissaoAutomatica = !!body.asaasEmissaoAutomatica;
     if (body.ativo !== undefined) updates.ativo = body.ativo;
 
     await db.update(contratosTable).set(updates as never).where(eq(contratosTable.id, id));
@@ -157,6 +163,8 @@ router.patch("/admin/contratos/:id", async (req, res) => {
       contrato: {
         ...updated,
         asaasApiKey: undefined,
+        asaasWebhookToken: undefined,
+        asaasWebhookConfigured: !!updated.asaasWebhookToken,
         asaasApiKeyMasked: maskKey(updated.asaasApiKey),
         asaasApiKeyConfigured: !!updated.asaasApiKey,
       },

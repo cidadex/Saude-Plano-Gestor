@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
 import { formatMoney } from "@/lib/format";
 import { Search, MessageCircle, AlertTriangle, Clock, Ban, Loader2, RefreshCw } from "lucide-react";
+import { MensalidadesAsaas } from "@/components/mensalidades-asaas";
 import { WhatsappModal } from "@/components/whatsapp-modal";
 
 type BoletoAdminAPI = {
@@ -106,6 +107,8 @@ export default function AdminCobranca() {
           <RefreshCw className="h-4 w-4" /> Atualizar
         </Button>
       </div>
+
+      <MensalidadesAsaas onDone={carregar} />
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="border-l-4 border-l-amber-500 shadow-sm">

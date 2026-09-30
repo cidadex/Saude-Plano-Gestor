@@ -20,6 +20,8 @@ type Contrato = {
   asaasModo: "SANDBOX" | "PRODUCAO";
   asaasApiKeyMasked: string | null;
   asaasApiKeyConfigured: boolean;
+  asaasEmissaoAutomatica: boolean;
+  asaasWebhookConfigured: boolean;
   ativo: boolean;
   totalBeneficiarios: number;
 };
@@ -29,10 +31,11 @@ type FormState = {
   descricao: string;
   asaasApiKey: string;
   asaasModo: "SANDBOX" | "PRODUCAO";
+  asaasEmissaoAutomatica: boolean;
   ativo: boolean;
 };
 
-const empty: FormState = { nome: "", descricao: "", asaasApiKey: "", asaasModo: "SANDBOX", ativo: true };
+const empty: FormState = { nome: "", descricao: "", asaasApiKey: "", asaasModo: "SANDBOX", asaasEmissaoAutomatica: false, ativo: true };
 
 export default function AdminContratos() {
   const { toast } = useToast();
@@ -58,19 +61,33 @@ export default function AdminContratos() {
 
   useEffect(() => { void carregar(); }, []);
 
+  const [webhookToken, setWebhookToken] = useState("");
+  const gerarToken = async () => {
+    if (!editing) return;
+    if ((editing.asaasWebhookConfigured || webhookToken) && !window.confirm("Gerar um novo token invalida o anterior no Asaas. Continuar?")) return;
+    try {
+      const r = await apiFetch<{ token: string }>(`/admin/asaas/contratos/${editing.id}/webhook-token`, { method: "POST" });
+      setWebhookToken(r.token);
+      await carregar();
+    } catch (e) { toast({ title: "Erro ao gerar token", description: String(e), variant: "destructive" }); }
+  };
+
   const abrirNovo = () => {
+    setWebhookToken("");
     setEditing(null);
     setForm(empty);
     setOpen(true);
   };
 
   const abrirEdicao = (c: Contrato) => {
+    setWebhookToken("");
     setEditing(c);
     setForm({
       nome: c.nome,
       descricao: c.descricao ?? "",
       asaasApiKey: "",
       asaasModo: c.asaasModo,
+      asaasEmissaoAutomatica: c.asaasEmissaoAutomatica,
       ativo: c.ativo,
     });
     setOpen(true);
@@ -87,6 +104,7 @@ export default function AdminContratos() {
         nome: form.nome.trim(),
         descricao: form.descricao.trim(),
         asaasModo: form.asaasModo,
+        asaasEmissaoAutomatica: form.asaasEmissaoAutomatica,
         ativo: form.ativo,
       };
       if (form.asaasApiKey.trim()) payload.asaasApiKey = form.asaasApiKey.trim();
@@ -271,6 +289,24 @@ export default function AdminContratos() {
                   : "A chave fica armazenada no banco e nunca é retornada — só sua máscara."}
               </p>
             </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={form.asaasEmissaoAutomatica} onCheckedChange={v => setForm({ ...form, asaasEmissaoAutomatica: v })} data-testid="switch-emissao-automatica" />
+              <span className="text-sm">Emitir mensalidades automaticamente (nos primeiros dias de cada mês)</span>
+            </div>
+            {editing && (
+              <div className="space-y-1.5 rounded-lg border p-3">
+                <Label>Webhook (baixa automática do pagamento)</Label>
+                <p className="text-xs text-muted-foreground">
+                  No painel do Asaas, em Integrações → Webhooks, cadastre a URL abaixo, o token gerado aqui e os eventos de cobrança (recebida, confirmada, vencida, removida).
+                </p>
+                <Input readOnly value={`${window.location.origin}/api/asaas/webhook`} className="font-mono text-xs" />
+                {webhookToken && <Input readOnly value={webhookToken} className="font-mono text-xs" onFocus={e => e.currentTarget.select()} />}
+                <Button type="button" size="sm" variant="outline" onClick={() => void gerarToken()}>
+                  {editing.asaasWebhookConfigured || webhookToken ? "Gerar novo token" : "Gerar token"}
+                </Button>
+                {webhookToken && <p className="text-xs text-amber-600">Copie o token agora; ele só é exibido aqui uma vez.</p>}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>

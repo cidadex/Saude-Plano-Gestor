@@ -11,6 +11,7 @@ export const contratosTable = pgTable("contratos", {
   asaasApiKey: text("asaas_api_key"),
   asaasModo: asaasModoEnum("asaas_modo").notNull().default("SANDBOX"),
   asaasWebhookToken: text("asaas_webhook_token"),
+  asaasEmissaoAutomatica: boolean("asaas_emissao_automatica").notNull().default(false),
   ativo: boolean("ativo").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
