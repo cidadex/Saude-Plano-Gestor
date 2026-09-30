@@ -19,6 +19,7 @@ import {
 } from "@workspace/db";
 import { count as drizzleCount, sum as drizzleSum } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
+import { importarClientes, type LinhaImportacao } from "../lib/importarClientes.js";
 import { validarDadosTitular } from "../lib/validacaoProposta.js";
 import { validarSelecaoProposta } from "../lib/validacaoSelecaoProposta.js";
 import {
@@ -1046,6 +1047,18 @@ router.get("/admin/clientes", async (_req, res) => {
 });
 
 // POST /admin/clientes — admin cadastra cliente diretamente (sem fluxo de proposta)
+router.post("/admin/clientes/importar", async (req, res) => {
+  try {
+    const { linhas } = req.body as { linhas?: LinhaImportacao[] };
+    if (!Array.isArray(linhas) || linhas.length === 0) return res.status(400).json({ error: "Nenhuma linha para importar" });
+    if (linhas.length > 5000) return res.status(400).json({ error: "Máximo de 5000 beneficiários por importação" });
+    res.json(await importarClientes(linhas));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 router.post("/admin/clientes", async (req, res) => {
   try {
     const body = req.body as Record<string, string | number | boolean | undefined | null>;

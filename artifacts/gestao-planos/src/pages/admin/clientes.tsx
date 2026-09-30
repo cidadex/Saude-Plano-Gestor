@@ -13,10 +13,11 @@ import { formatMoney } from "@/lib/format";
 import {
   Search, SlidersHorizontal, ChevronDown, ChevronUp,
   PlayCircle, PauseCircle, MessageCircle, Pencil, Loader2, RefreshCw,
-  UserPlus, FileSignature, Users2, Building2, User as UserIcon,
+  UserPlus, Upload, FileSignature, Users2, Building2, User as UserIcon,
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { WhatsappModal } from "@/components/whatsapp-modal";
+import { ImportarClientesDialog } from "@/components/importar-clientes";
 import CadastroCliente from "@/pages/admin/cadastro-cliente";
 
 type ClienteAdminAPI = {
@@ -76,6 +77,7 @@ export default function AdminClientes() {
   const [clienteWhatsapp, setClienteWhatsapp] = useState<ClienteAdminAPI | null>(null);
 
   const [novoAberto, setNovoAberto] = useState(false);
+  const [importAberto, setImportAberto] = useState(false);
   const [editandoCliente, setEditandoCliente] = useState<ClienteAdminAPI | null>(null);
   const [editSalvando, setEditSalvando] = useState(false);
   const [editErro, setEditErro] = useState("");
@@ -199,12 +201,16 @@ export default function AdminClientes() {
           <Button variant="outline" size="sm" onClick={carregar} className="gap-2">
             <RefreshCw className="h-4 w-4" /> Atualizar
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setImportAberto(true)} className="gap-2" data-testid="btn-importar-excel">
+            <Upload className="h-4 w-4" /> Importar Excel
+          </Button>
           <Button size="sm" onClick={() => setNovoAberto(true)} className="gap-2" data-testid="btn-novo-cliente">
             <UserPlus className="h-4 w-4" /> Novo Cliente
           </Button>
         </div>
       </div>
 
+      <ImportarClientesDialog open={importAberto} onClose={() => setImportAberto(false)} onDone={carregar} />
       <CadastroCliente open={novoAberto} onClose={() => setNovoAberto(false)} onCreated={carregar} />
 
       <Card className="p-4">
