@@ -29,7 +29,7 @@ export const comissoesTable = pgTable("comissoes", {
     .where(sql`${table.tipo} = 'VENDA'`),
   boletoIdMensalUnique: uniqueIndex("comissoes_boleto_id_mensal_unique")
     .on(table.boletoId)
-    .where(sql`${table.tipo} = 'MENSALIDADE'`),
+    .where(sql`${table.tipo} <> 'VENDA' AND ${table.tipo} <> 'SERVICO'`),
 }));
 
 export const insertComissaoSchema = createInsertSchema(comissoesTable).omit({ createdAt: true });
