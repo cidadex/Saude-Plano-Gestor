@@ -18,6 +18,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { WhatsappModal } from "@/components/whatsapp-modal";
 import { ImportarClientesDialog } from "@/components/importar-clientes";
+import { ImportarVitalgestorDialog } from "@/components/importar-vitalgestor";
 import CadastroCliente from "@/pages/admin/cadastro-cliente";
 
 type ClienteAdminAPI = {
@@ -78,6 +79,7 @@ export default function AdminClientes() {
 
   const [novoAberto, setNovoAberto] = useState(false);
   const [importAberto, setImportAberto] = useState(false);
+  const [vitalAberto, setVitalAberto] = useState(false);
   const [editandoCliente, setEditandoCliente] = useState<ClienteAdminAPI | null>(null);
   const [editSalvando, setEditSalvando] = useState(false);
   const [editErro, setEditErro] = useState("");
@@ -204,6 +206,9 @@ export default function AdminClientes() {
           <Button variant="outline" size="sm" onClick={() => setImportAberto(true)} className="gap-2" data-testid="btn-importar-excel">
             <Upload className="h-4 w-4" /> Importar Excel
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setVitalAberto(true)} className="gap-2" data-testid="btn-importar-vitalgestor">
+            <Upload className="h-4 w-4" /> Importar Vitalgestor
+          </Button>
           <Button size="sm" onClick={() => setNovoAberto(true)} className="gap-2" data-testid="btn-novo-cliente">
             <UserPlus className="h-4 w-4" /> Novo Cliente
           </Button>
@@ -211,6 +216,7 @@ export default function AdminClientes() {
       </div>
 
       <ImportarClientesDialog open={importAberto} onClose={() => setImportAberto(false)} onDone={carregar} />
+      <ImportarVitalgestorDialog open={vitalAberto} onClose={() => setVitalAberto(false)} onDone={carregar} />
       <CadastroCliente open={novoAberto} onClose={() => setNovoAberto(false)} onCreated={carregar} />
 
       <Card className="p-4">

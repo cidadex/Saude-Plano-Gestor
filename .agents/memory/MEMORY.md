@@ -2,3 +2,4 @@
 - [Activation commission policy](activation-commission-policy.md) — one-time titular-based commission; preserve history and avoid retroactive payouts.
 - [Express catch-all admin router pattern](express-catchall-admin-router.md) — sub-routers with role-check middleware mounted without a path prefix block ALL unmatched requests; must be exported separately.
 - [Tabela↔vendedor model](tabela-vendedor-model.md) — N:N join table is source of truth; legacy column fallback; startup backfill.
+- [Vitalgestor import](vitalgestor-import.md) — real-customer sheet mapping; grouped by titular CPF; must be run in production via admin UI.

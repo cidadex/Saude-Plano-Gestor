@@ -20,6 +20,7 @@ import {
 import { count as drizzleCount, sum as drizzleSum } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
 import { importarClientes, type LinhaImportacao } from "../lib/importarClientes.js";
+import { importarVitalgestor, type LinhaVital } from "../lib/importarVitalgestor.js";
 import { validarDadosTitular } from "../lib/validacaoProposta.js";
 import { validarSelecaoProposta } from "../lib/validacaoSelecaoProposta.js";
 import {
@@ -987,6 +988,19 @@ router.get("/admin/clientes", async (_req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: String(err) });
+  }
+});
+
+// Importação da planilha Vitalgestor (titular = responsável financeiro; dependentes abaixo dele)
+router.post("/admin/clientes/importar-vitalgestor", async (req, res) => {
+  try {
+    const { linhas, substituir } = req.body as { linhas?: LinhaVital[]; substituir?: boolean };
+    if (!Array.isArray(linhas) || linhas.length === 0) return res.status(400).json({ error: "Nenhuma linha para importar" });
+    if (linhas.length > 20000) return res.status(400).json({ error: "Planilha grande demais" });
+    res.json(await importarVitalgestor(linhas, { substituir: substituir === true }));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
