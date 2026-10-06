@@ -991,6 +991,23 @@ router.get("/admin/clientes", async (_req, res) => {
   }
 });
 
+// Atribui um contrato a vários beneficiários de uma vez
+router.post("/admin/clientes/atribuir-contrato", async (req, res) => {
+  try {
+    const { contratoId, clienteIds } = req.body as { contratoId?: string; clienteIds?: string[] };
+    if (!contratoId) return res.status(400).json({ error: "Selecione o contrato" });
+    if (!Array.isArray(clienteIds) || clienteIds.length === 0) return res.status(400).json({ error: "Nenhum beneficiário selecionado" });
+    const [contrato] = await db.select({ id: contratosTable.id }).from(contratosTable).where(eq(contratosTable.id, contratoId)).limit(1);
+    if (!contrato) return res.status(400).json({ error: "Contrato inválido" });
+    const atualizados = await db.update(clientesTable).set({ contratoId, updatedAt: new Date() })
+      .where(inArray(clientesTable.id, clienteIds)).returning({ id: clientesTable.id });
+    res.json({ atualizados: atualizados.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // Importação da planilha Vitalgestor (titular = responsável financeiro; dependentes abaixo dele)
 router.post("/admin/clientes/importar-vitalgestor", async (req, res) => {
   try {

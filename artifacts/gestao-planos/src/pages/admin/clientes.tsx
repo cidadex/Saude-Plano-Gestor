@@ -19,6 +19,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { WhatsappModal } from "@/components/whatsapp-modal";
 import { ImportarClientesDialog } from "@/components/importar-clientes";
 import { ImportarVitalgestorDialog } from "@/components/importar-vitalgestor";
+import { useToast } from "@/hooks/use-toast";
 import CadastroCliente from "@/pages/admin/cadastro-cliente";
 
 type ClienteAdminAPI = {
@@ -67,6 +68,7 @@ function statusBadge(status: string) {
 }
 
 export default function AdminClientes() {
+  const { toast } = useToast();
   const [clientes, setClientes] = useState<ClienteAdminAPI[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -80,6 +82,11 @@ export default function AdminClientes() {
   const [novoAberto, setNovoAberto] = useState(false);
   const [importAberto, setImportAberto] = useState(false);
   const [vitalAberto, setVitalAberto] = useState(false);
+  const [contratoAberto, setContratoAberto] = useState(false);
+  const [contratosOpc, setContratosOpc] = useState<{ id: string; nome: string }[]>([]);
+  const [contratoSel, setContratoSel] = useState("");
+  const [contratoSalvando, setContratoSalvando] = useState(false);
+  const [contratoMsg, setContratoMsg] = useState("");
   const [editandoCliente, setEditandoCliente] = useState<ClienteAdminAPI | null>(null);
   const [editSalvando, setEditSalvando] = useState(false);
   const [editErro, setEditErro] = useState("");
@@ -115,7 +122,7 @@ export default function AdminClientes() {
 
   const filteredClientes = useMemo(() =>
     clientes.filter(c => {
-      const matchSearch = c.nome.toLowerCase().includes(search.toLowerCase()) || c.cpf.includes(search);
+      const matchSearch = c.nome.toLowerCase().includes(search.toLowerCase()) || c.cpf.includes(search) || (c.observacao ?? "").toLowerCase().includes(search.toLowerCase());
       const matchVendedor = vendedorFilter === "TODOS" || (c.vendedorNome ?? "—") === vendedorFilter;
       const matchPlano = planoFilter === "TODOS" || c.planoCode === planoFilter;
       const matchTipo = tipoFilter === "TODOS" || c.tipo === tipoFilter;
@@ -125,6 +132,25 @@ export default function AdminClientes() {
   const totalFiltrado = filteredClientes.length;
   const titularesFiltrados = filteredClientes.filter(c => c.tipo === "TITULAR").length;
   const dependentesFiltrados = filteredClientes.filter(c => c.tipo === "DEPENDENTE").length;
+
+  const abrirAtribuirContrato = async () => {
+    setContratoMsg(""); setContratoSel(""); setContratoAberto(true);
+    try {
+      const r = await apiFetch("/admin/contratos") as { contratos: { id: string; nome: string; ativo?: boolean }[] };
+      setContratosOpc((r.contratos ?? []).filter(c => c.ativo !== false));
+    } catch (e) { setContratoMsg(String(e)); }
+  };
+  const atribuirContrato = async () => {
+    setContratoSalvando(true); setContratoMsg("");
+    try {
+      const r = await apiFetch("/admin/clientes/atribuir-contrato", {
+        method: "POST", body: JSON.stringify({ contratoId: contratoSel, clienteIds: filteredClientes.map(c => c.id) }),
+      }) as { atualizados: number };
+      setContratoAberto(false);
+      toast({ title: `${r.atualizados} beneficiários vinculados ao contrato` });
+      await carregar();
+    } catch (e) { setContratoMsg(e instanceof Error ? e.message : String(e)); } finally { setContratoSalvando(false); }
+  };
 
   const handleAbrirEdicao = (c: ClienteAdminAPI) => {
     setEditandoCliente(c);
@@ -217,6 +243,28 @@ export default function AdminClientes() {
 
       <ImportarClientesDialog open={importAberto} onClose={() => setImportAberto(false)} onDone={carregar} />
       <ImportarVitalgestorDialog open={vitalAberto} onClose={() => setVitalAberto(false)} onDone={carregar} />
+      <Dialog open={contratoAberto} onOpenChange={setContratoAberto}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Atribuir contrato</DialogTitle>
+            <DialogDescription>
+              Os {totalFiltrado} beneficiários da lista filtrada serão vinculados ao contrato escolhido (substitui o contrato atual).
+              Dica: busque pelo código da empresa (ex.: 0H4C9) para filtrar.
+            </DialogDescription>
+          </DialogHeader>
+          <Select value={contratoSel} onValueChange={setContratoSel}>
+            <SelectTrigger data-testid="select-contrato-lote"><SelectValue placeholder="Escolha o contrato" /></SelectTrigger>
+            <SelectContent>{contratosOpc.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
+          </Select>
+          {contratoMsg && <p className="text-sm text-red-600">{contratoMsg}</p>}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setContratoAberto(false)}>Cancelar</Button>
+            <Button disabled={!contratoSel || contratoSalvando} onClick={() => void atribuirContrato()} data-testid="btn-confirmar-contrato-lote">
+              {contratoSalvando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Atribuir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <CadastroCliente open={novoAberto} onClose={() => setNovoAberto(false)} onCreated={carregar} />
 
       <Card className="p-4">
@@ -281,6 +329,10 @@ export default function AdminClientes() {
           <span className="text-blue-600 font-medium">{titularesFiltrados} titular{titularesFiltrados !== 1 ? "es" : ""}</span>
           <span>•</span>
           <span className="text-purple-600 font-medium">{dependentesFiltrados} dependente{dependentesFiltrados !== 1 ? "s" : ""}</span>
+          <Button variant="outline" size="sm" className="ml-auto h-7 gap-1 text-xs" disabled={!totalFiltrado}
+            onClick={() => void abrirAtribuirContrato()} data-testid="btn-atribuir-contrato">
+            <FileSignature className="h-3 w-3" /> Atribuir contrato aos {totalFiltrado} filtrados
+          </Button>
         </div>
       </Card>
 
