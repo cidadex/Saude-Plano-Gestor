@@ -94,7 +94,7 @@ export default function GerenteDashboard() {
 
       {permissoes.includes("ver_financeiro") && (
         <div>
-          <h2 className="text-base font-semibold text-foreground mb-3">Boletos — Abril 2026</h2>
+          <h2 className="text-base font-semibold text-foreground mb-3">Boletos</h2>
           <div className="grid grid-cols-3 gap-4">
             <StatCard label="Em Dia" value={s?.boletosEmDia ?? 0} icon={CheckCircle2} color="bg-emerald-500" />
             <StatCard label="A Vencer" value={s?.boletosAVencer ?? 0} icon={Clock} color="bg-amber-500" />

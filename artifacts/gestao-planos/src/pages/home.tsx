@@ -1,6 +1,5 @@
 import { Link } from "wouter";
 import { Shield, User, HeartPulse, ArrowRight, TrendingUp, Users, FileCheck } from "lucide-react";
-import { vendedorAtual } from "@/data/vendedores";
 
 export default function Home() {
   return (
@@ -119,8 +118,7 @@ export default function Home() {
                 <div className="mb-6">
                   <h2 className="text-2xl font-bold text-white mb-2">Vendedor</h2>
                   <p className="text-slate-400 text-sm leading-relaxed">
-                    Painel pessoal de{" "}
-                    <span className="text-emerald-400 font-medium">{vendedorAtual.nome}</span>.
+                    Painel pessoal do vendedor.
                     Propostas, boletos, comissões e sua carteira de clientes.
                   </p>
                 </div>

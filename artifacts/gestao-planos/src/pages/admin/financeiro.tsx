@@ -4,9 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { boletos } from "@/data/boletos";
-import { clientesAtivos } from "@/data/clientes";
-import { vendedores } from "@/data/vendedores";
+import { useAdminDados, num } from "@/hooks/useAdminDados";
 import { formatMoney, getStatusBadgeVariant } from "@/lib/format";
 import {
   CheckCircle2, AlertCircle, Clock, DollarSign, Banknote,
@@ -19,21 +17,35 @@ import {
 import { WhatsappModal } from "@/components/whatsapp-modal";
 import type { Boleto } from "@/data/types";
 
-const MES_ATUAL = '04/2026';
-const MES_LABEL: Record<string, string> = {
-  '04/2026': 'Abril 2026',
-  '03/2026': 'Março 2026',
-};
+const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const mesLabel = (m: string) => { const [mm, aa] = m.split("/"); return MESES[Number(mm) - 1] ? `${MESES[Number(mm) - 1]} ${aa}` : m; };
+const fmtData = (d: string) => (d ? d.slice(0, 10).split("-").reverse().join("/") : "");
+const hoje = new Date();
+const MES_ATUAL = `${String(hoje.getMonth() + 1).padStart(2, "0")}/${hoje.getFullYear()}`;
 
 export default function AdminFinanceiro() {
+  const { data: dados, isLoading, error } = useAdminDados();
+  const clientes = dados?.clientes ?? [];
+  const boletos: Boleto[] = useMemo(() => (dados?.boletos ?? []).map(b => ({
+    id: b.id,
+    clienteNome: b.clienteNome,
+    clienteCpf: b.clienteCpf,
+    vendedor: b.vendedorNome ?? "Sem vendedor",
+    plano: b.planoCode ?? "-",
+    valor: num(b.valor),
+    vencimento: fmtData(b.vencimento),
+    mesReferencia: b.mesReferencia,
+    status: b.status as Boleto["status"],
+    dataEmissao: "",
+  })), [dados]);
   const [mesFilter, setMesFilter] = useState(MES_ATUAL);
+  const mesesDisp = Array.from(new Set([MES_ATUAL, ...boletos.map(b => b.mesReferencia)]));
   const [vendedorFilter, setVendedorFilter] = useState('TODOS');
   const [statusFilter, setStatusFilter] = useState('TODOS');
   const [whatsappAberto, setWhatsappAberto] = useState(false);
   const [boletoSel, setBoletoSel] = useState<Boleto | null>(null);
 
-  const meses = Array.from(new Set(boletos.map(b => b.mesReferencia)));
-  const listaVendedores = Array.from(new Set(boletos.map(b => b.vendedor)));
+    const listaVendedores = Array.from(new Set(boletos.map(b => b.vendedor)));
 
   const boletosFiltrados = useMemo(() =>
     boletos.filter(b => {
@@ -41,10 +53,10 @@ export default function AdminFinanceiro() {
       const matchVendedor = vendedorFilter === 'TODOS' || b.vendedor === vendedorFilter;
       const matchStatus = statusFilter === 'TODOS' || b.status === statusFilter;
       return matchMes && matchVendedor && matchStatus;
-    }), [mesFilter, vendedorFilter, statusFilter]);
+    }), [boletos, mesFilter, vendedorFilter, statusFilter]);
 
   const boletosMes = boletos.filter(b => b.mesReferencia === mesFilter);
-  const totalReceita = clientesAtivos.reduce((a, c) => a + c.valor, 0);
+  const totalReceita = clientes.filter(c => c.status === "ATIVO").reduce((a, c) => a + num(c.valorMensal), 0);
   const totalPago = boletosMes.filter(b => b.status === 'PAGO').reduce((a, b) => a + b.valor, 0);
   const totalAtraso = boletosMes.filter(b => b.status === 'VENCIDO').reduce((a, b) => a + b.valor, 0);
   const totalPendente = boletosMes.filter(b => b.status === 'PENDENTE').reduce((a, b) => a + b.valor, 0);
@@ -64,8 +76,10 @@ export default function AdminFinanceiro() {
     };
   }).filter(v => v.Pago + v.Pendente + v.Vencido > 0).sort((a, b) => (b.Pago + b.Pendente + b.Vencido) - (a.Pago + a.Pendente + a.Vencido));
 
-  const getTelefone = (cpf: string) =>
-    clientesAtivos.find(c => c.cpf === cpf)?.telefone ?? '';
+  const getTelefone = (cpf: string) => clientes.find(c => c.cpf === cpf)?.telefone ?? '';
+
+  if (isLoading) return <p className="p-6 text-muted-foreground">Carregando financeiro...</p>;
+  if (error) return <p className="p-6 text-red-600">Erro ao carregar os dados financeiros.</p>;
 
   return (
     <div className="space-y-6">
@@ -124,7 +138,7 @@ export default function AdminFinanceiro() {
           <CardHeader className="border-b pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-primary" />
-              Cobrança por Vendedor — {MES_LABEL[mesFilter] || mesFilter}
+              Cobrança por Vendedor — {mesLabel(mesFilter)}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4 h-[220px]">
@@ -156,7 +170,7 @@ export default function AdminFinanceiro() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {meses.map(m => <SelectItem key={m} value={m}>{MES_LABEL[m] || m}</SelectItem>)}
+                  {mesesDisp.map(m => <SelectItem key={m} value={m}>{mesLabel(m)}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={vendedorFilter} onValueChange={setVendedorFilter}>

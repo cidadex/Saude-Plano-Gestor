@@ -3,12 +3,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { clientesCancelados, getTotalDevedores } from "@/data/cancelados";
+import { useAdminDados, num } from "@/hooks/useAdminDados";
 import { formatMoney } from "@/lib/format";
 import { Search, AlertTriangle, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function AdminCancelados() {
+  const { data: dados, isLoading, error } = useAdminDados();
+  const clientesCancelados = useMemo(() => {
+    const debitos = new Map<string, number>();
+    (dados?.boletos ?? []).filter(b => b.status === "VENCIDO").forEach(b => debitos.set(b.clienteId, (debitos.get(b.clienteId) ?? 0) + num(b.valor)));
+    return (dados?.clientes ?? []).filter(c => c.status === "CANCELADO").map(c => ({
+      id: c.id,
+      nome: c.nome,
+      cpf: c.cpf,
+      responsavel: c.responsavelNome ?? c.vendedorNome ?? "-",
+      plano: c.planoCode ?? "",
+      dataCancelamento: "",
+      debitoTotal: debitos.get(c.id) ?? 0,
+    }));
+  }, [dados]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("TODOS");
 
@@ -21,9 +35,12 @@ export default function AdminCancelados() {
       if (filter === "SEM_DEBITO") return matchSearch && !hasDebito;
       return matchSearch;
     });
-  }, [search, filter]);
+  }, [clientesCancelados, search, filter]);
 
-  const totalDevedores = getTotalDevedores();
+  const totalDevedores = clientesCancelados.reduce((a, c) => a + c.debitoTotal, 0);
+
+  if (isLoading) return <p className="p-6 text-muted-foreground">Carregando...</p>;
+  if (error) return <p className="p-6 text-red-600">Erro ao carregar os clientes cancelados.</p>;
 
   return (
     <div className="space-y-6">

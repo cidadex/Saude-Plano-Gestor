@@ -977,6 +977,7 @@ router.get("/admin/clientes", async (_req, res) => {
         responsavelNome: responsaveisFinanceirosTable.nome,
         responsavelTipo: responsaveisFinanceirosTable.tipo,
         responsavelCpfCnpj: responsaveisFinanceirosTable.cpfCnpj,
+        qtdDependentes: sql<number>`(select count(*)::int from dependentes d where d.cliente_id = ${clientesTable.id})`,
       })
       .from(clientesTable)
       .leftJoin(vendedoresTable, eq(vendedoresTable.id, clientesTable.vendedorId))

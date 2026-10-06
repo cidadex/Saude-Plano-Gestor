@@ -3,11 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { clientesAtivos } from "@/data/clientes";
-import { clientesCancelados } from "@/data/cancelados";
-import { vendedores } from "@/data/vendedores";
-import { comissoes } from "@/data/comissoes";
-import { boletos } from "@/data/boletos";
+import { useAdminDados, num } from "@/hooks/useAdminDados";
 import { formatMoney } from "@/lib/format";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
@@ -17,34 +13,38 @@ import { BarChart3, Users, TrendingDown, DollarSign, Award, AlertTriangle } from
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'];
 
+const MES_ATUAL = (() => { const h = new Date(); return `${String(h.getMonth() + 1).padStart(2, "0")}/${h.getFullYear()}`; })();
+const fmtData = (d: string) => (d ? d.slice(0, 10).split("-").reverse().join("/") : "");
+
 export default function AdminRelatorios() {
+  const { data: dados, isLoading, error } = useAdminDados();
+  const ativosLista = useMemo(() => (dados?.clientes ?? []).filter(c => c.status === "ATIVO"), [dados]);
+  const canceladosLista = useMemo(() => (dados?.clientes ?? []).filter(c => c.status === "CANCELADO"), [dados]);
+
   /* ── Por Vendedor ─── */
   const porVendedor = useMemo(() => {
-    return vendedores.map(v => {
-      const ativos = clientesAtivos.filter(c =>
-        c.representante.toUpperCase() === v.nome.toUpperCase() ||
-        c.responsavel.toUpperCase() === v.nome.toUpperCase()
-      );
-      const titulares = ativos.filter(c => c.tipo === 'TITULAR').length;
-      const dependentes = ativos.filter(c => c.tipo === 'DEPENDENTE').length;
-      const receita = ativos.reduce((a, c) => a + c.valor, 0);
-      const saldo = ativos.reduce((a, c) => a + c.saldo, 0);
-      const comissaoPend = comissoes
-        .filter(co => co.vendedor.toUpperCase() === v.nome.toUpperCase() && co.status === 'PENDENTE')
-        .reduce((a, c) => a + c.valor, 0);
+    return (dados?.vendedores ?? []).map(v => {
+      const meus = ativosLista.filter(c => c.vendedorId === v.id);
+      const titulares = meus.length;
+      const dependentes = meus.reduce((a, c) => a + (c.qtdDependentes ?? 0), 0);
+      const receita = meus.reduce((a, c) => a + num(c.valorMensal), 0);
+      const saldo = meus.reduce((a, c) => a + num(c.saldo), 0);
+      const comissaoPend = (dados?.comissoes ?? [])
+        .filter(co => co.vendedorId === v.id && co.status === "PENDENTE")
+        .reduce((a, c) => a + num(c.valor), 0);
       return {
         nome: v.nome,
-        ativos: ativos.length,
+        ativos: titulares + dependentes,
         titulares,
         dependentes,
-        cancelados: v.totalCancelados,
+        cancelados: canceladosLista.filter(c => c.vendedorId === v.id).length,
         receita,
         saldo,
         comissaoPend,
         comissionado: v.comissionado,
       };
     }).sort((a, b) => b.receita - a.receita);
-  }, []);
+  }, [dados, ativosLista, canceladosLista]);
 
   const chartVendedor = porVendedor.map(v => ({
     name: v.nome,
@@ -55,42 +55,59 @@ export default function AdminRelatorios() {
   /* ── Por Plano ─── */
   const porPlano = useMemo(() => {
     const mapa: Record<string, { titulares: number; dependentes: number; receita: number }> = {};
-    clientesAtivos.forEach(c => {
-      if (!mapa[c.plano]) mapa[c.plano] = { titulares: 0, dependentes: 0, receita: 0 };
-      if (c.tipo === 'TITULAR') mapa[c.plano].titulares++;
-      else mapa[c.plano].dependentes++;
-      mapa[c.plano].receita += c.valor;
+    ativosLista.forEach(c => {
+      const plano = c.planoCode ?? "Sem plano";
+      if (!mapa[plano]) mapa[plano] = { titulares: 0, dependentes: 0, receita: 0 };
+      mapa[plano].titulares++;
+      mapa[plano].dependentes += c.qtdDependentes ?? 0;
+      mapa[plano].receita += num(c.valorMensal);
     });
-    const total = clientesAtivos.reduce((a, c) => a + c.valor, 0);
+    const total = ativosLista.reduce((a, c) => a + num(c.valorMensal), 0);
     return Object.entries(mapa).map(([plano, d]) => ({
       plano,
       ...d,
       total: d.titulares + d.dependentes,
-      pct: total > 0 ? ((d.receita / total) * 100).toFixed(1) : '0',
+      pct: total > 0 ? ((d.receita / total) * 100).toFixed(1) : "0",
     })).sort((a, b) => b.receita - a.receita);
-  }, []);
+  }, [ativosLista]);
 
   const pieData = porPlano.map(p => ({ name: `Plano ${p.plano}`, value: p.total }));
 
   /* ── Cancelamentos ─── */
+  const debitosPorCliente = useMemo(() => {
+    const m = new Map<string, number>();
+    (dados?.boletos ?? []).filter(b => b.status === "VENCIDO").forEach(b => m.set(b.clienteId, (m.get(b.clienteId) ?? 0) + num(b.valor)));
+    return m;
+  }, [dados]);
+  const clientesCancelados = useMemo(() => canceladosLista.map(c => ({
+    id: c.id, nome: c.nome, cpf: c.cpf,
+    responsavel: c.responsavelNome ?? c.vendedorNome ?? "",
+    debitoTotal: debitosPorCliente.get(c.id) ?? 0,
+  })), [canceladosLista, debitosPorCliente]);
+
   const canceladosPorVendedor = useMemo(() => {
     const mapa: Record<string, number> = {};
     clientesCancelados.forEach(c => {
-      const v = c.responsavel || 'Sem Resp.';
+      const v = c.responsavel || "Sem Resp.";
       mapa[v] = (mapa[v] || 0) + 1;
     });
     return Object.entries(mapa)
       .map(([nome, total]) => ({ nome, total }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 10);
-  }, []);
+  }, [clientesCancelados]);
 
-  const canceladosComDebito = clientesCancelados.filter(c => c.debitoTotal && c.debitoTotal > 0);
-  const totalDebito = canceladosComDebito.reduce((a, c) => a + (c.debitoTotal || 0), 0);
+  const canceladosComDebito = clientesCancelados.filter(c => c.debitoTotal > 0);
+  const totalDebito = canceladosComDebito.reduce((a, c) => a + c.debitoTotal, 0);
 
   /* ── Inadimplência ─── */
-  const boletosMes = boletos.filter(b => b.mesReferencia === '04/2026');
-  const inadimplentes = boletosMes.filter(b => b.status === 'VENCIDO');
+  const boletosMes = (dados?.boletos ?? [])
+    .filter(b => b.mesReferencia === MES_ATUAL)
+    .map(b => ({ ...b, valor: num(b.valor), vendedor: b.vendedorNome ?? "Sem vendedor", plano: b.planoCode ?? "-", vencimento: fmtData(b.vencimento) }));
+  const inadimplentes = boletosMes.filter(b => b.status === "VENCIDO");
+
+  if (isLoading) return <p className="p-6 text-muted-foreground">Carregando relatórios...</p>;
+  if (error) return <p className="p-6 text-red-600">Erro ao carregar os relatórios.</p>;
 
   return (
     <div className="space-y-6">
@@ -119,7 +136,7 @@ export default function AdminRelatorios() {
         <TabsContent value="vendedor" className="space-y-4">
           <Card>
             <CardHeader className="border-b pb-3">
-              <CardTitle className="text-base">Performance por Vendedor — Abril 2026</CardTitle>
+              <CardTitle className="text-base">Performance por Vendedor</CardTitle>
             </CardHeader>
             <CardContent className="h-[260px] pt-4">
               <ResponsiveContainer width="100%" height="100%">
@@ -344,7 +361,7 @@ export default function AdminRelatorios() {
                 <p className="text-3xl font-bold text-amber-600">
                   {boletosMes.length > 0 ? ((inadimplentes.length / boletosMes.length) * 100).toFixed(0) : 0}%
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">Referência Abr/2026</p>
+                <p className="text-xs text-muted-foreground mt-1">Referência {MES_ATUAL}</p>
               </CardContent>
             </Card>
           </div>
@@ -352,7 +369,7 @@ export default function AdminRelatorios() {
           <Card className="overflow-hidden">
             <CardHeader className="border-b pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-red-500" /> Boletos Vencidos — Abril 2026
+                <AlertTriangle className="h-4 w-4 text-red-500" /> Boletos Vencidos — {MES_ATUAL}
               </CardTitle>
             </CardHeader>
             <Table>
